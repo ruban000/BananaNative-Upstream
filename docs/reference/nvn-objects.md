@@ -469,6 +469,13 @@ Games read this count as a position in their own command memory and size their h
 - **Fix:** general: each queued write counts on its image (`vka_img.rw_pend`). Eviction takes them as holds, and `vka_tex_drop_pool` takes the image's queued writes back first (`rw_cancel_locked`: the entries stay in the queue without an image, which the prepare skips).
 - **Found on:** followed from a double free in `img_destroy` on [The Legend of Zelda: Breath of the Wild](../../dm/games/01007EF00011E000/README.md) on Android, by code reading and a model of the queue; not confirmed on the device.
 
+### Tens of thousands of `WriteTexels` copies in one prepare (Vulkan replay)
+
+- **Symptom:** Android: the picture stops for minutes with the music still playing; the game thread waits for the texture cache's lock, and the replay thread is in `vka_tex_prepare` (Metroid Dread after Game Over → Continue; issue #8).
+- **Cause:** the game redraws its map with one `WriteTexels` per texel (`main+0x160e80`): tens of thousands of disjoint 1x1 region copies queued for one prepare. Each copy was checked for overlap against every copy before it (`reg_write_overlap`, O(n²) with the lock held).
+- **Fix:** general: only the copies since the last barrier can overlap a new one, so a barrier starts the check afresh. Copies of at most 16 texels are kept as texels in a hash set, larger ones in a list scanned exactly (`rw_overlaps` / `rw_note` / `rw_reset` in `vka_tex.c`); the answer is the old check's over those copies. With no memory for the set, a barrier is put instead.
+- **Found on:** [Metroid Dread](../../dm/games/010093801237C000/README.md) (issue #8).
+
 ### Band-granular re-uploads of a tracked texture
 
 - **Symptom:** (Android) a tracked block-linear texture of a few MB or more is deswizzled and copied whole whenever the CPU writes one small block, even one in a neighbouring allocation, so `texture prepare` grows with the texture rather than with the write.
