@@ -117,6 +117,7 @@ run: $(B)/t_language $(B)/t_motion $(B)/t_heap_size $(B)/t_touch $(B)/t_gesture 
 	$(B)/t_android_pwlist
 	$(B)/t_android_fmtlist
 	$(B)/t_android_place
+	$(B)/t_android_holes
 	$(B)/t_android_ovl
 	$(B)/t_android_pace
 	$(B)/t_lse_unaligned
@@ -473,7 +474,7 @@ coverage:
 	LLVM_PROFILE_FILE="$(call cov_profile,$(B)/cov)" $(MAKE) -i B=$(B)/cov SAN="$(COV_FLAGS)" run
 	@$(call cov_export,$(B)/cov)
 # The Android host's pure parts (dm/host/android): resampler, channel map, SPS size, MediaCodec picture layouts; gamepad / touch / sensor mapping
-run: $(B)/t_android_av $(B)/t_android_input $(B)/t_android_shlib $(B)/t_android_spvpatch $(B)/t_android_imgmem $(B)/t_android_zshare $(B)/t_android_texlimit $(B)/t_android_tstick $(B)/t_android_lowram $(B)/t_android_livemap $(B)/t_android_smap $(B)/t_android_mapbudget $(B)/t_android_rsslog $(B)/t_android_hostmem $(B)/t_android_psogate $(B)/t_android_hangparts $(B)/t_android_wbfollow $(B)/t_android_pckeep $(B)/t_android_pwlist $(B)/t_android_fmtlist $(B)/t_android_place $(B)/t_android_ovl $(B)/t_android_pace $(B)/t_lse_unaligned $(B)/t_android_skipwarn $(B)/t_android_gmem $(B)/t_android_fpenv $(B)/t_android_soft $(B)/t_android_qsched $(B)/t_android_poolslot $(B)/t_android_prepass $(B)/t_android_tlsig $(B)/t_android_texown $(B)/t_android_gbar $(B)/t_android_memu $(B)/t_android_auto $(B)/t_android_layerreq $(B)/t_android_driverpath $(B)/t_android_placefail $(B)/t_android_rplist
+run: $(B)/t_android_av $(B)/t_android_input $(B)/t_android_shlib $(B)/t_android_spvpatch $(B)/t_android_imgmem $(B)/t_android_zshare $(B)/t_android_texlimit $(B)/t_android_tstick $(B)/t_android_lowram $(B)/t_android_livemap $(B)/t_android_smap $(B)/t_android_mapbudget $(B)/t_android_rsslog $(B)/t_android_hostmem $(B)/t_android_psogate $(B)/t_android_hangparts $(B)/t_android_wbfollow $(B)/t_android_pckeep $(B)/t_android_pwlist $(B)/t_android_fmtlist $(B)/t_android_place $(B)/t_android_ovl $(B)/t_android_pace $(B)/t_lse_unaligned $(B)/t_android_skipwarn $(B)/t_android_gmem $(B)/t_android_fpenv $(B)/t_android_soft $(B)/t_android_qsched $(B)/t_android_poolslot $(B)/t_android_prepass $(B)/t_android_tlsig $(B)/t_android_texown $(B)/t_android_gbar $(B)/t_android_memu $(B)/t_android_auto $(B)/t_android_layerreq $(B)/t_android_driverpath $(B)/t_android_placefail $(B)/t_android_rplist $(B)/t_android_holes
 $(B)/t_android_av: t_android_av.c ../android/av_android.h | $(B)
 	$(CLANG) -O1 -g -Wall -Werror -Wno-unused-function -fsanitize=address,undefined -I.. $(WEAK_HOST) -o $@ t_android_av.c
 $(B)/t_android_input: t_android_input.c ../android/input_map.c ../android/input_map.h ../../gfx/vk_android/vka_present_fit.h ../motion_fusion.h ../dm_input.h | $(B)
@@ -560,6 +561,13 @@ $(B)/t_android_fmtlist: t_android_fmtlist.c $(VKA)/vka_fmtlist.h | $(B)
 # Large memory pools placed by parts: the range arithmetic (vka_place.h; vka_mem.c mtl_pool_need)
 $(B)/t_android_place: t_android_place.c $(VKA)/vka_place.h | $(B)
 	$(CLANG) -O1 -g -Wall -Werror -Wno-unused-function -fsanitize=address,undefined -I.. -o $@ t_android_place.c
+# Guest memory given back inside a placed segment: the table of holes and the parts of a segment that stay placed (vka_holes.h; vka_mem.c vka_mem_release). Built with
+# run (and run there); android-holes builds and runs it alone
+$(B)/t_android_holes: t_android_holes.c $(VKA)/vka_holes.h | $(B)
+	$(CLANG) -O1 -g -Wall -Werror -Wno-unused-function -fsanitize=address,undefined -I.. -o $@ t_android_holes.c
+.PHONY: android-holes
+android-holes: $(B)/t_android_holes
+	$(B)/t_android_holes
 # File-backed pools (vka_fileback.h; vka_mem.c "File-backed pools", DM_MEM_FILEBACK). Linux only (mremap, O_TMPFILE, SEEK_DATA, fallocate; the file in TMPDIR, made and
 # removed by the test): make fileback, in `run` on a Linux host. From Anka Native (MIT, EddizEge; NOTICE.md)
 .PHONY: fileback

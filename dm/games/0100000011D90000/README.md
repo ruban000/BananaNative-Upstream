@@ -60,7 +60,7 @@ Build with `scripts/build_ipa_from_nsp.py <dump folder> --platform mac`; its fin
 - [Zero initialization of depth and stencil textures](../../../docs/reference/rendering.md#new-textures-start-as-zero).
 - [AudioOut stop releases pending buffers](../../../docs/reference/audio.md#stopping-an-audioout-releases-its-pending-buffers), reported on 1.0.0 in PR #190.
 - [Unity's integer target frame rate](../../../docs/reference/frame-rate.md#unitys-integer-target-frame-rate).
-- [Unity's vSyncCount and targetFrameRate, found through the internal-call table](../../../docs/reference/frame-rate.md#unitys-vsynccount-and-targetframerate-found-through-the-internal-call-table) (upstream on the Mac; on Android the build row stays, and the found field is written once with it).
+- Missing models on Android after memory was given back inside a joined placed segment: [Guest memory given back inside a placed segment (Android)](../../../docs/reference/memory.md#guest-memory-given-back-inside-a-placed-segment-android).
 
 ## Open
 

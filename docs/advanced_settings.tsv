@@ -707,6 +707,7 @@ DM_VK_RC_QUERY_MEM	developer	Diagnostics			text			both
 DM_VK_RD_SPLIT	developer	Graphics			text			both							
 DM_VK_RD_TOUCH	developer	Graphics			text			both							
 DM_VK_READTEXELS	developer	Graphics			text			both							
+DM_VK_RELEASE_PART	developer	Graphics			text			both							
 DM_VK_REMAP_SPV	internal	Diagnostics			text			both						test harness	
 DM_VK_REPLAY_NICE	developer	Graphics			text			both							
 DM_VK_ROWS	developer	Graphics			text			both							
