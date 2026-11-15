@@ -2035,7 +2035,12 @@ void vka_tex_drop_pool(const void *pool) {
     uint64_t bytes_dropped = 0;
     for (int i = 0; i < g_nlive; ) {
         vka_img *im = g_live[i];
-        if (im->pool == pool) {
+        // Not an image a holder has (the present's and frame generation's rings keep the last window textures for three presents; a texel read, a capture): the count
+        // forced below freed it at its fence while the holder still had the pointer, and the holder's vka_tex_drop then ran on freed memory (or on the image that had
+        // taken its memory: one reference too few there, a second img_destroy later). A game that makes its window textures and their pool again, as some do at a change
+        // of console mode, finalizes the pool with those holds standing. Skipped, it is an image of a finalized pool like any other (img_pool_dead): it goes with its
+        // last reference, or is evicted once nothing holds it
+        if (im->pool == pool && !im->holds) {
             bytes_dropped += im->m.size;
             ndrop++;
             map_del_im(im);

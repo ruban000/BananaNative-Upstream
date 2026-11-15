@@ -141,6 +141,13 @@ A game may tell NVN objects apart by their bytes, without an NVN call. A host re
 - **Fix:** every game (`vka_tex.c` `vka_tex_get`). An image of a finalized pool is taken over only when the GPU drew it (`gpu_owned`: the GPU draws it again, and a large depth buffer is still not made twice); a texture over storage the CPU fills gets an image of its own, whose first use reads the new storage (`first_mode`) and protects its pages. A taken-over image also takes the new pool's generation when the pool object is the same, so it is not judged dead again at the next check.
 - **Found on:** [The Legend of Zelda: Ocarina of Time](../../dm/games/0400486024DEC000/README.md#found-on-this-game): found by reading the code while porting upstream's terrain fixes (the symptom class of upstream's [storage beside storage the GPU writes](https://github.com/seedds/nxnative/blob/main/docs/reference/nvn-objects.md#uncompressed-storage-beside-storage-the-gpu-writes), nxnative e2b76d4e); pending a phone check.
 
+### An image a holder has, freed with its finalized pool (Vulkan replay)
+
+- **Symptom:** Android: an abort in `img_destroy` (a second free) or a crash in `vka_tex_drop` some frames after a game finalizes the memory pool of its window textures (as some do when the console mode changes and they make those textures again).
+- **Cause:** `vka_tex_drop_pool` gives up every image of the finalized pool whatever its references (`refs` forced to 1). An image a holder outside the recording thread has (`holds`: the present's and frame generation's rings keep the last window textures for three presents, a texel read, a capture) was freed at its fence while the holder still had the pointer; the holder's `vka_tex_drop` then ran on freed memory, or on the image that had taken that memory (one reference too few there, a second `img_destroy` later).
+- **Fix:** general: `vka_tex_drop_pool` leaves an image with `holds` alone. It is then an image of a finalized pool like any other (`img_pool_dead`): it goes with its last reference, or is evicted once nothing holds it.
+- **Found on:** code reading while following a double free in `img_destroy` on [The Legend of Zelda: Breath of the Wild](../../dm/games/01007EF00011E000/README.md) on Android; not reproduced on its own.
+
 ### GPU-written sparse textures as sparse residency images on the Vulkan replay
 
 - **Symptom:** Android: right after the first frames, `[vk] memory:` lines climb by 171-342 MiB at a time (`large image: texture serial … 16384x16384 … flags 0x28 … pool flags 0x2a1`, `DM_VK_BIGIMG_MB`) and the run stops for low memory, or the low-memory killer ends it.
