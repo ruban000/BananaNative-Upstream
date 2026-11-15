@@ -491,8 +491,8 @@ static void rt_range(const vka_img *im, const view_t *v, int has_v, uint32_t *lv
 // a BC texture through a view in an uncompressed format of the block's size (RGBA16UI for BC4's 8-byte blocks), one texel per 4x4 block: on the Switch the view's texels are
 // the texture's blocks. Vulkan attaches no compressed image, so such a pass draws into an uncompressed shadow of blocks x blocks in the view's format (a texture of the
 // replay's own, one per format, size and layer count), filled from the texture's level (or its layers, or a 3D texture's depth planes) by a copy before the pass and copied
-// back after it (vkCmdCopyImage between size-compatible formats: a texel of one is a block of the other). Only levels whose size is a whole number of blocks; others are
-// not drawn into, as before, logged. DM_VK_BC_RT=0: none (the earlier behaviour)
+// back after it (vkCmdCopyImage between size-compatible formats: a texel of one is a block of the other). A level smaller than whole blocks takes its blocks rounded up
+// (bcrt_attach). DM_VK_BC_RT=0: none (the earlier behaviour)
 static int bc_fmt(const vka_fmt *f) { return f->bw > 1 || f->bh > 1; }   // (vka_tex.c compressed)
 static struct { int fmt; uint32_t w, h, nl; tex_t t; } g_bcsh[16]; static int g_nbcsh;   // (the recording thread only)
 static vka_img *bcrt_shadow(int fmt, uint32_t w, uint32_t h, uint32_t nl) {
@@ -521,8 +521,10 @@ static VkImageView bcrt_attach(const p_set_rt *rt, int i, vka_img *im, const vka
     uint32_t lv, l0, nl; rt_range(im, &rt->cview[i], rt->has_cview[i], &lv, &l0, &nl);
     if (lv >= im->levels || !nl || R.nbc == 8) return VK_NULL_HANDLE;
     uint32_t mw = im->w >> lv ? im->w >> lv : 1, mh = im->h >> lv ? im->h >> lv : 1;
-    if (mw % im->f.bw || mh % im->f.bh) { VRED_ONCE("block-compressed render target %ux%u (level %u) is not a whole number of blocks: not drawn into", mw, mh, lv); return VK_NULL_HANDLE; }
-    uint32_t bw = mw / im->f.bw, bh = mh / im->f.bh;
+    // A level that is not a whole number of blocks (a mip chain's tail: 2x2, 1x1) still takes whole blocks in a compressed texture's storage, on the Switch as on other
+    // GPUs, so its block count is rounded up and the copies cover whole blocks. Refusing those levels left Mario Kart 8 Deluxe's regenerated mip chains unwritten below
+    // 4x4, and its attract races went almost all black for about 20 s
+    uint32_t bw = (mw + im->f.bw - 1) / im->f.bw, bh = (mh + im->f.bh - 1) / im->f.bh;
     vka_img *sh = bcrt_shadow(rt->cview[i].format, bw, bh, nl);
     if (!sh || !(sh->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) { VRED_ONCE("block-compressed render target: no shadow image of NVN format %#x: not drawn into", rt->cview[i].format); return VK_NULL_HANDLE; }
     vka_tex_own(im, g_cb); vka_tex_own(sh, g_cb);

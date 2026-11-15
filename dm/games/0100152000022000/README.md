@@ -79,6 +79,7 @@ General host changes first needed here; each applies to every game:
 - **The zero cube for a 2D array of fewer than six layers in a cube slot** (`tex_fit`): [A 2D texture in a cube slot binds the zero cube](../../../docs/reference/rendering.md#a-2d-texture-in-a-cube-slot-binds-the-zero-cube).
 - **Frame generation on Android** (measured on the title screen, 2x at a 30 fps limit; resolved): [Frame generation's chain larger than the picture on screen](../../../docs/reference/frame-rate.md#frame-generations-chain-larger-than-the-picture-on-screen), [Frame generation's waits after a GPU hang](../../../docs/reference/frame-rate.md#frame-generations-waits-after-a-gpu-hang).
 - **A NULL texture registration on Android** (title screen; `treg`): [A texture ID registered with no texture on the Vulkan replay (Android)](../../../docs/reference/rendering.md#a-texture-id-registered-with-no-texture-on-the-vulkan-replay-android).
+- **Black attract races on Android** (issue #6: compressed mip tails left undrawn, and the HDR scene's image gone with its finalized texture object): [Block-compressed render-target levels smaller than a block on the Vulkan replay (Android)](../../../docs/reference/rendering.md#block-compressed-render-target-levels-smaller-than-a-block-on-the-vulkan-replay-android), [A GPU-drawn image gone with its finalized texture object (Android)](../../../docs/reference/rendering.md#a-gpu-drawn-image-gone-with-its-finalized-texture-object-android).
 
 ## Open
 

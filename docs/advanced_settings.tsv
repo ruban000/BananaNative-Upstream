@@ -748,6 +748,7 @@ DM_VK_SYNCLOG	developer	Diagnostics			text			both
 DM_VK_TBUF	developer	Graphics			text			both							
 DM_VK_TEST_HANG	developer	Diagnostics			text			both							
 DM_VK_TEXU_ELEM	developer	Diagnostics			text			both							
+DM_VK_TEX_LINGER	developer	Graphics			text			both							
 DM_VK_TEX_MEMO	developer	Memory			text			both							
 DM_VK_TEX_PEEK	developer	Diagnostics			text			both							
 DM_VK_TEX_PEEK_FROM	developer	Diagnostics			text			both							

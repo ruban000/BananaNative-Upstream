@@ -300,6 +300,7 @@ typedef struct vka_img {
     int refs, inited, gpu_owned, cpu_dirty;
     int is_video;
     uint64_t last_frame;
+    uint64_t linger;         // a GPU-drawn image whose last texture object was finalized: the frame that happened in + 1, kept for one of the same storage and shape (vka_tex.c linger_keep); 0 = not lingering
     uint64_t wr_frame, wr_prev;   // the frame of its last GPU write, and the frame of the write before that frame (vka_img_written): vka_draw.c pass_redrawn
     uint64_t pool_frame;     // the last prune that found a live texture pool slot naming it (vka_tex_prune_locked): shaders may read it through the pool, so it is in use
     uint64_t last_fence;

@@ -253,11 +253,14 @@ static inline void im_unhold_locked(vka_img *im) {
 // The recording thread's memo of texture ID -> view (vka_tex_id_view_rec) and sampler ID -> sampler (vka_samp_id_rec): an entry holds while the ID was not registered
 // again (g_tver / g_sver, per ID) and no texture mapping was dropped or image let go since (g_tgen). It saves the table lock and the lookups 3-4 times a texture binding
 static vka_img *g_big[64]; static int g_nbig;   // large images (DM_VK_BIGIMG_MB), for the storage overlap check (big_note)
+static vka_img *g_linger[32]; static int g_nlinger;   // GPU-drawn images kept past their last texture object (linger_keep below), under g_tmu
 static vka_img *g_lrz_prev;   // the depth image of the last pass that had one (vka_lrz_touch), under g_tmu
+static void linger_prune_locked(void); static void linger_take(vka_img *im);
 static void unref_locked(vka_img *im) {
     atomic_fetch_add_explicit(&g_tgen, 1, memory_order_release);
     if (--im->refs) return;
     if (g_lrz_prev == im) g_lrz_prev = NULL;   // (vka_lrz_touch)
+    if (im->linger) { for (int i = 0; i < g_nlinger; i++) if (g_linger[i] == im) { g_linger[i] = g_linger[--g_nlinger]; break; } im->linger = 0; }   // (a lingering image that goes otherwise)
     map_del_im(im);
     if (im->par) {   // a level child: destroyed after its last use, then its reference on the parent let go (the parent's image outlives the child's views' use)
         vka_img *p = im->par; uint64_t f = im->last_fence ? im->last_fence : (vka_fence_last() + 1);
@@ -1965,7 +1968,7 @@ vka_img *vka_tex_get(const tex_t *t, VkCommandBuffer cb) {
         // and its pages were never protected for that image, so its tracking would not see the CPU's writes there and it kept the old pool's texels (tiles of the scene
         // before; docs/reference/nvn-objects.md "An image of a finalized pool taken over with its old content")
         int lk; for (vka_img *o = t->mem ? live_first(t->mem, &lk) : NULL; o && !im; o = live_next(o, t->mem, &lk)) if (same_shape(o, t, &f, 1) && !(o->base && sparse_gpu(t, &f)) && (!img_pool_dead(o) || o->gpu_owned)) {
-            im = o; im->refs++;
+            im = o; if (im->linger) linger_take(im); else im->refs++;   // (a lingering image's reference becomes this texture's: linger_keep)
             int revived = im->pdead;
             if (revived) {
                 im->pdead = 0; im->track = (im->mode == ST_TRACK);
@@ -1980,6 +1983,7 @@ vka_img *vka_tex_get(const tex_t *t, VkCommandBuffer cb) {
         uint64_t t_new = 0;
         if (!im) {
             t_new = now_ns();
+            linger_prune_locked();   // lingering images past their frames go (linger_keep)
             vka_tex_prune_locked();
             mode = first_mode(t, &f, cpuw_take(t->serial, 0));
             soft = !base && soft_want(t, &f, mode);
@@ -2229,6 +2233,32 @@ static int tex_obj_holds(uintptr_t obj, uint64_t serial) {   // read through the
     tex_t seen; dm_guest_read_mapped(&seen, obj, sizeof seen);
     return seen.magic == MAGIC('T', 'E', 'X', 0) && seen.serial == serial;
 }
+// A GPU-drawn image outlives its last texture object for LINGER_FRAMES frames. Mario Kart 8 Deluxe finalizes and initializes again the texture objects of its frame's
+// render targets (its HDR scene, B10G11R11 1920x1080, shares storage with an R8 target of the same size), and the HDR scene's image went with its object: the next
+// object over that storage got a new, empty image, and when that came between the scene's draws and the tone map's read the whole lit scene came out black (the attract
+// races of issue #6; water and particles, drawn later, were still there). On the Switch the storage keeps its bytes. A lingering image stays in the live list, so a texture
+// of the same storage and shape takes it over (vka_tex_get's same_shape scan) with the lingering reference; one not taken over within the frames, or past LINGER_MAX
+// lingering, goes. DM_VK_TEX_LINGER=0 (restart): an image goes with its last texture object, as before
+enum { LINGER_MAX = 32, LINGER_FRAMES = 2 };   // (g_linger: above unref_locked)
+static void linger_drop_at(int i) { vka_img *im = g_linger[i]; g_linger[i] = g_linger[--g_nlinger]; im->linger = 0; unref_locked(im); }
+static void linger_prune_locked(void) {
+    uint64_t f = vka_frame();
+    for (int i = 0; i < g_nlinger; ) if (f > g_linger[i]->linger + LINGER_FRAMES) linger_drop_at(i); else i++;
+}
+static int linger_keep(vka_img *im, const tex_t *t) {   // the texture object's reference, kept: 1 (caller holds g_tmu)
+    static int on = -1; if (on < 0) on = VKA_ENV("DM_VK_TEX_LINGER", 1);
+    if (!on || !im || !t->mem || !im->gpu_owned || im->par || im->refs != 1 || im->linger) return 0;
+    linger_prune_locked();
+    if (g_nlinger == LINGER_MAX) { int o = 0; for (int i = 1; i < g_nlinger; i++) if (g_linger[i]->linger < g_linger[o]->linger) o = i; linger_drop_at(o); }
+    im->linger = vka_frame() + 1;   // (+1: never 0)
+    g_linger[g_nlinger++] = im;
+    atomic_fetch_add_explicit(&g_tgen, 1, memory_order_release);   // (the recording thread's memo: its texture is gone, as unref_locked says)
+    return 1;
+}
+static void linger_take(vka_img *im) {   // im taken over by a texture: the lingering reference becomes that texture's
+    for (int i = 0; i < g_nlinger; i++) if (g_linger[i] == im) { g_linger[i] = g_linger[--g_nlinger]; break; }
+    im->linger = 0;
+}
 void mtl_tex_init(const tex_t *t) { if (!t || !t->serial) return; pthread_mutex_lock(&g_tmu); vto_own(&g_tex_own, t->serial, t); pthread_mutex_unlock(&g_tmu); }
 void mtl_tex_release(tex_t *t) {
     pthread_mutex_lock(&g_tmu);
@@ -2240,7 +2270,7 @@ void mtl_tex_release(tex_t *t) {
     smap_ent *e = map_get(t->serial); vka_img *im = e ? e->im : NULL;
     if (e) map_del(t->serial);
     cpuw_take(t->serial, 0);
-    if (im) unref_locked(im);
+    if (im && !linger_keep(im, t)) unref_locked(im);   // a GPU-drawn image lingers (linger_keep)
     pthread_mutex_unlock(&g_tmu);
 }
 // Linear textures the GPU wrote in this submission. Metal makes a linear texture on the pool buffer, so what the GPU renders there is in guest memory for the CPU to read
