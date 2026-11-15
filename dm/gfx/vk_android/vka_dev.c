@@ -217,6 +217,9 @@ static int init_once(void) {
     const char *x_cal = has_ext(de, nde, VK_KHR_CALIBRATED_TIMESTAMPS_EXTENSION_NAME) ? VK_KHR_CALIBRATED_TIMESTAMPS_EXTENSION_NAME
                       : has_ext(de, nde, VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME) ? VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME : NULL;
     if (x_cal) { dext[ndext++] = x_cal; V.cal_ts = 1; }
+    // VK_EXT_image_2d_view_of_3d: a sampled or storage 2D view of one depth slice of a 3D image (NVN's TextureView of a 3D texture overridden to a 2D target; vka_tex.c view_of)
+    int x_2dv3 = has_ext(de, nde, VK_EXT_IMAGE_2D_VIEW_OF_3D_EXTENSION_NAME);
+    if (x_2dv3) dext[ndext++] = VK_EXT_IMAGE_2D_VIEW_OF_3D_EXTENSION_NAME;
     free(de);
 
     // Every feature the device has, but robustness and capture-replay (they cost and nothing needs them); the shader side takes what it needs from the same device
@@ -228,10 +231,11 @@ static int init_once(void) {
     VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT fgpl = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT};
     VkPhysicalDeviceMeshShaderFeaturesEXT fmesh = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
     VkPhysicalDeviceFaultFeaturesEXT ffault = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT};
+    VkPhysicalDeviceImage2DViewOf3DFeaturesEXT f2v3 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_2D_VIEW_OF_3D_FEATURES_EXT};
     void *chain = placed ? &fmp : NULL;
 #define LINK(on, st) if (on) { (st).pNext = chain; chain = &(st); }
     struct { VkStructureType sType; void *pNext; VkBool32 queuePerfHint; } fph = {(VkStructureType)1000302001};   // VkPhysicalDeviceQueuePerfHintFeaturesQCOM (not in the NDK's headers yet)
-    LINK(x_vin, fvin) LINK(x_rob, frob) LINK(x_i8, fi8) LINK(x_div, fdiv) LINK(x_ph, fph) LINK(x_gpl, fgpl) LINK(x_mesh, fmesh) LINK(x_fault, ffault)
+    LINK(x_vin, fvin) LINK(x_rob, frob) LINK(x_i8, fi8) LINK(x_div, fdiv) LINK(x_ph, fph) LINK(x_gpl, fgpl) LINK(x_mesh, fmesh) LINK(x_fault, ffault) LINK(x_2dv3, f2v3)
 #undef LINK
     VkPhysicalDeviceVulkan13Features f13 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES, .pNext = chain};
     VkPhysicalDeviceVulkan12Features f12 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, .pNext = &f13};
@@ -254,6 +258,7 @@ static int init_once(void) {
     V.imageless = f12.imagelessFramebuffer;   // (enabled with the rest of f12)
     V.draw_count = f12.drawIndirectCount;
     V.minmax = f12.samplerFilterMinmax;   // (enabled with the rest of f12)
+    V.img2d3d = x_2dv3 && f2v3.image2DViewOf3D; V.samp2d3d = x_2dv3 && f2v3.sampler2DViewOf3D;   // (enabled as the device reports them)
     V.bda = f12.bufferDeviceAddress; V.uab = f12.descriptorBindingSampledImageUpdateAfterBind && f12.descriptorBindingPartiallyBound && f12.runtimeDescriptorArray;
     V.placed = placed && fmp.memoryMapPlaced; V.placed_range = placed && fmp.memoryMapRangePlaced; V.unmap_reserve = placed && fmp.memoryUnmapReserve;
     float prio = 1.f;

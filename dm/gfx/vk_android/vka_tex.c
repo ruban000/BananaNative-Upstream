@@ -576,6 +576,13 @@ static vka_img *img_create_(const tex_t *t, const vka_fmt *f, uint32_t base, int
     }
     // A 3D texture is drawn into slice by slice (NVN render target views of its slices, or all of them layered): 2D / 2D-array views of slices need this (Vulkan 1.1 maintenance1)
     if (is3d && (u & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) fl |= VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
+    // A sampled or shader-image 3D texture may be read or written one depth slice at a time through NVN's own TextureView with its target overridden to 2D (view_of): a 2D
+    // view of a 3D image in a descriptor needs VK_EXT_image_2d_view_of_3d (sampler2DViewOf3D / image2DViewOf3D, as the device reports them) and this flag. Without them such
+    // a view is refused ("no view of shape"), as before. Only when the device takes the image with it: the flag never costs the image a usage
+    if (is3d && (((u & VK_IMAGE_USAGE_SAMPLED_BIT) && V.samp2d3d) || ((u & VK_IMAGE_USAGE_STORAGE_BIT) && V.img2d3d))) {
+        VkImageFormatProperties ip3;
+        if (!vk.vkGetPhysicalDeviceImageFormatProperties(V.pd, f->vk, VK_IMAGE_TYPE_3D, VK_IMAGE_TILING_OPTIMAL, u, fl | VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT, &ip3)) fl |= VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT;
+    }
     // Zero-shared images (below): a large GPU-content image the caller makes (g_zwant: vka_tex_get, its content ST_ZERO) is made to alias the zeroed memory of its create info
     int zs = g_zwant && VKA_ENV("DM_VK_ZSHARE", 1) && vkz_candidate(t->L.size, (uint64_t)(VKA_ENVF("DM_VK_ZSHARE_MB", 4.0) * 1048576.0),
                                                                     vkz_max(f->kind >= 3, V.driver_id == VK_DRIVER_ID_MESA_TURNIP, (int64_t)VKA_ENVF("DM_VK_ZSHARE_MAX_MB", -1.0)), res, im->samples, is3d, compressed(f),
@@ -2779,6 +2786,7 @@ static VkImageView view_of(const treg_ent *e, vka_img *im, int vt_want, int stor
     vksoft_view(im->base, &l0, &nl);   // texture levels → the image's (a sparse texture's left-out levels, a soft texture's level 0)
     l0 += im->lvk;   // (a level child: from its parent's level lvk)
     uint32_t a0 = v && v->set_layers ? v->min_layer : 0, na = v && v->set_layers && v->nlayers ? v->nlayers : im->layers - a0;
+    uint32_t s0 = a0;   // (a 3D texture: the depth slice its view's layer range names, for a 2D view of that slice below)
     if (im->d.target == NVN_TEXTURE_TARGET_3D) { a0 = 0; na = 1; }   // a 3D texture's view range names slices (a render target view's), which a 3D view does not take
     if (l0 >= im->levels || a0 >= im->layers) return VK_NULL_HANDLE;
     if (l0 + nl > im->levels) nl = im->levels - l0;
@@ -2795,7 +2803,14 @@ static VkImageView view_of(const treg_ent *e, vka_img *im, int vt_want, int stor
     VkImageViewType vt = vt_want >= 0 ? (VkImageViewType)vt_want : view_type(tgt, na);
     // What the image's type lets the view be (img_create: 3D for a 3D target, 1D for the 1D targets, cube-compatible for square 2D images of whole cubes)
     int img3d = im->d.target == NVN_TEXTURE_TARGET_3D;
-    if ((vt == VK_IMAGE_VIEW_TYPE_3D) != img3d || vt == VK_IMAGE_VIEW_TYPE_1D || vt == VK_IMAGE_VIEW_TYPE_1D_ARRAY) return VK_NULL_HANDLE;   // no 1D images (img_create)
+    // A 2D view of one depth slice of a 3D image: NVN's TextureView of a 3D texture with its target overridden to 2D, as a compute pass reading or writing a volume one slice
+    // at a time does (an 8x8x8 3D texture read through such a view was refused, "no view of shape", and read as unbound). Only on an image made 2D-view compatible
+    // (img_create_: VK_EXT_image_2d_view_of_3d as the device reports it), one level, the slice as its layer; a 2D-array view of a 3D image stays refused (Vulkan has none in descriptors)
+    if (img3d && vt == VK_IMAGE_VIEW_TYPE_2D && (im->cflags & VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT) && (storage ? V.img2d3d : V.samp2d3d)) {
+        uint32_t dl = im->depth >> l0 ? im->depth >> l0 : 1;
+        if (s0 >= dl) return VK_NULL_HANDLE;
+        a0 = s0; nl = 1;
+    } else if ((vt == VK_IMAGE_VIEW_TYPE_3D) != img3d || vt == VK_IMAGE_VIEW_TYPE_1D || vt == VK_IMAGE_VIEW_TYPE_1D_ARRAY) return VK_NULL_HANDLE;   // no 1D images (img_create)
     if (vt == VK_IMAGE_VIEW_TYPE_CUBE || vt == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY) {
         if (im->w != im->h || im->layers < 6 || im->layers % 6 || im->samples > 1 || na < 6) return VK_NULL_HANDLE;
         if (vt == VK_IMAGE_VIEW_TYPE_CUBE) na = 6; else na -= na % 6;

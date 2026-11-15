@@ -136,6 +136,13 @@ The replay on Metal (`dm/gfx/nvn/nvn_mtl.m`) and the Vulkan and OpenGL layers. E
 - **Found on:** [Batman: Arkham Knight](../../dm/games/0100ACD0163D0000/README.md#files-and-shaders) (four shaders, 3,813 draws in a run to the diner). The same red line is recorded on [FINAL FANTASY RESONANCE](../../dm/games/0100606026F12000/README.md), [ROMANCE OF THE THREE KINGDOMS 8 REMAKE](../../dm/games/0100C2A01A730000/README.md), [Luigi's Mansion 3](../../dm/games/0100DCA0064A6000/README.md) and [Hyrule Warriors: Age of Calamity](../../dm/games/01002B00111A2000/README.md), none of them run with this rule.
 - **Check:** `make -C dm/gfx/tests GAME=<id> check_t_cube_placeholder` also covers a 2D texture and one- and five-layer 2D arrays in a `texture3d` argument: an unselected fallback leaves the real volume's output alone, a selected one reads zero.
 
+### A 2D view of one slice of a 3D texture on the Vulkan replay (Android)
+
+- **Symptom:** (Android) a compute or draw pass that reads or writes a volume one depth slice at a time reads it as unbound; the log has `texture ID … has no view of shape 0x1` for a 3D texture (an 8x8x8 one in the log this was found from).
+- **Cause:** NVN lets a texture view of a 3D texture override its target to 2D, naming a depth slice in its layer range. `view_of` refused every view of a 3D image other than a 3D one, and the image was made 2D-array compatible only for colour attachments (Vulkan 1.1 maintenance1), which allows no slice view in a descriptor. Vulkan takes a 2D view of a 3D image's slice in a sampled or storage descriptor only with VK_EXT_image_2d_view_of_3d (`sampler2DViewOf3D`, `image2DViewOf3D`) and an image made with `VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT`.
+- **Fix:** general, keyed on what the device reports: the extension is enabled where the device lists it (`vka_dev.c`, `V.samp2d3d` / `V.img2d3d`); a sampled or storage 3D image gets the 2D-view-compatible flag where the matching feature is there and the device takes the image with it (`img_create_`); `view_of` makes a 2D view of one level and the named slice on such an image. A 2D-array view of a 3D image stays refused (Vulkan has none in descriptors), and without the extension everything is as before.
+- **Found on:** a phone log of a 3D texture read through a 2D-target view (`no view of shape 0x1`); the game was not recorded. Not yet run on a device with the extension.
+
 ### Multisample texture slots
 
 - **Symptom:** `[RED] texture type mismatch: shader … declares slot … as Metal type 2, texture ID … is type 4 (NVN target 5, …); bound as is`, for a shader whose MSL declares the slot `texture2d_ms`.
