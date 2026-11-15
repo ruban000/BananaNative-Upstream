@@ -1122,6 +1122,13 @@ The replay on Metal (`dm/gfx/nvn/nvn_mtl.m`) and the Vulkan and OpenGL layers. E
 - **Open:** a stencil, depth-stencil or colour destination without `BLIT_DST` is not copied, with a `[RED]` line.
 - **Found on:** Mario Tennis Fever (`0400D4201C6EA000`, profile in pull request #268): its shadow map's level 0 to level 1, 3584x3584 D32, Odin 3 (Adreno 830), Qualcomm's driver, 2026-11-13. [Donkey Kong Bananza](../../dm/games/040074A01BF12000/README.md) takes the path once there (a 360x202 depth copy).
 
+### Same-size texture copies between formats on the Vulkan replay (Android)
+
+- **Symptom:** rainbow bands over the whole picture where a frame is copied into a window texture of another format of the same texel size; or a picture too dark (or too bright) where a frame is copied between an sRGB and a linear texture.
+- **Cause:** `copy_t2t` took any same-size copy between formats of one texel size as a `vkCmdCopyImage`, which moves bits: a B10G11R11 frame copied into an RGBA8 window showed its packed float bits. NVN's copy converts the texels when the formats differ, as `nvn_mtl.m`'s `copy_t2t` draws it. And an 8-bit sRGB texture's image is its UNORM twin, so a blit between an sRGB and a linear texture neither encoded nor decoded.
+- **Fix:** general: a same-size copy is a plain copy only between equal formats, or where a blit cannot convert (depth / stencil, integer, compressed, multisampled: as before, logged once as bits); other colour copies take the blit. Between sRGB and linear the blit goes through a scratch image of the real sRGB format (`sconv_image` in `vka_exec.c`, at most 4, transfer use only): blitted into it and copied raw into the destination (the encode), or copied raw into it and blitted out (the decode). Without a scratch image (none left, or a format that is no blit source and destination) the plain blit runs, with a `[RED]` line.
+- **Found on:** [The Legend of Zelda: Link's Awakening](../../dm/games/01006BB00C6F0000/README.md): its B10G11R11 frame copied into its sRGB RGBA8 window every frame (AYN Thor, 2026-11-11).
+
 ### `Downsample` of a single-sample texture
 
 - **Symptom:** `[RED] Downsample case not implemented: 320x176 1 samples format 70 → 80x48`; a missing bloom.
