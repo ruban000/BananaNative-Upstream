@@ -23,6 +23,13 @@ The replay on Metal (`dm/gfx/nvn/nvn_mtl.m`) and the Vulkan and OpenGL layers. E
 - **Fix:** check the first texture before logging its dimensions (`hle_nvn.c`) and log serial 0 for a null clear texture (`nvn_mtl.m`).
 - **Found on:** clang static analysis ([issue #424](https://github.com/seedds/nxnative/issues/424)); synthetic null-texture tests, with no gameplay failure reported.
 
+### A texture ID registered with no texture on the Vulkan replay (Android)
+
+- **Symptom:** a crash in `treg` (`vka_tex.c`) when a game registers NULL into its texture pool (Mario Kart 8 Deluxe at its title screen).
+- **Cause:** `nvnTexturePoolRegisterTexture` / `RegisterImage` with a NULL texture clears that ID on the console, and `nvn_mtl.m`'s `mtl_reg_tex` does so; the Vulkan replay's `treg` copied the texture through the NULL pointer.
+- **Fix:** general: a NULL registration clears the entry (serial 0: every lookup sees it unregistered, its slot reads the null view), logged once.
+- **Found on:** [Mario Kart 8 Deluxe](../../dm/games/0100152000022000/README.md) (title screen).
+
 ### Texture objects copied into command records
 
 - **Symptom:** Metal aborts on a texture descriptor with an absurd size (`height (1869367126) greater than … 16384`).
