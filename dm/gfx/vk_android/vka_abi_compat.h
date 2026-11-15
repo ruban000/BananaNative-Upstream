@@ -14,14 +14,17 @@
 
 // The host ABI the rows were checked against: when DMSH_VK_ABI moves, the table is not used (vka_abi_compat_of) until its rows are checked again against the new
 // headers and this line is raised (the unit test t_android_shlib fails meanwhile)
-#define VKA_ABI_COMPAT_FOR "4fbeb79f5ab7"
+#define VKA_ABI_COMPAT_FOR "834347ac0523"
 // The rows' ABIs, space-separated, in the table's order: what the launcher reads (build.gradle NX_DMSH_VK_ABI_COMPAT, ShaderLibs.playable)
-#define DMSH_VK_ABI_COMPAT "228b73bd10f6 674db0a4ff79"
+#define DMSH_VK_ABI_COMPAT "4fbeb79f5ab7 228b73bd10f6 674db0a4ff79"
 
 typedef struct { const char *abi; unsigned differs; } vka_abi_compat_row;
 static const vka_abi_compat_row vka_abi_compat[] = {
-    // Before the image handles in uniform buffers (2026-11-13; Vulkan chains up to 65883461079b): the headers differ only in the kind added (dmsh_abi_vk.h
-    // DMSH_VK_KIND_IMG_UBO, dmsh_abi.h DMSH_KIND_IMG_UBO), which no library of that ABI holds; every other convention is this host's
+    // Before the dynamic handle arrays' kinds (DMSH_VK_KIND_TEX_DYN 24, SAMP_DYN 25, 2026-11-15): additive, an older library holds neither (it marked such arrays UNKNOWN,
+    // which the replay refuses as before), and every other convention is this host's
+    {"4fbeb79f5ab7", 0},
+    // Before the image handles in uniform buffers (2026-11-13; Vulkan chains up to 65883461079b): the headers differ only in the kinds added (dmsh_abi_vk.h
+    // DMSH_VK_KIND_IMG_UBO, TEX_DYN, SAMP_DYN; dmsh_abi.h DMSH_KIND_IMG_UBO), which no library of that ABI holds; every other convention is this host's
     {"228b73bd10f6", 0},
     // Before a319e773 (2026-11-07; Vulkan chains up to d64f157175fd): a pool table of 4096 entries, searched in 12 steps, and the page-hash write log.
     // The table of 8192 entries is a superset (entries 0..4095 the same, the lookup hint in word 6 unread; entry 0's sink in words 6 and 7 still written); the log is not

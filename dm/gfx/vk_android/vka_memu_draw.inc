@@ -64,7 +64,7 @@ static void memu_dispatch(const vka_dstate *d, int st, vka_shader *cs, const vka
     if (!stage_writes(d, st, cs, r, n, pool, NULL)) return;
     memu_write(VKA_MEMU_ARENA_BINDING, MB.arena, 0, VK_WHOLE_SIZE);
     memu_write(VKA_MEMU_REC_BINDING, MB.rec.buf, MB.rec.off, (VkDeviceSize)MEMU_MAX * VKA_MEMU_REC_WORDS * 4);
-    if (!sets_push(lay, VK_PIPELINE_BIND_POINT_COMPUTE, pool)) return;
+    if (!sets_push(lay, VK_PIPELINE_BIND_POINT_COMPUTE, pool & VKA_POOL_READS)) return;
     uint32_t pc[4] = {(uint32_t)idx, 0, 0, 0};
     vk.vkCmdPushConstants(g_cb, lay->layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, VKA_MEMU_PUSH_BYTES, pc);
     vk.vkCmdBindPipeline(g_cb, VK_PIPELINE_BIND_POINT_COMPUTE, p);

@@ -1265,7 +1265,7 @@ static void drv_memo_reset(void) { for (int st = 0; st < VKA_NSTAGE; st++) for (
 // default 1; 0: filled and compared every draw, as before). A c2 fill and compare is ~0.3 us a stage on the Mac (its 2.5 KB, 300 handle words)
 static void drv_key(const vka_dstate *d, int st, int bi_, int pool, uint64_t k[3]) {
     if (bi_ == 0) { k[0] = d->s_ssbo[st]; k[1] = d->b.base_instance; k[2] = d->b.samples; }
-    else if (bi_ == 1) { k[0] = d->s_tex[st]; k[1] = pool ? (uint64_t)(uint32_t)d->b.tex_base | (uint64_t)(uint32_t)d->b.samp_base << 32 : 0; k[2] = (uint64_t)(pool != 0); }
+    else if (bi_ == 1) { k[0] = d->s_tex[st]; k[1] = pool & VKA_POOL_READS ? (uint64_t)(uint32_t)d->b.tex_base | (uint64_t)(uint32_t)d->b.samp_base << 32 : 0; k[2] = (uint64_t)pool; }   // (pool: its bits, vka_bind.h)
     else { k[0] = d->s_push; k[1] = k[2] = 0; }
 }
 static int drv_seg(const vka_dstate *d, int st, int bank, int pool, VkDescriptorBufferInfo *bi, c0_at *c0) {
@@ -1632,7 +1632,7 @@ static int bind_sets(const vka_dstate *d, vka_shader *const sh[VKA_NSTAGE], cons
         if (st == 1 && d->rast_discard) continue;   // no fragments: its stage's records are not read (the layout keeps them unwritten: partially bound is not needed for push descriptors)
         int n = g_wk.n[st];
         if (n < 0) { static _Atomic int k; if (atomic_fetch_add(&k, 1) < 16) VRED("shader %016llx: %s; skipped", (unsigned long long)s->key, g_wk.why[st]); return 0; }
-        any_pool |= g_wk.pool[st];
+        any_pool |= g_wk.pool[st] & VKA_POOL_READS;   // (set 1: not for the dynamic handle arrays' bit)
         if (!stage_writes(d, st, s, g_wk.r[st], n, g_wk.pool[st], st == 5 ? c0 : NULL)) return 0;
     }
     if (g_prof) g_ps[1] += cntvct() - t1_;
@@ -1684,7 +1684,7 @@ static int bar_hazard(vka_shader *const sh[VKA_NSTAGE], const vka_dstate *d) {
     if (draw_writes(sh, d)) return 1;
     for (int st = 0; st < VKA_NSTAGE; st++) {
         if (!sh[st] || (st == 1 && d->rast_discard)) continue;
-        if (g_wk.pool[st] || g_wk.n[st] < 0) return 1;
+        if ((g_wk.pool[st] & VKA_POOL_READS) || g_wk.n[st] < 0) return 1;
         const vka_res *r = g_wk.r[st];
         for (int i = 0; i < g_wk.n[st]; i++) if ((r[i].what == VKA_R_TEX || r[i].what == VKA_R_TBUF) && r[i].tid && vka_tex_id_in_pass_rec(r[i].tid, r[i].dim)) return 1;
     }

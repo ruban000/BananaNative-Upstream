@@ -55,7 +55,7 @@ int vka_walk(const vka_bstate *s, int st, const dmsh_vk_entry *e, const dmsh_vk_
     for (unsigned i = 0; i < e->bind_count; i++) {
         const dmsh_vk_bind *b = &bs[i];
         if (b->kind == DMSH_VK_KIND_UNKNOWN) return refuse(why, whyn, "binding %u has no placed kind", b->binding);
-        if (b->set == DMSH_VK_SET_POOL || b->kind == DMSH_VK_KIND_TEX_POOL || b->kind == DMSH_VK_KIND_SAMP_POOL) { if (uses_pool) *uses_pool = 1; continue; }
+        if (b->set == DMSH_VK_SET_POOL || b->kind == DMSH_VK_KIND_TEX_POOL || b->kind == DMSH_VK_KIND_SAMP_POOL) { if (uses_pool) *uses_pool |= VKA_POOL_READS; continue; }
         unsigned cnt = b->count ? b->count : 1;
         for (unsigned k = 0; k < cnt; k++) {
             if (n >= max) return refuse(why, whyn, "more than %d descriptors", max);
@@ -87,6 +87,18 @@ int vka_walk(const vka_bstate *s, int st, const dmsh_vk_entry *e, const dmsh_vk_
             case DMSH_VK_KIND_TBUF: {
                 int tid = noslot ? 0 : (int)(vka_tex_slot(s, st, (unsigned)reg) & 0xfffff);
                 if (tid) { r.what = VKA_R_TBUF; r.tid = tid; }
+                break; }
+            // A fallback array of dynamic handles (profile key tex_dyn_slots, nvn_mtl.m NVN_RB_TEXD / SAMPD): element k is slot k, since c2 holds slot indices for this shader
+            // (vka_drv_fill, VKA_POOL_DYN)
+            case DMSH_VK_KIND_TEX_DYN: {
+                if (uses_pool) *uses_pool |= VKA_POOL_DYN;
+                uint64_t hk = k < 128 && k < VKA_NTEX ? (s->tex[st][k] ? s->tex[st][k] : DMSH_SEPTEX_SLOT0 + k < VKA_NTEX ? s->tex[st][DMSH_SEPTEX_SLOT0 + k] : 0) : 0; int tid = (int)(hk & 0xfffff);
+                if (tid) { r.what = r.desc == 4 /* VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER */ ? VKA_R_TBUF : VKA_R_TEX; r.tid = tid; }
+                break; }
+            case DMSH_VK_KIND_SAMP_DYN: {
+                if (uses_pool) *uses_pool |= VKA_POOL_DYN;
+                uint64_t hs = k < 128 ? s->samp[st][k] : 0, ht = k < VKA_NTEX ? s->tex[st][k] : 0; int sid = (int)((hs ? hs : ht) >> 20 & 0xfff);
+                if (sid) { r.what = VKA_R_TEX; r.sid = sid; }
                 break; }
             case DMSH_VK_KIND_IMG: {
                 int tid = noslot || reg >= 32 ? 0 : (int)(s->img[st][reg] & 0xfffff);
@@ -160,16 +172,19 @@ void vka_drv_fill(const vka_bstate *s, int st, int bank, int pool, uint8_t *d) {
         }
     } else if (bank == 2) {
         // A shader that reads the pools indexes them with the IDs it reads, which are the bound pool's own: its c2 holds the handles as the game bound them, without the bases
-        int tb = pool ? s->tex_base : 0, sb = pool ? s->samp_base : 0;
+        // A shader with dynamic handle arrays (VKA_POOL_DYN: TEX_DYN / SAMP_DYN, profile key tex_dyn_slots) picks a table slot at run time and ORs a texture word with a sampler
+        // word into a handle whose IDs index the arrays: its tables hold slot indices instead (texture slot r → r, and r << 20 when a combined handle carries a sampler;
+        // sampler slot r → r << 20), as nvn_mtl.m's DRV2 does
+        int dyn = (pool & VKA_POOL_DYN) != 0, tb = pool & VKA_POOL_READS ? s->tex_base : 0, sb = pool & VKA_POOL_READS ? s->samp_base : 0;
 #define C2_LOCAL(h) ((uint32_t)((((h) & 0xfffff) ? ((h) & 0xfffff) - (uint64_t)tb : 0) | ((((h) >> 20) & 0xfff) ? ((((h) >> 20) & 0xfff) - (uint64_t)sb) << 20 : 0)))
         const uint64_t *tx = s->tex[st], *im = s->img[st];
         for (int r = 0; r < DMSH_C2_IMG_SLOTS; r++) { uint32_t ih = (uint32_t)im[r]; memcpy(d + DMSH_C2_IMG + DMSH_C2_ROW * r, &ih, 4); }
         for (int r = 0; r < DMSH_C2_TEX_SLOTS; r++) {   // a combined slot past 31 is written when it is bound and the image slot it shares is not
             if (r >= 32 && (!tx[r] || (r - 32 < DMSH_C2_IMG_SLOTS && im[r - 32]))) continue;
-            uint32_t v = C2_LOCAL(tx[r]); memcpy(d + DMSH_C2_TEX + DMSH_C2_ROW * r, &v, 4);
+            uint32_t v = !dyn ? C2_LOCAL(tx[r]) : !tx[r] ? 0 : (uint32_t)r | (tx[r] >> 20 ? (uint32_t)r << 20 : 0); memcpy(d + DMSH_C2_TEX + DMSH_C2_ROW * r, &v, 4);
         }
-        for (int r = 0; r < DMSH_C2_SEP_SLOTS; r++) { uint64_t h = tx[DMSH_SEPTEX_SLOT0 + r]; uint32_t v = C2_LOCAL(h); memcpy(d + DMSH_C2_SEPTEX + DMSH_C2_ROW * r, &v, 4); }
-        for (int r = 0; r < DMSH_C2_SEP_SLOTS; r++) { uint64_t h = s->samp[st][r]; uint32_t v = C2_LOCAL(h); memcpy(d + DMSH_C2_SAMP + DMSH_C2_ROW * r, &v, 4); }
+        for (int r = 0; r < DMSH_C2_SEP_SLOTS; r++) { uint64_t h = tx[DMSH_SEPTEX_SLOT0 + r]; uint32_t v = !dyn ? C2_LOCAL(h) : h ? (uint32_t)r : 0; memcpy(d + DMSH_C2_SEPTEX + DMSH_C2_ROW * r, &v, 4); }
+        for (int r = 0; r < DMSH_C2_SEP_SLOTS; r++) { uint64_t h = s->samp[st][r]; uint32_t v = !dyn ? C2_LOCAL(h) : h ? (uint32_t)r << 20 : 0; memcpy(d + DMSH_C2_SAMP + DMSH_C2_ROW * r, &v, 4); }
 #undef C2_LOCAL
     }
 }

@@ -350,6 +350,8 @@ static const char *refusal(const vka_shlib *L, const dmsh_vk_entry *e) {
     }
     const dmsh_vk_bind *b = vka_shlib_binds(L, e);
     for (unsigned i = 0; i < e->bind_count; i++) if (b[i].kind == DMSH_VK_KIND_UNKNOWN) return "a binding the build could not place";
+    for (unsigned i = 0; i < e->bind_count; i++)   // the fallback arrays of dynamic handles only where the profile says the handles come from c2's tables, as nvn_mtl.m's TEXD / SAMPD
+        if ((b[i].kind == DMSH_VK_KIND_TEX_DYN || b[i].kind == DMSH_VK_KIND_SAMP_DYN) && !DM_GAME_TEX_DYN_SLOTS) return "dynamic texture handles (profile key tex_dyn_slots is off)";
     return NULL;
 }
 // A module of a stage sg_plan runs as one lane (no subgroup operations there on this device, or a subgroup size the library is not right for that cannot be pinned) has them

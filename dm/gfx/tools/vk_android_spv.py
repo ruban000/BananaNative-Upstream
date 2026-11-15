@@ -13,6 +13,7 @@ OP_ACCESS_CHAIN, OP_IN_BOUNDS_ACCESS_CHAIN, OP_DECORATE, OP_MEMBER_DECORATE = 65
 OP_COMPOSITE_EXTRACT, OP_COMPOSITE_INSERT, OP_COPY_OBJECT, OP_BITCAST, OP_FADD, OP_FMUL = 81, 82, 83, 124, 129, 133
 OP_EMIT_VERTEX, OP_EMIT_STREAM_VERTEX, OP_LABEL, OP_RETURN, OP_RETURN_VALUE, OP_IMAGE_TEXEL_POINTER = 218, 220, 248, 253, 254, 60
 OP_SPEC_CONSTANT_FALSE, OP_SELECT, OP_IMAGE_READ, OP_IMAGE_WRITE = 49, 169, 98, 99
+OP_IMAGE, OP_SAMPLED_IMAGE = 100, 86
 # decorations, storage classes, builtins
 DEC_SPEC_ID, DEC_BLOCK, DEC_BUFFER_BLOCK, DEC_BUILTIN, DEC_LOCATION, DEC_BINDING, DEC_SET = 1, 2, 3, 11, 30, 33, 34
 SC_UNIFORM_CONSTANT, SC_INPUT, SC_UNIFORM, SC_OUTPUT, SC_FUNCTION, SC_PUSH_CONSTANT, SC_STORAGE_BUFFER = 0, 1, 2, 3, 7, 9, 12
@@ -647,6 +648,36 @@ def buffer_block_to_storage(m):
             x[1] = sb_ptr(x[1]); sb.add(x[2])
     m.index()
     return len(blocks)
+
+
+def buffer_textures_split(m):
+    """The translator declares a buffer texture read through a texture slot as a combined image and sampler of Dim Buffer (OpTypeSampledImage of OpTypeImage Buffer, sampled), then takes
+    the image back with OpImage before every OpImageFetch and size query. Vulkan has no combined descriptor of a texel buffer: it is UNIFORM_TEXEL_BUFFER, a plain sampled Buffer image
+    with no sampler (and a driver reads the combined declaration as nothing). So each such sampled image type is made its image in place (the pointer and array types over it follow,
+    being the same ids), each load of one gives the image and each OpImage of it a copy: the binding reflects as UNIFORM_TEXEL_BUFFER. A module that uses a loaded value in any other
+    way (a call argument, a phi, an OpSampledImage with a sampler) is left as it is. → the number of sampled image types rewritten"""
+    imgs = {i for i, x in m.types.items() if x[0] & 0xffff == OP_TYPE_IMAGE and x[3] == DIM_BUFFER and x[7] == 1}
+    si = {i: x[2] for i, x in m.types.items() if x[0] & 0xffff == OP_TYPE_SAMPLED_IMAGE and x[2] in imgs}
+    if not si: return 0
+    loaded = {x[2] for x in m.ins if x[0] & 0xffff in (OP_LOAD, OP_SAMPLED_IMAGE) and x[1] in si}   # (a load of a combined variable, or an OpSampledImage of an image and a sampler: the sampler goes)
+    body = False
+    for x in m.ins:
+        op = x[0] & 0xffff
+        body = body or op == OP_FUNCTION
+        if not body or op == OP_LOAD or op == OP_SAMPLED_IMAGE and x[1] in si or op == OP_IMAGE and x[3] in loaded and len(x) == 4: continue
+        if any(w in loaded for w in x[3:]) and op not in (OP_STORE, OP_ACCESS_CHAIN, OP_IN_BOUNDS_ACCESS_CHAIN) or op == OP_STORE and x[2] in loaded: return 0
+    for x in m.ins:
+        op = x[0] & 0xffff
+        if op in (OP_TYPE_POINTER, OP_TYPE_ARRAY, OP_TYPE_RUNTIME_ARRAY):
+            k = 3 if op == OP_TYPE_POINTER else 2
+            x[k] = si.get(x[k], x[k])
+        elif op == OP_LOAD and x[1] in si: x[1] = si[x[1]]
+        elif op == OP_SAMPLED_IMAGE and x[1] in si: x[:] = [4 << 16 | OP_COPY_OBJECT, si[x[1]], x[2], x[3]]
+        elif op == OP_IMAGE and x[3] in loaded: x[0] = 4 << 16 | OP_COPY_OBJECT
+    used = {w for x in m.ins if x[0] & 0xffff not in (OP_NAME, OP_DECORATE) for w in x[2 if 19 <= x[0] & 0xffff <= 39 else 1:]}   # (a type no instruction names any more goes: SPIR-V 1.6 refuses a sampled image of Dim Buffer)
+    m.ins = [x for x in m.ins if not (x[0] & 0xffff == OP_TYPE_SAMPLED_IMAGE and x[1] in si and x[1] not in used)]
+    m.index()
+    return len(si)
 
 
 def dual_source(m):
