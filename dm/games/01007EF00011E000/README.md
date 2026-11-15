@@ -207,7 +207,7 @@ Before publishing, the fixes were integrated with main's pipeline archive and GP
 
 General host changes first needed here; each applies to every game:
 
-- **Images given up with their pool or evicted while still in use on Android** (a double free in `img_destroy`, followed by code reading): [An image a holder has, freed with its finalized pool (Vulkan replay)](../../../docs/reference/nvn-objects.md#an-image-a-holder-has-freed-with-its-finalized-pool-vulkan-replay).
+- **Images given up with their pool or evicted while still in use on Android** (a double free in `img_destroy`, followed by code reading): [An image a holder has, freed with its finalized pool (Vulkan replay)](../../../docs/reference/nvn-objects.md#an-image-a-holder-has-freed-with-its-finalized-pool-vulkan-replay), [Queued `WriteTexels` copies into an image given up meanwhile (Vulkan replay)](../../../docs/reference/nvn-objects.md#queued-writetexels-copies-into-an-image-given-up-meanwhile-vulkan-replay).
 - **Movies at twice their speed at 60 fps** (issue #636): [Movies hold 30 fps under the frame step](../../../docs/reference/frame-rate.md#movies-hold-30-fps-under-the-frame-step).
 - **Frame captures under the standard thread policy** (`cap_policy_standard`; also on Pokemon Scarlet): [A frame capture runs under the standard thread policy](../../../docs/reference/nvn-objects.md#a-frame-capture-runs-under-the-standard-thread-policy).
 - **Capture interface hashes of binding values** (also on Scarlet, Tears of the Kingdom and Wonder): [A capture refused after a change to the reflection structs](../../../docs/reference/nvn-objects.md#a-capture-refused-after-a-change-to-the-reflection-structs).

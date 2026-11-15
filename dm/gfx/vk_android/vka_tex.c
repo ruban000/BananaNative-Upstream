@@ -1849,7 +1849,9 @@ static void vka_tex_prune_locked(void) {
         if (pool_keep && im->pool_frame == cur_frame) continue;
         if (im->nkids) continue;   // (a level child's parent: its children see its image)
         if (vktl_skip_ws(&cfg, pinned, cur_frame, im->last_frame)) continue;
-        if (vktl_evictable(cur_frame, im->last_frame, im->holds, im->gpu_owned, im->is_video && video, im->last_fence && done_fence < im->last_fence, g_psi_shrink))
+        // (+ rw_pend: a texture the game only writes, WriteTexels with no draw for two frames, has region writes queued that hold the image by pointer; evicted, it was
+        // freed at once, and the next prepare copied into, and let go of, whatever had taken its memory since)
+        if (vktl_evictable(cur_frame, im->last_frame, im->holds + (int)im->rw_pend, im->gpu_owned, im->is_video && video, im->last_fence && done_fence < im->last_fence, g_psi_shrink))
             c[nc++] = (prune_ent){im, im->last_frame, im->gpu_owned != 0};
         else if (im->gpu_owned) { gpu_kept += im->bytes; ngpu_kept++; }
     }
@@ -2027,6 +2029,7 @@ void vka_tex_drop(vka_img *im) {
     unref_locked(im);
     pthread_mutex_unlock(&g_tmu);
 }
+static void rw_cancel_locked(vka_img *im);   // (below, with the region writes' queue)
 vka_img *vka_tex_ref(vka_img *im) { if (im) { pthread_mutex_lock(&g_tmu); im->refs++; im->holds++; im->last_fence = vka_fence_last(); pthread_mutex_unlock(&g_tmu); } return im; }
 void vka_tex_drop_pool(const void *pool) {
     if (!pool) return;
@@ -2043,6 +2046,7 @@ void vka_tex_drop_pool(const void *pool) {
         if (im->pool == pool && !im->holds) {
             bytes_dropped += im->m.size;
             ndrop++;
+            rw_cancel_locked(im);   // its queued region writes go with it: the count forced below would leave them holding a freed image
             map_del_im(im);
             im->refs = 1;
             unref_locked(im);
@@ -2366,6 +2370,13 @@ static int reg_write_overlap(const tex_region_write_t *a, const tex_region_write
 }
 static tex_region_write_t *g_reg_writes;
 static int g_nreg_writes, g_reg_writes_cap;
+// The region writes queued for im are dropped (caller holds g_tmu), for a caller that gives the image up whatever its references (vka_tex_drop_pool): their entries
+// stay in the queue with no image, which the drain skips; their references go with the image's forced count
+static void rw_cancel_locked(vka_img *im) {
+    if (!im->rw_pend) return;
+    for (int i = 0; i < g_nreg_writes; i++) if (g_reg_writes[i].im == im) { free(g_reg_writes[i].data); g_reg_writes[i].data = NULL; g_reg_writes[i].im = NULL; g_reg_writes[i].copied = 0; }
+    im->rw_pend = 0;
+}
 
 void mtl_tex_write_region(const tex_t *t, unsigned level, unsigned layer0, const NVNcopyRegion *r, const uint8_t *src, size_t row, size_t img) {
     if (!t || !r || !src) return;
@@ -2440,6 +2451,7 @@ void mtl_tex_write_region(const tex_t *t, unsigned level, unsigned layer0, const
             .size = slice_bytes,
         };
         im->refs++;
+        im->rw_pend++;   // (not evicted while it waits: vka_tex_prune_locked)
     }
     pthread_mutex_unlock(&g_tmu);
 }
@@ -3243,6 +3255,8 @@ void vka_tex_prepare(VkCommandBuffer cb) {
     for (int i = 0; i < g_nreg_writes; i++) {
         tex_region_write_t *w = &g_reg_writes[i];
         vka_img *im = w->im;
+        if (!im) continue;                 // its image went with its pool before the copy (rw_cancel_locked)
+        if (im->rw_pend) im->rw_pend--;    // (the entry's own reference is let go below)
         if (!im->gpu_owned && !img_pool_dead(im)) {
             vka_span s;
             if (vka_scratch(w->size, 16, &s)) {

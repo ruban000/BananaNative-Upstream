@@ -345,6 +345,9 @@ typedef struct vka_img {
     // The texture cache's own bookkeeping (vka_tex.c "Live images"): its place in the live list + 1 (0: not in it), the next live image in its storage address's chain,
     // and the video pool registrations count (dm_codec_video_epoch) at which it was last checked for lying in a video pool
     int live_ix; struct vka_img *mnext; uint64_t vep;
+    // Region writes queued for it and not yet copied (vka_tex.c mtl_tex_write_region; each holds a reference): it is not evicted meanwhile, and a pool drop takes them
+    // back (rw_cancel_locked), since both give the image up whatever its reference count says
+    uint32_t rw_pend;
     uint32_t smap_n;   // its entries in the serial map (vka_smap.h: vksm_del_im stops after them), under g_tmu
 } vka_img;
 // Texture level lv as a level of im (a sparse or soft texture's image starts at level im->base): 0 when the image does not hold it
