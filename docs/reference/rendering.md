@@ -27,7 +27,7 @@ The replay on Metal (`dm/gfx/nvn/nvn_mtl.m`) and the Vulkan and OpenGL layers. E
 
 - **Symptom:** a crash in `treg` (`vka_tex.c`) when a game registers NULL into its texture pool (Mario Kart 8 Deluxe at its title screen).
 - **Cause:** `nvnTexturePoolRegisterTexture` / `RegisterImage` with a NULL texture clears that ID on the console, and `nvn_mtl.m`'s `mtl_reg_tex` does so; the Vulkan replay's `treg` copied the texture through the NULL pointer.
-- **Fix:** general: a NULL registration clears the entry (serial 0: every lookup sees it unregistered, its slot reads the null view), logged once.
+- **Fix:** general: a NULL registration clears the entry (serial 0: every lookup sees it unregistered, its slot reads the null view), logged once. The buffer-texture flag set at the end of `treg` (`g_tisbuf`, from the buffer-texture change) still read the target through `t`, so the first fix only moved the crash one line on: `texture ID 4766 registered with no texture …`, then `CRASH sig=11 addr=0x4` in `libnxhost` (2026-11-16, AYN Thor). A cleared ID is now no buffer texture.
 - **Found on:** [Mario Kart 8 Deluxe](../../dm/games/0100152000022000/README.md) (title screen).
 
 ### Texture objects copied into command records

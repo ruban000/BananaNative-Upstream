@@ -2712,8 +2712,14 @@ static void treg(int id, const tex_t *t, const view_t *v, int img) {
     if (!g_tver) g_tver = calloc(1 << 20, sizeof *g_tver);
     if (g_tver) atomic_fetch_add_explicit(&g_tver[id], 1, memory_order_release);
     if (!g_tisbuf) g_tisbuf = calloc(1 << 20, 1);
-    if (g_tisbuf) atomic_store_explicit(&g_tisbuf[id], (v && v->set_target ? v->target : t->d.target) == NVN_TEXTURE_TARGET_BUFFER, memory_order_release);
+    // (a cleared ID is no buffer texture: t is NULL there, and reading its target was the same crash one line later, addr 0x4)
+    if (g_tisbuf) atomic_store_explicit(&g_tisbuf[id], t && (v && v->set_target ? v->target : t->d.target) == NVN_TEXTURE_TARGET_BUFFER, memory_order_release);
     pthread_mutex_unlock(&g_tmu);
+    {   // DM_NVN_TREG_ID=n logs every registration of texture ID n (as nvn_mtl.m's mtl_reg_tex): what it holds from then on
+        static int want = -2; if (want == -2) { const char *s = getenv("DM_NVN_TREG_ID"); want = s ? atoi(s) : -1; }
+        if (want == id) VLOG("TREG id %d %s ser=%llu %ux%u format=%#x target %d levels %d view %d%s", id, img ? "image" : "texture", t ? (unsigned long long)t->serial : 0ull,
+                             t ? t->d.width : 0, t ? t->d.height : 0, t ? t->d.format : 0, t ? (int)t->d.target : -1, t ? (int)t->d.levels : 0, v != NULL, t ? "" : " (NULL: cleared)");
+    }
 }
 int vka_tex_id_is_buffer(int id) {   // (no lock: the draw path asks it for every texture binding)
     return id > 0 && id < (1 << 20) && g_tisbuf && atomic_load_explicit(&g_tisbuf[id], memory_order_acquire);
