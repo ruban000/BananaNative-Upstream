@@ -772,6 +772,9 @@ static void fps_limit_wait(void) {
     static uint64_t next;
     if (!lim || dm_fps_limit_step()) { next = 0; return; }   // none, or the frame step holds it (dm_fps_limit_step)
     uint64_t now = plat_abs_time(), period = 1000000000ull / (uint64_t)lim;   // the platform's monotonic clock and sleep (plat.h): clock_nanosleep is Linux only
+    // DM_VK_PACE_PANEL=1 (Android, vka_present.c): a limit that is the panel's rate or a whole division of it ticks in the panel's measured refreshes (60 on a 59.83 Hz
+    // panel: 16.71 ms)
+    { uint64_t vka_panel_tick(uint64_t) __attribute__((weak)); if (&vka_panel_tick) period = vka_panel_tick(period); }
     if (next > now && next - now <= period) { plat_wait_until(next); now = next; }
     next = (next > now || (next && now - next < period / 2) ? next : now) + period;   // keep the phase through small lateness, restart after a long frame
 }

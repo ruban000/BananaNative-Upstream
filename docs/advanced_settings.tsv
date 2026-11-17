@@ -647,6 +647,7 @@ DM_VK_ONE_LANE_BASE	developer	Graphics			text			both
 DM_VK_OQ_SPLIT_PASS	developer	Diagnostics			text		1 with Qualcomm's driver when the game profile asks for it, 0 otherwise	both							
 DM_VK_OVERLAY	developer	Graphics			text			both							
 DM_VK_PACE_LOG	developer	Diagnostics			text			both							
+DM_VK_PACE_PANEL	developer	Performance			text			both							
 DM_VK_PACE_PROF	developer	Diagnostics			text			both							
 DM_VK_PARTLOG	developer	Diagnostics			text			both							
 DM_VK_PART_SERIAL	developer	Diagnostics			text			both							
@@ -672,6 +673,7 @@ DM_VK_POOL_FB_EARLY	developer	Diagnostics			text			both
 DM_VK_POOL_SLOT_BIND	developer	Diagnostics			text			both							
 DM_VK_PREFAULT	developer	Diagnostics			text			both							
 DM_VK_PRESENT_GATE_WAIT	developer	Performance			text		30 ms with Turnip, 0 (off) with other drivers	both							
+DM_VK_PRESENT_GRID	developer	Performance			text			both							
 DM_VK_PRESENT_NEAREST	developer	Performance			text			both							
 DM_VK_PRESENT_OWNFMT	developer	Diagnostics			text			both							
 DM_VK_PRESENT_PREWAIT	developer	Diagnostics			text			both							

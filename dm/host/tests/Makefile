@@ -109,6 +109,7 @@ run: $(B)/t_language $(B)/t_motion $(B)/t_heap_size $(B)/t_touch $(B)/t_gesture 
 	$(B)/t_android_pwbusy
 	$(B)/t_android_psosync
 	$(B)/t_android_tf
+	$(B)/t_android_panel
 	$(B)/t_android_hangparts
 	$(B)/t_android_auto
 	$(B)/t_nvn_dpool
@@ -561,6 +562,14 @@ $(B)/t_android_tf: t_android_tf.c $(VKA)/vka_tf_spv.c $(VKA)/vka_tf.h $(VKA)/vka
 .PHONY: android-tf
 android-tf: $(B)/t_android_tf
 	$(B)/t_android_tf
+# The panel's refresh grid (vka_panel.h): the period estimate from actual present times, a pacing period as whole refreshes, the chain of desired present times
+# (DM_VK_PACE_PANEL, DM_VK_PRESENT_GRID). Built and run with run; android-panel builds and runs it alone
+run: $(B)/t_android_panel
+$(B)/t_android_panel: t_android_panel.c $(VKA)/vka_panel.h | $(B)
+	$(CLANG) -O1 -g -Wall -Werror -Wno-unused-function -fsanitize=address,undefined -I.. -o $@ t_android_panel.c
+.PHONY: android-panel
+android-panel: $(B)/t_android_panel
+	$(B)/t_android_panel
 # Where in a submission the GPU stopped, from the parts' timestamps (vka_hangparts.h; vka_exec.c vka_exec_hang_parts)
 $(B)/t_android_hangparts: t_android_hangparts.c $(VKA)/vka_hangparts.h | $(B)
 	$(CLANG) -O1 -g -Wall -Werror -Wno-unused-function -fsanitize=address,undefined -I.. -o $@ t_android_hangparts.c

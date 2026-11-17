@@ -454,6 +454,9 @@ static void *vsync_thread(void *arg) {
         if (!e && mtl_link_wait_vsync(&seen, 2 * period)) { if (!vsync_tick(v)) break; next = now_ns() + period; continue; }
         uint64_t t = now_ns(); if (next > t) { struct timespec ts = {(time_t)((next - t) / 1000000000ull), (long)((next - t) % 1000000000ull)}; nanosleep(&ts, NULL); }
         if (!vsync_tick(v)) break;
+        // DM_VK_PACE_PANEL=1 (Android, vka_present.c): without DM_VSYNC_HZ the event ticks in the panel's measured refreshes like the acquire pacer, so a game that
+        // waits for both does not see them drift against each other (0.28 % apart on a 59.83 Hz panel: one tick every six seconds)
+        { uint64_t vka_panel_tick(uint64_t) __attribute__((weak)); if (!e && &vka_panel_tick) period = vka_panel_tick((uint64_t)(1e9 / hz)); }
         next += period; if (now_ns() > next + 4 * period) next = now_ns() + period;   // do not try to catch up when far behind
     }
     free(v); return NULL;

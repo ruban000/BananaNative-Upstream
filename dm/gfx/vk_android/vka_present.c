@@ -20,6 +20,7 @@
 #endif
 #include "vka_present_fit.h"
 #include "vka_ovl.h"
+#include "vka_panel.h"   // the panel's measured refresh grid (DM_VK_PACE_PANEL, DM_VK_PRESENT_GRID)
 #include <android/native_window.h>
 #include <dlfcn.h>
 #include <math.h>
@@ -760,12 +761,23 @@ typedef struct { tex_t t; double period; int crop[4], has_crop; uint64_t ticket,
 static pq_item g_pq[PQ];
 static uint64_t g_pq_in, g_pq_read, g_pq_done, g_pq_fill;   // tickets: reserved, taken by the present thread, shown; filled (a ticket is reserved by the game's present, filled when the replay reaches it: vka_worker.c)
 
+// The panel's refresh grid from the actual present times (vka_panel.h). g_panel and g_grid belong to the present thread; the game's thread, the frame limiter and the
+// vsync event read the period through g_panel_ns (vka_panel_tick below), and the statistics line reads the counters: atomics, no lock
+static vkpanel g_panel; static vkgrid g_grid;
+static _Atomic uint64_t g_panel_ns, g_panel_seed;
+static _Atomic uint32_t g_grid_timed, g_grid_late, g_grid_presents;
 static void pres_note(uint64_t n, double t) { if (!n) return; g_pres[n % PRING].n = n; g_pres[n % PRING].t = t; }
 static void timing_poll(void) {
     if (!V.display_timing || !g_swap || !vk.vkGetPastPresentationTimingGOOGLE) return;
     VkPastPresentationTimingGOOGLE pt[16]; uint32_t n = 16;
     if (vk.vkGetPastPresentationTimingGOOGLE(V.dev, g_swap, &n, pt) < 0) return;
     for (uint32_t i = 0; i < n; i++) pres_note(pt[i].presentID, pt[i].actualPresentTime / 1e9);
+    // Every actual present time (generated frames too) also feeds the estimate of the panel's refresh period and phase (vka_panel.h), whether or not the two switches
+    // that use it are on (the statistics line reports it). When the estimate is dropped (readings off the grid: the panel changed its mode on its own) the driver's
+    // refresh period is read again, as after a window frame rate change
+    vkpanel_seed(&g_panel, g_refresh_ns);
+    for (uint32_t i = 0; i < n; i++) if (vkpanel_sample(&g_panel, pt[i].actualPresentTime) && !g_refresh_n) g_refresh_n = 1;
+    atomic_store_explicit(&g_panel_ns, g_panel.period, memory_order_relaxed); atomic_store_explicit(&g_panel_seed, g_panel.seed, memory_order_relaxed);
 }
 
 // VK_SUBOPTIMAL_KHR: recreate when the window has a new size, or the surface a new rotation that pre-rotation can follow (the phone turned over: ROTATE_90 ↔ ROTATE_270).
@@ -1007,7 +1019,21 @@ static int present_one(const pq_item *it) {
         // and with their hold under 1.5 refreshes (4x at 25 fps: 10 ms) they went out untimed, two landed in one refresh and the compositor dropped one (on the Portal
         // about 48 of 105 a second, mostly generated frames, so the screen showed little more than the game's own rate)
         if (g_fg_on && g_refresh_ns && period < g_refresh_ns) period = g_refresh_ns;
-        if (g_refresh_ns && (period > g_refresh_ns * 3 / 2 || g_fg_on)) {   // hold each image for its present period: the panel refreshes faster than the game presents
+        // DM_VK_PRESENT_GRID=1 (live, default 0): without frame generation every game frame whose period is a whole number of the panel's measured refreshes gets a desired
+        // present time on the measured grid, one hold after the last (vka_panel.h vkgrid_next). The period is never shorter than the host's frame limit allows, as in
+        // vka_fg_frame: a game on the host's 120 Hz tick held to 60 fps declares 8.3 ms. The lines below remain for frame generation, for periods that are no whole number
+        // of refreshes, until the grid is measured, and with the switch off
+        uint64_t grid = 0;
+        if (!g_fg_on && it->ticket && g_panel.period && VKA_ENV("DM_VK_PRESENT_GRID", 0)) {
+            int nxhost_fps_limit_get(void) __attribute__((weak));
+            int lim = &nxhost_fps_limit_get ? nxhost_fps_limit_get() : 0, late = 0; uint64_t per = period;
+            if (lim > 0 && per < 1000000000ull / (uint64_t)lim) per = 1000000000ull / (uint64_t)lim;
+            grid = vkgrid_next(&g_grid, g_panel.last, g_panel.period, per, now_ns(), &late);
+            if (grid) { want = grid - g_panel.period / 2; g_last_desired = 0; atomic_fetch_add_explicit(&g_grid_timed, 1, memory_order_relaxed); if (late) atomic_fetch_add_explicit(&g_grid_late, 1, memory_order_relaxed); }
+        } else g_grid.last = 0;
+        if (it->ticket) atomic_fetch_add_explicit(&g_grid_presents, 1, memory_order_relaxed);
+        if (grid) {}   // (timed above)
+        else if (g_refresh_ns && (period > g_refresh_ns * 3 / 2 || g_fg_on)) {   // hold each image for its present period: the panel refreshes faster than the game presents
             uint64_t now = now_ns(); want = g_last_desired ? g_last_desired + period : now;
             if (want < now) want = now;
             g_last_desired = want; want -= g_refresh_ns / 2;
@@ -1106,6 +1132,33 @@ void mtl_present_progress(uint64_t *queued, uint64_t *done) { pthread_mutex_lock
 int mtl_has_window(void) { return g_surf != VK_NULL_HANDLE; }
 int mtl_display_hz(void) { return !g_surf ? 0 : g_refresh_ns ? (int)(1e9 / g_refresh_ns + 0.5) : 60; }
 uint64_t vka_refresh_ns(void) { return g_refresh_ns; }   // the panel's refresh period (display timing; 0 = not known). Present thread
+// A pacing period in whole refreshes of the panel (DM_VK_PACE_PANEL=1, live, default 0): the acquire pacer's slot period (hle_nvn.c), the frame limiter's
+// (hle_fpslock.c) and the vi vsync event's (hle_sdk16.c). The period as given when the switch is off, nothing is measured yet, or it is no whole number of refreshes
+// within 1 %. Any thread
+uint64_t vka_panel_tick(uint64_t period_ns) {
+    uint64_t p = atomic_load_explicit(&g_panel_ns, memory_order_relaxed);
+    return p && VKA_ENV("DM_VK_PACE_PANEL", 0) ? vkpanel_fit(period_ns, p) : period_ns;
+}
+// One line per statistics window of the game's thread (hle_nvn.c tsummary, after its on-screen line): the panel's period, what the acquire pacer ticks on, and how
+// many refreshes each game frame stayed on screen. iv_ms: the window's on-screen intervals (-1 discarded, 0 no reading); nominal_ns / tick_ns: the pacer's period on
+// the host's clock and the one it used at the last present
+void vka_panel_line(unsigned long long frame, const double *iv_ms, unsigned n, uint64_t nominal_ns, uint64_t tick_ns) {
+    uint64_t p = atomic_load_explicit(&g_panel_ns, memory_order_relaxed), seed = atomic_load_explicit(&g_panel_seed, memory_order_relaxed);
+    double ref = p ? p / 1e6 : seed ? seed / 1e6 : 1000.0 / 60;
+    unsigned h[5] = {0}, none = 0, gone = 0;
+    for (unsigned i = 0; i < n; i++) {
+        if (iv_ms[i] < 0) { gone++; continue; }
+        if (!(iv_ms[i] > 0)) { none++; continue; }
+        double k = floor(iv_ms[i] / ref + 0.5); h[k < 2 ? 1 : k > 3 ? 4 : (int)k]++;
+    }
+    const char *src = !nominal_ns ? "no pacing" : !VKA_ENV("DM_VK_PACE_PANEL", 0) ? "the host's clock: DM_VK_PACE_PANEL off" : !p ? "the host's clock: no measured refresh"
+                    : vkpanel_fit(nominal_ns, p) == nominal_ns && tick_ns == nominal_ns && nominal_ns % p ? "the host's clock: no whole number of refreshes" : "panel";
+    VLOG("panel up to frame %llu: refresh %.3f ms (%.2f Hz, %s); acquire pacer %.3f ms a frame (%s); on-screen for 1 / 2 / 3 / 4+ refreshes: %u / %u / %u / %u frames, no timing %u, discarded %u; "
+         "desired present times on the grid: %u of %u presents, %u started over late%s",
+         frame, ref, 1000.0 / ref, p ? "measured" : seed ? "the driver's figure, not measured yet" : "not known, 60 Hz assumed", tick_ns / 1e6, src, h[1], h[2], h[3], h[4], none, gone,
+         atomic_exchange_explicit(&g_grid_timed, 0, memory_order_relaxed), atomic_exchange_explicit(&g_grid_presents, 0, memory_order_relaxed), atomic_exchange_explicit(&g_grid_late, 0, memory_order_relaxed),
+         VKA_ENV("DM_VK_PRESENT_GRID", 0) ? "" : " (DM_VK_PRESENT_GRID off)");
+}
 int mtl_fps_target(void) { static int v = -1; if (v < 0) { const char *e = getenv("DM_FPS"); v = e && (atoi(e) == 30 || atoi(e) == 60) ? atoi(e) : 60; } return v; }
 uint64_t mtl_drawable_ns_take(void) { uint64_t v = g_drawable_ns; g_drawable_ns = 0; return v; }
 void mtl_xv_window_tex(uint64_t serial) { (void)serial; }

@@ -2035,6 +2035,7 @@ static double g_pres_exp[TWIN], g_pres_exp_last;   // how long that frame should
 // The hold (60 Hz vsyncs) each present was given, by present number. On-screen intervals are read 8 presents late, so each is judged against the holds of its own presents:
 // with the frame step at 2 vsyncs every frame stays 33.3 ms, which is not a dropped frame
 static uint8_t g_hold_ring[16];
+static uint64_t g_pres_tk[16];   // the ticket (mtl_present) of each of the last 16 presents, by the window's count of presents; 0 = that present showed nothing
 static double pres_expect_ms(uint64_t n) {   // the interval between presents n - 1 and n shows frame n - 1: the display link holds it for its own present's hold, the Mac pacer spaces present n by n's, so the larger of the two
     int k = g_hold_ring[n % 16] > g_hold_ring[(n - 1) % 16] ? g_hold_ring[n % 16] : g_hold_ring[(n - 1) % 16];
     double held = (k ? k : 1) * 1000.0 / 60, tgt = 1000.0 / mtl_fps_target();   // at least one frame period of the target (33.3 ms when the game itself asks for 30)
@@ -2121,6 +2122,11 @@ static void power_line(uint64_t frame) {
 #endif
 }
 int nxhost_fps_limit_get(void) __attribute__((weak));   // the host's frame limit (hle_fpslock.c), 0 without one
+// The Android layer's panel-locked pacing (vka_present.c, vka_panel.h; these defaults elsewhere): a pacing period in whole refreshes of the panel as measured, and its
+// line after the on-screen line. g_pace_nominal / g_pace_tick: the acquire pacer's period on the host's clock and the one it used at the last present
+__attribute__((weak)) uint64_t vka_panel_tick(uint64_t period_ns) { return period_ns; }
+__attribute__((weak)) void vka_panel_line(unsigned long long frame, const double *iv_ms, unsigned n, uint64_t nominal_ns, uint64_t tick_ns) { (void)frame; (void)iv_ms; (void)n; (void)nominal_ns; (void)tick_ns; }
+static uint64_t g_pace_nominal, g_pace_tick;
 static void tsummary(uint64_t frame) {
     char line[1024]; size_t o = 0;
     for (int k = 0; k < 6; k++) {
@@ -2145,6 +2151,7 @@ static void tsummary(uint64_t frame) {
       int64_t foot = plat_footprint_bytes(); double fp = foot >= 0 ? foot / 1048576.0 : -1;
       double br = dm_brightness_now();   // footprint / brightness are carried on the on-screen present row: does not depend on the tick-entry observation gate (camp runs have it too)
       if (k) { qsort(v, k, sizeof *v, dcmp); LOG("[nvn] on-screen up to frame %llu: %u frames, dropped %u (discarded %u), p99 %.2f ms; footprint %.0f MiB; brightness %.2f; thermal %d", frame, k + discard, drop, discard, v[(k * 99) / 100 < k ? (k * 99) / 100 : k - 1], fp, br, dm_thermal_now()); }
+      vka_panel_line(frame, g_pres_iv, n, g_pace_nominal, g_pace_tick);   // the panel's period, the pacer's source, on-screen intervals in refreshes (Android)
       g_presn = 0; }
     power_line(frame);
     { static uint64_t prev[6], pf; uint64_t v[6]; mtl_vbuf_stats(&v[0], &v[1], &v[2], &v[3], &v[4], &v[5]);
@@ -2535,7 +2542,8 @@ NVN(nvnQueuePresentTexture, void, NVNqueue *q, NVNwindow *w, int idx) {
         nvn_cap_present(t, crop);   // DM_NVN_CAPTURE (nvn_capture.inc)
         o->ticket[idx] = mtl_present(t, present_period(o) / 1e9, crop);
         o->pfence[idx] = mtl_last_fence();
-    }
+        g_pres_tk[o->presents % 16] = o->ticket[idx];   // this present's ticket, for the on-screen statistics (below)
+    } else g_pres_tk[o->presents % 16] = 0;
     gfx_leave();
     atomic_fetch_add(&g_nvn_ns, now_ns() - t0);
     uint64_t f = g_frame, ps, dr; mtl_stats(&ps, &dr);
@@ -2658,13 +2666,19 @@ NVN(nvnQueuePresentTexture, void, NVNqueue *q, NVNwindow *w, int idx) {
     // Real-device semantics: present only enqueues and returns immediately; this frame's display time is scheduled by the pacer, and the texture can be acquired again only at "display time + one period" (blocking in AcquireTexture)
     uint64_t period = present_period(o), now = dm_detclock_enabled() ? guest_ns() : now_ns();
     g_hold_ring[o->presents % 16] = (uint8_t)present_itv(o);
+    // DM_VK_PACE_PANEL=1 (Android): the slots are whole refreshes of the panel as measured, not sixtieths of a second on the host's clock (an AYN Thor's panel runs at
+    // 59.83 Hz: the game outran it and waited about 24 ms in an acquire every few seconds). Only when the game may go on changes: the period it is told stays
+    g_pace_nominal = period; if (!dm_detclock_enabled()) period = vka_panel_tick(period); g_pace_tick = period;
     nvn_pacer pc = {o->pace};
     uint64_t slot = now + nvn_pace(&pc, now, period);
     o->pace = pc.target;
     if (idx >= 0 && idx < 4) o->avail[idx] = period ? slot + period : 0;
     static uint64_t prev_slot; if (prev_slot && period) trow(f, "@display_ms", (slot - prev_slot) / 1e6); prev_slot = slot;   // display interval between two adjacent frames on screen (this is the one to look at for dropped frames)
     // Actual presentation interval (windowed mode): taken 8 presents late (the presented callback has arrived by then), as the difference between the n-th and the (n−1)-th; −1 = discarded
-    if (o->presents > 9) { uint64_t n = o->presents - 8; double a_ = mtl_presented_time(n), b_ = mtl_presented_time(n - 1);
+    // The two times are asked for by the presents' tickets (g_pres_tk), not by the window's count of presents: the graphics layer keeps a present's time under its
+    // ticket, which counts for the whole run, and the count starts again at 1 when the game makes its window again (Final Fantasy Resonance when the operation mode
+    // changes): from then on every frame read as "no reading" and the on-screen line stopped
+    if (o->presents > 9) { uint64_t n = o->presents - 8; double a_ = mtl_presented_time(g_pres_tk[n % 16]), b_ = mtl_presented_time(g_pres_tk[(n - 1) % 16]);
         if (a_ < 0) trow(f - 8, "@presented_ms", -1); else if (a_ > 0 && b_ > 0) trow(f - 8, "@presented_ms", (a_ - b_) * 1e3);
         g_pres_exp[g_presn % TWIN] = g_pres_exp_last = pres_expect_ms(n);
         g_pres_iv[g_presn++ % TWIN] = a_ < 0 ? -1 : (a_ > 0 && b_ > 0 ? (a_ - b_) * 1e3 : 0);
