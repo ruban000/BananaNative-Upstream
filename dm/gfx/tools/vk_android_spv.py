@@ -467,6 +467,45 @@ def formatless_storage_caps(m):
     return sorted(CAPS[c] for c in need)
 
 
+# Two rewrites for modules spirv-val refused (Final Fantasy Resonance: 115 compute shaders). Neither touches a module that was valid before
+CAP_STORAGE_EXTENDED = 49
+BASE_IMAGE_FORMATS = {0, 1, 2, 3, 4, 5, 21, 22, 23, 24, 30, 31, 32, 33}   # Unknown and the formats the Shader capability gives; 40 and up need other capabilities
+
+
+def extended_format_caps(m):
+    """StorageImageExtendedFormats for a module with an image type of a format outside the base set (Rg32ui from the answer table: the translator declares the format and
+    not the capability, the device feature shaderStorageImageExtendedFormats). → names of the capabilities added"""
+    if CAP_STORAGE_EXTENDED in m.caps: return []
+    if not any(x[0] & 0xffff == OP_TYPE_IMAGE and x[8] not in BASE_IMAGE_FORMATS and x[8] < 40 for x in m.types.values()): return []
+    at = max(k for k, y in enumerate(m.ins) if y[0] & 0xffff == OP_CAPABILITY) + 1
+    m.ins.insert(at, [2 << 16 | OP_CAPABILITY, CAP_STORAGE_EXTENDED])
+    m.index()
+    return [CAPS[CAP_STORAGE_EXTENDED]]
+
+
+DEC_ARRAY_STRIDE = 6
+
+
+def workgroup_plain_arrays(m):
+    """A Workgroup variable whose array type carries ArrayStride gets an array type of its own without it: Vulkan allows no explicit layout in workgroup memory, and
+    the translator's shared memory of N words has the type of a uniform block's uint[N] member (one id for both, decorated for the block, which keeps it).
+    The translator reaches shared memory through access chains to its words, which do not name the array type (a load of the whole array would, and spirv-val
+    would refuse that module as it refused it before). → variables given a type"""
+    done, made = 0, {}
+    for vid, (ptr, sc) in list(m.vars.items()):
+        if sc != 4: continue   # Workgroup
+        t = m.pointee(ptr)[1]
+        if m.op(t) != OP_TYPE_ARRAY or DEC_ARRAY_STRIDE not in m.decos.get(t, {}): continue
+        k = next(k for k, x in enumerate(m.ins) if x[0] & 0xffff == OP_VARIABLE and x[2] == vid)
+        if t not in made:
+            arr, p = m.new_id(), m.new_id()
+            m.ins[k:k] = [[4 << 16 | OP_TYPE_ARRAY, arr, *m.types[t][2:4]], [4 << 16 | OP_TYPE_POINTER, p, sc, arr]]
+            made[t] = p; k += 2
+        m.ins[k][1] = made[t]; done += 1
+    if done: m.index()
+    return done
+
+
 def maybe_ids(x):
     """The words of a function-body instruction that may be ids (the literal operands of the instructions whose literals could pass for an id left out; others whole)"""
     op = x[0] & 0xffff

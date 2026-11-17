@@ -602,6 +602,8 @@ def finish(key, w, job, c1):
     vcull = stage == 'gs' and spv.private_viewport_mask(m)   # before strip_unused_caps: the capability goes with the output
     dropped = spv.strip_unused_caps(m)
     added = spv.formatless_storage_caps(m)
+    added += spv.extended_format_caps(m)   # the capability of an image format outside the base set (vk_android_spv.py extended_format_caps)
+    spv.workgroup_plain_arrays(m)   # no ArrayStride on a workgroup variable's type (vk_android_spv.py workgroup_plain_arrays)
     n_precise = spv.precise_minmax(m)
     spv.txq_extra_components(m)   # a size query's component past the image's dimensions (vk_android_spv.py txq_extra_components)
     hmma = stage == 'cs' and spv.hmma_lds(m)   # the HMMA helper's calls lowered at their sites, gathers shared (vk_android_spv.py hmma_lds)
