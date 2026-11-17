@@ -17,6 +17,7 @@
 #include "vka_prepass.h"
 #include "vka_wbfollow.h"
 #include "vka_rplist.h"
+#include "vka_psosync.h"   // which draws are not skipped while their pipeline is made in the background (draw_body)
 #include <math.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -2652,6 +2653,14 @@ static void draw_body(vka_dstate *d, const p_set_rt *rt, int has_rt, const p_sci
     if (!mesh) vin_build_kept(d, sh[0], &k);
     PT(4);
     VkPipeline p = vka_gfx_pipeline(sh, &lay, &k);
+    // With DM_VK_PSO_ASYNC a pipeline the cache lacks is made in the background and its draws skipped until then. Not the draws whose result the game keeps
+    // (vka_psosync.h vkps_why: a draw into a target of at most 64x64, a draw that writes memory or runs with the rasterizer off): theirs is made now, on the frame
+    // path (Super Mario Odyssey stayed black for a whole first run). Looked at only when a pipeline is still being made. A fixed rule, no switch
+    if (!p && vka_pso_wait && !mesh) {
+        vkps_draw q = {.writes = d->rast_discard || draw_writes(sh, d), .w = R.full_w, .h = R.full_h};
+        int why = vkps_why(&q);
+        if (why) p = vka_gfx_pipeline_now(sh, why, (dw ? dw->ind : di->ind) || mdi ? -1 : (long long)(dw ? dw->count : di->count), q.w, q.h);
+    }
     if (!p) { g_skipped++; if (vks_pipeline_counts(vka_pso_wait)) g_skip_dev[VKS_PIPELINE]++; return; }   // the driver refused it (logged when it was made); one still being made in the background is not the driver's (vka_skipwarn.h)
     // DM_VK_INSTANCE: a direct indexed draw of one instance with only vertex and pixel shaders, their base modules and no retyped inputs may join the open run (its
     // instanced pipeline stays bound) or start one (decided at the sets, below)

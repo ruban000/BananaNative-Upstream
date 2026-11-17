@@ -538,6 +538,9 @@ int vka_static(VkDeviceSize n, VkDeviceSize align, vka_span *out);   // host-vis
 typedef struct { VkPipelineLayout layout; VkDescriptorSetLayout set0; int push; uint32_t ndesc; } vka_layout;
 int vka_layout_of(vka_shader *const sh[VKA_NSTAGE], int compute, vka_layout *out);   // the set-0 layout of these stages' records with the pools' set 1
 VkPipeline vka_gfx_pipeline(vka_shader *const sh[VKA_NSTAGE], const vka_layout *lay, const vka_gkey *k);
+// The last vka_gfx_pipeline call's pipeline made on the frame path when a background thread was to make it (vka_psosync.h: a draw whose result the game keeps); why: the
+// VKPS_ reason; count (-1: indirect), w, h: for the log
+VkPipeline vka_gfx_pipeline_now(vka_shader *const sh[VKA_NSTAGE], int why, long long count, uint32_t w, uint32_t h);
 extern _Thread_local int vka_pso_wait;   // after vka_gfx_pipeline / vka_cs_pipeline_frame returned NULL: 1 when the pipeline is still being made in the background (the draw waits, no failure), 0 when it was refused
 VkPipeline vka_cs_pipeline(vka_shader *cs, const vka_layout *lay);
 VkPipeline vka_cs_pipeline_frame(vka_shader *cs, const vka_layout *lay);   // a dispatch's: VK_NULL_HANDLE while the asynchronous threads make it (DM_VK_CS_ASYNC), the dispatch then skipped
