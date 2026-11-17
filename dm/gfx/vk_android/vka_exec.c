@@ -1336,11 +1336,12 @@ static int t2t_depth_draw(vka_img *s, vka_img *d, VkImageSubresourceLayers ss, V
 }
 // Scratch images of a real sRGB format for copy_t2t's sRGB <-> linear conversions: one per format and size class, transfer use only, kept for the process (a 1080p one is
 // 8 MiB; at most SCONV_N, then the conversion is left out and the plain blit runs). Every transfer op is ordered after the one before by the replay's barriers, so one image
-// serves every copy
-enum { SCONV_N = 4 };
+// serves every copy. copy_t2t's copies between textures whose images have another format (below) use them too, hence 8
+enum { SCONV_N = 8 };
 static struct { VkImage img; VkDeviceMemory dm; VkFormat f; uint32_t w, h; } g_sconv[SCONV_N]; static int g_sconv_n;
-static VkImage sconv_image(VkFormat f, uint32_t w, uint32_t h) {
-    for (int i = 0; i < g_sconv_n; i++) if (g_sconv[i].f == f && g_sconv[i].w >= w && g_sconv[i].h >= h) return g_sconv[i].img;
+// not: an image the caller already uses in this copy (a source and a destination scratch of one format must be two images: a blit cannot read and write one)
+static VkImage sconv_image_not(VkFormat f, uint32_t w, uint32_t h, VkImage not) {
+    for (int i = 0; i < g_sconv_n; i++) if (g_sconv[i].f == f && g_sconv[i].w >= w && g_sconv[i].h >= h && g_sconv[i].img != not) return g_sconv[i].img;
     if (g_sconv_n == SCONV_N) { VRED_ONCE("sRGB conversion copy: no scratch image left for VkFormat %d (%ux%u): copied without the sRGB step", f, w, h); return VK_NULL_HANDLE; }
     VkFormatProperties fp; vk.vkGetPhysicalDeviceFormatProperties(V.pd, f, &fp);
     if ((fp.optimalTilingFeatures & (VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT)) != (VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT)) {
@@ -1360,11 +1361,21 @@ static VkImage sconv_image(VkFormat f, uint32_t w, uint32_t h) {
     VLOG("sRGB conversion copy: scratch image VkFormat %d %ux%u (%.1f MiB)", f, w, h, mr.size / 1048576.0);
     return img;
 }
+static VkImage sconv_image(VkFormat f, uint32_t w, uint32_t h) { return sconv_image_not(f, w, h, VK_NULL_HANDLE); }
 static void copy_t2t(const p_copy_t2t *c) {
     if (!c->src || !c->dst) return;
     vka_img *s = vka_tex_get(c->src, g_cb), *d = vka_tex_get(c->dst, g_cb);
     if (!s || !d) return;
     vka_tex_own(d, g_cb);
+    // The copy goes by the formats of the two textures the game named, not by their images'. A texture may be a view of an image of another format (textures of two
+    // formats over one memory share an image: vka_tex.c, learned view formats), and judged by the images a copy between two R11G11B10 textures, the second sharing an R32
+    // float texture's image, was a format-changing one: the blit converted the colour into the float image (red only), and what read the texture afterwards saw those bits
+    // as R11G11B10. Super Mario Odyssey's water, crystal and other refracting materials drew flat bright green with a green bloom (AYN Thor, Turnip and Qualcomm's driver).
+    // tsf / tdf: the textures' formats; fs / fd: that side's image has another format (a converting copy then goes through a scratch image of the texture's format)
+    vka_fmt tsf = s->f, tdf = d->f, tq;
+    if (c->src->d.format != s->d.format && vka_fmt_of(c->src->d.format, &tq) && tq.bpb == s->f.bpb && tq.bw == s->f.bw && tq.bh == s->f.bh) tsf = tq;
+    if (c->dst->d.format != d->d.format && vka_fmt_of(c->dst->d.format, &tq) && tq.bpb == d->f.bpb && tq.bw == d->f.bw && tq.bh == d->f.bh) tdf = tq;
+    int fs = tsf.vk != s->f.vk, fd = tdf.vk != d->f.vk;
     unsigned sl = c->has_sv && c->sv.set_levels ? c->sv.base_level : 0, dl = c->has_dv && c->dv.set_levels ? c->dv.base_level : 0;
     unsigned sz0 = c->has_sv && c->sv.set_layers ? c->sv.min_layer : 0, dz0 = c->has_dv && c->dv.set_layers ? c->dv.min_layer : 0;
     vka_tex_soft_copy(s, -1, g_cb); vka_tex_soft_copy(d, (int)dl, g_cb);   // (a soft texture copied from, or into at level 0: made whole first)
@@ -1380,17 +1391,17 @@ static void copy_t2t(const p_copy_t2t *c) {
         if (sa == VK_IMAGE_ASPECT_COLOR_BIT) vk.vkCmdResolveImage(g_cb, s->img, VK_IMAGE_LAYOUT_GENERAL, d->img, VK_IMAGE_LAYOUT_GENERAL, 1, &r);
         else VRED_ONCE("depth resolve is not on Vulkan yet");
     } else if (c->sr.width == c->dr.width && c->sr.height == c->dr.height && !(c->flags & (NVN_COPY_FLAGS_MIRROR_X_BIT | NVN_COPY_FLAGS_MIRROR_Y_BIT | NVN_COPY_FLAGS_MIRROR_Z_BIT))
-               && s->samples == d->samples && s->f.bpb == d->f.bpb && s->f.bw == d->f.bw && s->f.bh == d->f.bh
-               && ((s->f.vk == d->f.vk && s->f.srgb == d->f.srgb) || sa != VK_IMAGE_ASPECT_COLOR_BIT || s->f.kind || d->f.kind || s->f.bw > 1 || s->f.bh > 1 || s->samples > 1)) {
+               && s->samples == d->samples && tsf.bpb == tdf.bpb && tsf.bw == tdf.bw && tsf.bh == tdf.bh
+               && ((tsf.vk == tdf.vk && tsf.srgb == tdf.srgb) || sa != VK_IMAGE_ASPECT_COLOR_BIT || tsf.kind || tdf.kind || tsf.bw > 1 || tsf.bh > 1 || s->samples > 1)) {
         // A plain copy only between equal formats, or where a blit cannot convert (depth / stencil, integer, compressed, multisampled): NVN's copy converts the texels when
         // the formats differ, as nvn_mtl.m's copy_t2t draws it. The Legend of Zelda: Link's Awakening copies its B10G11R11 frame into its RGBA8 window every frame, the same
         // size and 4 bytes a texel: copied bit for bit, the packed float bits showed as rainbow bands over the whole picture; the blit below converts them
-        static _Atomic int noted_; if (s->f.vk != d->f.vk && !atomic_exchange(&noted_, 1)) VLOG("texture copy between formats of one size, %#x → %#x (VkFormat %d → %d): copied as bits, not converted", c->src->d.format, c->dst->d.format, s->f.vk, d->f.vk);
+        static _Atomic int noted_; if (tsf.vk != tdf.vk && !atomic_exchange(&noted_, 1)) VLOG("texture copy between formats of one size, %#x → %#x (VkFormat %d → %d): copied as bits, not converted", c->src->d.format, c->dst->d.format, s->f.vk, d->f.vk);
         VkImageCopy r = {ss, {c->sr.xoffset, c->sr.yoffset, s3 ? c->sr.zoffset : 0}, ds, {c->dr.xoffset, c->dr.yoffset, d3 ? c->dr.zoffset : 0}, {(uint32_t)c->sr.width, (uint32_t)c->sr.height, s3 ? (uint32_t)nz : 1}};
         vk.vkCmdCopyImage(g_cb, s->img, VK_IMAGE_LAYOUT_GENERAL, d->img, VK_IMAGE_LAYOUT_GENERAL, 1, &r);
     } else {   // a scaled, mirrored or format-changing copy: a blit (filtered with LINEAR_FILTER), or a draw into a depth format that is no blit destination (vka_t2tpath.h)
-        VkFormatProperties dp; vk.vkGetPhysicalDeviceFormatProperties(V.pd, d->f.vk, &dp);
-        int path = t2t_path(0, s->f.kind, d->f.kind, s->f.bw > 1 || d->f.bw > 1, s->samples > 1 || d->samples > 1, (dp.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT) != 0);
+        VkFormatProperties dp; vk.vkGetPhysicalDeviceFormatProperties(V.pd, tdf.vk, &dp);   // the texture's format: with fd the blit writes a scratch image of it
+        int path = t2t_path(0, tsf.kind, tdf.kind, tsf.bw > 1 || tdf.bw > 1, s->samples > 1 || d->samples > 1, (dp.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT) != 0);
         if (path == T2T_NONE) {
             VRED_ONCE("texture copy %#x → %#x needs a draw (integer, compressed, multisampled, stencil, or into a format that is no blit destination, VkFormat %d)", c->src->d.format, c->dst->d.format, d->f.vk); return; }
         int x0 = c->sr.xoffset, x1 = x0 + c->sr.width, y0 = c->sr.yoffset, y1 = y0 + c->sr.height, t;
@@ -1401,8 +1412,41 @@ static void copy_t2t(const p_copy_t2t *c) {
             vka_img_written(d); g_stat_ops++; vka_barrier(g_cb); return;
         }
         VkImageBlit r = {ss, {{x0, y0, 0}, {x1, y1, 1}}, ds, {{c->dr.xoffset, c->dr.yoffset, 0}, {c->dr.xoffset + c->dr.width, c->dr.yoffset + c->dr.height, 1}}};
-        VkFormatProperties fp; vk.vkGetPhysicalDeviceFormatProperties(V.pd, s->f.vk, &fp);
+        VkFormatProperties fp; vk.vkGetPhysicalDeviceFormatProperties(V.pd, tsf.vk, &fp);
         VkFilter fl = (c->flags & NVN_COPY_FLAGS_LINEAR_FILTER_BIT) && sa == VK_IMAGE_ASPECT_COLOR_BIT && (fp.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+        // A converting copy with a side whose image has another format than its texture (fs / fd, above): the blit must read and write the textures' formats, so that side
+        // goes through a scratch image of the texture's format (sconv_image): the source's bytes copied raw into one, the blit made into another whose bytes are then copied
+        // raw into the destination. With one texture sRGB and the other linear, the sRGB side goes through a scratch of the real sRGB format too, whatever its image (an
+        // sRGB texture's image holds its UNORM twin, so only such a scratch decodes or encodes). One layer of a 2D colour texture; anything else is logged and blitted as before
+        if (fs || fd) {
+            static _Atomic int note_; VkImage t1 = VK_NULL_HANDLE, t2 = VK_NULL_HANDLE; VkImageSubresourceLayers ts = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+            int ok = sa == VK_IMAGE_ASPECT_COLOR_BIT && !s3 && !d3 && nz == 1;
+            int us = fs || (tsf.srgb != tdf.srgb && tsf.srgb), ud = fd || (tsf.srgb != tdf.srgb && tdf.srgb);
+            if (ok && us) ok = (t1 = sconv_image(tsf.srgb ? tsf.view : tsf.vk, (uint32_t)c->sr.width, (uint32_t)c->sr.height)) != VK_NULL_HANDLE;
+            if (ok && ud) ok = (t2 = sconv_image_not(tdf.srgb ? tdf.view : tdf.vk, (uint32_t)c->dr.width, (uint32_t)c->dr.height, t1)) != VK_NULL_HANDLE;
+            if (!atomic_exchange(&note_, 1)) VLOG("texture copy %#x → %#x between textures whose images have other formats (VkFormat %d in a %d image → %d in a %d image): %s", c->src->d.format, c->dst->d.format,
+                                                  tsf.vk, s->f.vk, tdf.vk, d->f.vk, ok ? "converted through scratch images of the textures' formats" : "no scratch image for it: blitted between the images as they are");
+            if (ok) {
+                VkImage si = s->img; VkImageSubresourceLayers sx = ss; int bx0 = x0, bx1 = x1, by0 = y0, by1 = y1;
+                if (us) {
+                    VkImageCopy cp = {ss, {c->sr.xoffset, c->sr.yoffset, 0}, ts, {0, 0, 0}, {(uint32_t)c->sr.width, (uint32_t)c->sr.height, 1}};
+                    vk.vkCmdCopyImage(g_cb, s->img, VK_IMAGE_LAYOUT_GENERAL, t1, VK_IMAGE_LAYOUT_GENERAL, 1, &cp);
+                    vka_barrier(g_cb);
+                    si = t1; sx = ts; bx0 -= c->sr.xoffset; bx1 -= c->sr.xoffset; by0 -= c->sr.yoffset; by1 -= c->sr.yoffset;
+                }
+                if (ud) {
+                    VkImageBlit b = {sx, {{bx0, by0, 0}, {bx1, by1, 1}}, ts, {{0, 0, 0}, {c->dr.width, c->dr.height, 1}}};
+                    vk.vkCmdBlitImage(g_cb, si, VK_IMAGE_LAYOUT_GENERAL, t2, VK_IMAGE_LAYOUT_GENERAL, 1, &b, fl);
+                    vka_barrier(g_cb);
+                    VkImageCopy cp = {ts, {0, 0, 0}, ds, {c->dr.xoffset, c->dr.yoffset, 0}, {(uint32_t)c->dr.width, (uint32_t)c->dr.height, 1}};
+                    vk.vkCmdCopyImage(g_cb, t2, VK_IMAGE_LAYOUT_GENERAL, d->img, VK_IMAGE_LAYOUT_GENERAL, 1, &cp);
+                } else {
+                    VkImageBlit b = {sx, {{bx0, by0, 0}, {bx1, by1, 1}}, ds, {{c->dr.xoffset, c->dr.yoffset, 0}, {c->dr.xoffset + c->dr.width, c->dr.yoffset + c->dr.height, 1}}};
+                    vk.vkCmdBlitImage(g_cb, si, VK_IMAGE_LAYOUT_GENERAL, d->img, VK_IMAGE_LAYOUT_GENERAL, 1, &b, fl);
+                }
+                goto done;
+            }
+        }
         // One side sRGB, the other linear: an 8-bit sRGB image is stored as its UNORM twin, so a blit between the VkImages neither encodes on the write nor decodes on the read,
         // as the console's copy (and nvn_mtl.m's draw into the sRGB view) does. The blit goes through a scratch image of the real sRGB format (sconv_image): into it (the encode),
         // then its bytes copied raw into the destination; or the source's bytes copied raw into it, then blitted out (the decode). Link's Awakening's frame copy into its sRGB
@@ -1425,6 +1469,7 @@ static void copy_t2t(const p_copy_t2t *c) {
             vk.vkCmdBlitImage(g_cb, sct, VK_IMAGE_LAYOUT_GENERAL, d->img, VK_IMAGE_LAYOUT_GENERAL, 1, &b, fl);
         } else vk.vkCmdBlitImage(g_cb, s->img, VK_IMAGE_LAYOUT_GENERAL, d->img, VK_IMAGE_LAYOUT_GENERAL, 1, &r, fl);
     }
+done:
     vka_img_written(d); g_stat_ops++;
     vka_barrier(g_cb);
 }
