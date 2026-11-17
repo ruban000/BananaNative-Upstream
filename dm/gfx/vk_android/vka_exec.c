@@ -2009,6 +2009,7 @@ static int exec(const uint8_t *p, int depth) {   // 1: parked at a wait (g_pk ho
                           if (!S.rc_skip && g_cb) { p_draw_idx t; g_stat_draws++; mdx_before_draw(p, NULL); qdx_before_draw(p, NULL); memu_before_draw(p, NULL); uint64_t sk = 0; if (g_oq_count) vka_draw_stats(NULL, &sk, NULL, NULL);
                           vka_draw(&S.d, &S.rt, S.has_rt, &S.sc, S.has_sc, NULL, draw_idx_rec(a, h.size, &t)); oq_lost(sk); } else if (!S.rc_skip && g_oq_count) g_oq_lost++; break;
         case OP_DISPATCH: mdx_write(); qdx_write(); if (!S.rc_skip && g_cb) vka_dispatch(&S.d, a); break;
+        case OP_TF_STATE: vka_tf_state(a, g_cb); break;   // transform feedback's byte counts, and what was captured copied out at End / Pause (vka_tf.c); the state itself: vka_state_op above
         case OP_DRAW_TEX: not_yet(h.op); if (!S.rc_skip && g_oq_count) { g_oq_lost++; g_oqs_skip++; } break;
         default: break;   // state: taken by vka_state_op above
         }

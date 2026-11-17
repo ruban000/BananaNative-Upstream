@@ -2,8 +2,9 @@
 // and each draw resolves its program to shaders (vka_shader.c), opens the dynamic-rendering pass of the bound targets if none is open, takes a pipeline keyed on the state
 // Vulkan cannot set dynamically here (vka_pso.c), writes set 0 from the binding records (vka_bind.c's walker: push descriptors when they fit, else a set from the submission
 // slot's pool), sets the dynamic state and draws. The pass stays open across draws and closes at anything else (vka_rp_end), followed by a full barrier.
-// What is not here yet, each logged once: SINT attachments and integer vertex formats (no variants), transform feedback, DrawTexture, line loops and quads through indirect draws,
-// tessellation's patch size, texel buffers, viewport swizzles other than a y flip
+// What is not here yet, each logged once: SINT attachments and integer vertex formats (no variants), DrawTexture, line loops and quads through indirect draws,
+// tessellation's patch size, texel buffers, viewport swizzles other than a y flip. Transform feedback from the vertex stage is captured (vka_tf.c); from a geometry
+// stage, or of an indirect draw, it is not (logged once)
 #if defined(__ANDROID__)
 #include "vka.h"
 #include "vka_skipwarn.h"
@@ -137,7 +138,7 @@ int vka_state_op(vka_dstate *d, uint32_t op, const void *a) {
     case OP_BLEND_COLOR: memcpy(d->blend_color, ((const p_blend_color *)a)->rgba, 16); break;
     case OP_ALPHA_REF: d->alpha_ref = ((const p_alpha_ref *)a)->ref; break;
     case OP_PUSH_CONST: { const p_push_const *b = a; if ((uint32_t)b->offset + b->size <= DMSH_PUSH_SIZE) { memcpy(d->b.push[b->compute ? 1 : 0] + b->offset, b->data, b->size); d->s_push = vka_stamp(); } break; }
-    case OP_TF_BIND: break;
+    case OP_TF_BIND: { const p_tf_bind *b = a; if (b->index >= 0 && b->index < 4) d->tf[b->index] = *b; break; }   // kept for the captures (vka_tf.c)
     case OP_TF_STATE: { const p_tf_state *b = a; d->tf_on = b->what == 0 || b->what == 3; break; }
     case OP_PRIM_RESTART: d->restart = *(const p_prim_restart *)a; break;
     case OP_RAST_DISCARD: d->rast_discard = ((const p_rast_discard *)a)->on; break;
@@ -482,6 +483,7 @@ void vka_rp_end(void) {
     vka_xp_ts(g_cb, 1);
     bcrt_flush();        // block-compressed targets drawn through shadows: their blocks back (bcrt_attach)
     ub_flush();          // inline uniform updates deferred during the pass: copied into placed guest RAM
+    vka_tf_flush(g_cb);  // what the pass's draws captured by transform feedback: copied into the game's buffers (vka_tf.c)
     R.on = 0; vka_tex_feedback(NULL, NULL, 0);
     vka_crumb(g_cb, CR_PASS_END, (uint64_t)R.area.extent.width << 32 | R.area.extent.height);   // DM_VK_CRUMBS=2
     if (vka_nan_on()) vka_nan_pass(g_cb, R.cim, R.clv, R.cl0, R.nci);
@@ -2460,6 +2462,7 @@ static void draw_body(vka_dstate *d, const p_set_rt *rt, int has_rt, const p_sci
     int mesh = dw && dw->prim == NVN_PRIM_MESH;
     memu_ent *memu_e = NULL;   // a mesh draw through compute (vka_memu_draw.inc): drawn as a vertex draw of the arena
     int eq_relax = 0;   // mesh_cut: EQUAL drawn as LEQUAL
+    int tfc = 0;   // this draw captures transform feedback (vka_tf.c)
     if (mesh) {
         if (!V.mesh && !V.memu) SKIPD(VKS_MESH, "mesh draw (nvnCommandBufferDrawMeshTasks) on a device without VK_EXT_mesh_shader (or DM_VK_MESH=0): skipped");
         // The program whose task and mesh shaders run: the fragment stage's when it has a mesh shader (a program's stages are bound together), else the one bound at the
@@ -2509,8 +2512,11 @@ static void draw_body(vka_dstate *d, const p_set_rt *rt, int has_rt, const p_sci
         if (bad) { g_skipped++; SKIP_COUNT(bad); return; }   // a refused or missing shader (logged when it was made; a missing one is not the device's: vka_skipwarn.h)
         if (!sh[0]) SKIP("draw with no vertex shader bound: skipped");
         if (sh[1] && (sh[1]->e->flags & DMSH_VK_F_MESH_PRIM)) SKIP("pixel shader %016llx reads per-primitive mesh outputs and is drawn with a vertex shader: skipped", (unsigned long long)sh[1]->key);
-        if (d->rast_discard && d->tf_on) SKIP("transform feedback is not on Vulkan yet (F_TF): the draw is skipped");
-        if (d->tf_on) VRED_ONCE("transform feedback is not on Vulkan yet: the draw is drawn without capture");
+        // Transform feedback is captured where it can be (vka_tf.c): the draw then takes the vertex shader's capture variant. Where it cannot (the reason is logged once
+        // there), the draw is made as before: skipped under rasterizer discard, else drawn without capture
+        if (d->tf_on && !g_pp_side) { vka_shader *tv = vka_tf_capture(sh, d, dw, di); if (tv) { sh[0] = tv; tfc = 1; } }
+        if (d->rast_discard && d->tf_on && !tfc) SKIP("transform feedback not captured (the reason is logged once, above): the draw is skipped");
+        if (d->tf_on && !tfc) VRED_ONCE("transform feedback not captured (the reason is logged once, above): the draw is drawn without capture");
     }
     // DM_VK_DRAW_SKIP_KEY=<pixel shader key>,... (diagnostic): the draws of those pixel shaders are not drawn (their pass still opens and clears), to see a pass's share of the picture
     { static char sk[1024]; static int got; if (!got) { const char *e = getenv("DM_VK_DRAW_SKIP_KEY"); snprintf(sk, sizeof sk, "%s", e ? e : ""); got = 1; }
@@ -2665,7 +2671,7 @@ static void draw_body(vka_dstate *d, const p_set_rt *rt, int has_rt, const p_sci
     // DM_VK_INSTANCE: a direct indexed draw of one instance with only vertex and pixel shaders, their base modules and no retyped inputs may join the open run (its
     // instanced pipeline stays bound) or start one (decided at the sets, below)
     VkBuffer i_ib = VK_NULL_HANDLE; VkDeviceSize i_io = 0; VkIndexType i_it = VK_INDEX_TYPE_UINT16;
-    int icand = g_inst_on && !mesh && di && !di->ind && !expand && di->instances <= 1 && d->b.base_instance == 0 && sh[1] && !sh[2] && !sh[3] && !sh[4] && !d->rast_discard
+    int icand = g_inst_on && !mesh && di && !di->ind && !expand && di->instances <= 1 && d->b.base_instance == 0 && sh[1] && !sh[2] && !sh[3] && !sh[4] && !d->rast_discard && !tfc   // (a capture is drawn alone)
                 && !(k.vin_u | k.vin_s) && k.fs_variant == DMSH_VK_MOD_BASE && lay.push && vka_enc_on() && inst_ib(di, &i_ib, &i_io, &i_it);
     int ijoin = icand && RUN.open && p == RUN.base.p && DY.valid && DY.pipe == RUN.ipipe && vka_enc_total() == RUN.mark && inst_same_draw(&RUN.base, i_ib, i_io, i_it, di, d);
     if (!ijoin) {
@@ -2888,7 +2894,7 @@ static void draw_body(vka_dstate *d, const p_set_rt *rt, int has_rt, const p_sci
                    if (mdi_n) { if (mdi_ranges(ind, mdi, mdi_n, mdi_st, 16, &b, &o, &cb, &co)) vk.vkCmdDrawIndirectCount(g_cb, b, o, cb, co, mdi_n, mdi_st); else mdi_cpu(0, ind, mdi, mdi_n, mdi_st); }
                    else { if (!vka_addr(ind, 16, &b, &o, NULL) || (o & 3)) SKIPD(VKS_GUESTMEM, "indirect draw arguments at %#llx are not in placed guest RAM: skipped", (unsigned long long)ind);
                           vk.vkCmdDrawIndirect(g_cb, b, o, 1, 16); } }
-        else vk.vkCmdDraw(g_cb, (uint32_t)dw->count, inst, (uint32_t)dw->first, binst);
+        else { if (tfc) vka_tf_begin(g_cb); vk.vkCmdDraw(g_cb, (uint32_t)dw->count, inst, (uint32_t)dw->first, binst); if (tfc) vka_tf_end(g_cb); }   // tfc: the capture around it (vka_tf.c)
     } else {
         VkBuffer ib; VkDeviceSize io; VkIndexType it = di->itype == 0 ? VK_INDEX_TYPE_UINT8 : di->itype == 1 ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
         size_t isz = di->itype == 0 ? 1 : di->itype == 1 ? 2 : 4;
@@ -2916,7 +2922,7 @@ static void draw_body(vka_dstate *d, const p_set_rt *rt, int has_rt, const p_sci
             RUN.args[0] = (uint32_t)di->count; RUN.args[1] = 1; RUN.args[2] = 0; RUN.args[3] = (uint32_t)di->base_vertex; RUN.args[4] = 0;
             vk.vkCmdDrawIndexedIndirect(g_cb, i_aa.buf, i_aa.off, 1, 20); RUN.mark = vka_enc_total(); g_inst_runs++;
             inst_fast_arm(d, rt, has_rt, sc, has_sc, di, 1);
-        } else vk.vkCmdDrawIndexed(g_cb, (uint32_t)di->count, inst, 0, di->base_vertex, binst);
+        } else { if (tfc) vka_tf_begin(g_cb); vk.vkCmdDrawIndexed(g_cb, (uint32_t)di->count, inst, 0, di->base_vertex, binst); if (tfc) vka_tf_end(g_cb); }   // tfc: the capture around it (vka_tf.c)
     }
     g_draws++;
     if (icand && !istart && !RUN.open) { if (inst_snap(&g_ia, p, i_ib, i_io, i_it, di, d)) g_ia.mark = vka_enc_total(); } else g_ia.valid = 0;   // a run may start from this draw

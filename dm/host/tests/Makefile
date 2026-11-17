@@ -108,6 +108,7 @@ run: $(B)/t_language $(B)/t_motion $(B)/t_heap_size $(B)/t_touch $(B)/t_gesture 
 	$(B)/t_android_psogate
 	$(B)/t_android_pwbusy
 	$(B)/t_android_psosync
+	$(B)/t_android_tf
 	$(B)/t_android_hangparts
 	$(B)/t_android_auto
 	$(B)/t_nvn_dpool
@@ -552,6 +553,14 @@ $(B)/t_android_psosync: t_android_psosync.c $(VKA)/vka_psosync.h | $(B)
 .PHONY: android-psosync
 android-psosync: $(B)/t_android_psosync
 	$(B)/t_android_psosync
+# Transform feedback on the Vulkan replay, the part with no Vulkan (vka_tf_spv.c): the capture layout of a control section and the module rewrite, validated by
+# spirv-val when it is on the PATH; DM_VK_SPV_DIR=<.spv folder> adds those modules. Built and run with run; android-tf builds and runs it alone
+run: $(B)/t_android_tf
+$(B)/t_android_tf: t_android_tf.c $(VKA)/vka_tf_spv.c $(VKA)/vka_tf.h $(VKA)/vka_selftest_spv.h | $(B)
+	$(CLANG) -O1 -g -Wall -Werror -Wno-unused-function -fsanitize=address,undefined -I.. -o $@ t_android_tf.c $(VKA)/vka_tf_spv.c
+.PHONY: android-tf
+android-tf: $(B)/t_android_tf
+	$(B)/t_android_tf
 # Where in a submission the GPU stopped, from the parts' timestamps (vka_hangparts.h; vka_exec.c vka_exec_hang_parts)
 $(B)/t_android_hangparts: t_android_hangparts.c $(VKA)/vka_hangparts.h | $(B)
 	$(CLANG) -O1 -g -Wall -Werror -Wno-unused-function -fsanitize=address,undefined -I.. -o $@ t_android_hangparts.c

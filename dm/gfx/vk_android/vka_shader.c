@@ -416,6 +416,7 @@ static void gs_fill(uint64_t key, int stage, uint32_t **w, size_t *nb) {
 static void prep_words(const dmsh_vk_entry *e, uint64_t key, uint32_t **w, size_t *nb) {
     if (e->flags & DMSH_VK_F_SUBGROUP) single_lane(key, e->stage, w, nb);
     gs_fill(key, e->stage, w, nb);
+    vka_tf_prep(key, w, nb);   // a transform feedback capture variant's words get their capture (vka_tf.c; a key of no variant, every library key among them: untouched)
 }
 // A library module's words. With the mesh draws drawn through compute (V.memu, vka_memu.c), a pixel shader of per-primitive inputs is only ever drawn behind the generated
 // vertex shader: every module of it is made from its words with those inputs flat (vka_memu_fs_flat), so the variants and retypes made from them are too

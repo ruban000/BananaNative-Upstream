@@ -789,6 +789,7 @@ DM_VK_VIN_SKIP	developer	Graphics			text			both
 DM_VK_WB_FOLLOW	developer	Graphics			text			both							
 DM_VK_WORKER	developer	Graphics			text			both							
 DM_VK_WORKER_FRAMES	developer	Memory			text			both							
+DM_VK_XFB	developer	Graphics			text			both							
 DM_VK_XP_SCISSOR	developer	Diagnostics			text			both							
 DM_VK_XP_TS	developer	Diagnostics			text			both							
 DM_VK_XP_TS_SEL	developer	Diagnostics			text			both							

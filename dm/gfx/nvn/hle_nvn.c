@@ -1101,6 +1101,9 @@ static int keys_hash(const NVNshaderData *sd, int mapped, uint8_t out[8]) {
     plat_sha256_final(md, &hc); memcpy(out, md, 8);
     return 1;
 }
+// The Android replay notes what a shader's control section says it captures by transform feedback (vka_tf.c), where the shader's key is made in nvnProgramSetShaders:
+// the section is only guaranteed valid during that call (a key made later, in prog_key, notes nothing)
+__attribute__((weak)) void nvn_tf_ctl_note(const uint8_t key[8], const void *control) { (void)key; (void)control; }
 int prog_key(const prog_t *p, unsigned st, uint8_t key[8]) {
     if (st >= p->nstage) return 0;
     prog_keys_t *k = pk_get(p, 1);
@@ -1122,7 +1125,7 @@ NVN(nvnProgramSetShaders, NVNboolean, NVNprogram *p, int n, const NVNshaderData 
     prog_keys_t *k = pk_get(p, 1);
     k->ok = 0; k->ctl_ok = 0;
     for (int i = 0; i < n; i++) {
-        if (keys_hash(&sd[i], 1, k->key[i])) k->ok |= (uint8_t)(1u << i);
+        if (keys_hash(&sd[i], 1, k->key[i])) { k->ok |= (uint8_t)(1u << i); if (sd[i].control) nvn_tf_ctl_note(k->key[i], sd[i].control); }   // the capture layout (above)
         if (sd[i].control && nvn2_ctl(sd[i].control)) { memcpy(k->ctl[i], sd[i].control, PROG_CTL_LEN); k->ctl_ok |= (uint8_t)(1u << i); }
         // Diagnostic: trace the loader of selected shader keys (comma-separated hex).
         if (trace && (k->ok & (1u << i))) {
