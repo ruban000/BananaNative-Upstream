@@ -21,6 +21,9 @@ public final class NxApp extends Application {
             }
         };
         PickedNup.install(this);
+        // the tiles' icons and details, kept between runs by each file's identity, the phone's language and this build (MetaKeep): a start shows them at once
+        GameMeta.keepDir = new java.io.File(getCacheDir(), "game-meta");
+        GameMeta.appVersion = BuildConfig.NX_COMMIT;
         ShaderLibs.appFiles = getExternalFilesDir(null);   // where the games' temporary folders are: the shader layer's fallback (ShaderLibs.layerWritable)
         Readiness.minSdk = BuildConfig.NX_MIN_SDK;
         UpdateCheck.android12 = BuildConfig.NX_MIN_SDK < 33;

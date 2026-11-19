@@ -375,6 +375,18 @@ class Descriptor(Fixture):
         with mock.patch.dict(os.environ, {'DM_NUP_FD': f'x:{self.stand}'}): self.assertIsNone(nup.fd_of(self.stand))
         self.assertEqual(nup.fd_of(self.root / 'picked' / '0123456789abcdef' / '.' / 'Game.nup'), self.fd)   # the same path, spelled otherwise
 
+    def test_several_files(self):   # a games folder read through the provider: the game and the files beside it, one line each; beside() lists them in their folder
+        other = self.stand.parent / 'Update.nup'
+        fd2 = os.open(self.nup, nup.O_RDONLY)
+        self.addCleanup(os.close, fd2)
+        with mock.patch.dict(os.environ, {'DM_NUP_FD': f'{self.fd}:{self.stand}\n{fd2}:{other}'}):
+            self.assertEqual((nup.fd_of(self.stand), nup.fd_of(other)), (self.fd, fd2))
+            self.assertTrue(nup.is_nup(other))
+            self.assertEqual(nup.beside(self.stand.parent), sorted([str(self.stand), str(other)]))
+            self.assertEqual(nup.beside(self.root), sorted(str(p) for p in self.root.glob('*.nup')))   # another folder: only its own files
+            app, vers, dlc = pack_dump.scan(self.stand)
+            self.assertEqual((app, sorted(vers)), (TID, [VER]))
+
     def test_pack_android_same_pack(self):   # the phone's rewrite and pack steps from the stand-in path: the pack of the file itself
         try: import capstone, lz4.block   # noqa: F401
         except ImportError: self.skipTest('no capstone / lz4 (android/environment.yml)')

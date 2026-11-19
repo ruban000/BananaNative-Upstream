@@ -792,8 +792,11 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
             if (readinessHold(id)) return;   // after the pack's own checks (a missing pack says so first), before the save is locked or anything is written
             // A .nup used where it is (PickedNup): the host gets a descriptor of it, fd:<n>/<name>, wherever it would get the file's path (DM_ROMFS, the add-on links);
             // it stays open for this process's life, and the host duplicates it for each image it opens (nup_image.h)
-            int nupFd = PickedNup.is(this, game.getPath()) ? PickedNup.detachedFd(this, game) : -1;
-            if (nupFd >= 0) romfs = PickedPath.forHost(romfs, game, nupFd);
+            // A games folder's file read through the provider: its update or DLC may be a file beside it (Nup.companions), which gets a descriptor of its own
+            java.util.Map<String, Integer> nupFds = new java.util.HashMap<>();
+            if (PickedNup.is(this, game.getPath())) PickedNup.forHost(this, game.getPath(), nupFds);   // the game's own first: it says so when it cannot be opened
+            int nupFd = nupFds.getOrDefault(game.getAbsolutePath(), -1);
+            romfs = PickedNup.forHost(this, romfs, nupFds);
             // The user's lines, read first: the paths the launcher sets cannot be changed by them (guard), but the test app's env-<id>.txt may name a test save folder (one game's file only: a global DM_SAVE would point every game at one save)
             List<String> user = new ArrayList<>(guard(AdvancedSettings.lines(this, id, PROTECTED), "Advanced", false));   // Settings > Advanced and the game's Advanced switches: before env.txt, so its lines and the game's own win
             List<String> envTxt = guard(userEnv(new File(files, "env.txt")), "env.txt", false);
@@ -812,7 +815,7 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
             File save = saveDir(files, game, saveId), temp = mkdirs(new File(files, "temp/" + id)), root = mkdirs(new File(files, "root"));
             // The DLC links live in internal app storage: the external files folder is shared storage (FUSE), which refuses symbolic links (errno not yet confirmed on a phone; a refused link is now a [RED] line), so
             // every link failed there and no game saw its DLC (docs/reference/packing.md "DLC links in shared storage"). Their targets stay where they are
-            File aoc = aocLinks(mkdirs(new File(getFilesDir(), "aoc/" + id)), game, pack, nupFd);
+            File aoc = aocLinks(mkdirs(new File(getFilesDir(), "aoc/" + id)), game, pack, nupFds);
             Pack.removeDir(new File(files, "aoc/" + id));   // the folder earlier builds used (empty, or links on a device that took them)
             log = new File(LogProvider.dir(this), id + "-" + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(new Date()) + ".log");
             pruneLogs(id);
@@ -1180,15 +1183,18 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
 
     /**
      * DM_AOC_DIR/<index> → each DLC's RomFS folder in the game folder, or DM_AOC_DIR/<index>.nup → the .nup (hle_fs.c aoc_dir; Pack.aocLinks), as symbolic links in
-     * app storage. A .nup used where it is (nupFd ≥ 0): the link's target is fd:<n>/<name>, which the host reads with readlink (nothing is at that path).
+     * app storage. A .nup used where it is (PickedNup, a games folder's file read through the provider): the link's target is fd:<n>/<name> of the file that holds
+     * the DLC (nupFds: one descriptor per file), which the host reads with readlink (nothing is at that path).
      * A link that cannot be made, or a pack.tsv aoc row whose DLC the game's folder or .nup has not got (Pack.aocLinks skipped), is a [RED] line in the run's
      * log (aocProblems): the game runs without that DLC
      */
-    private File aocLinks(File dir, File game, Pack pack, int nupFd) {
+    private File aocLinks(File dir, File game, Pack pack, Map<String, Integer> nupFds) {
         List<String> skipped = new ArrayList<>();
         Map<String, String> links = pack.aocLinks(game, skipped);
         for (String p : skipped) aocProblems.add("[RED] [nxlaunch] DLC: " + p);
-        for (String p : Pack.makeAocLinks(dir, links, t -> nupFd >= 0 ? PickedPath.forHost(t, game, nupFd) : t, (target, path) -> {
+        for (String p : Pack.makeAocLinks(dir, links, t -> {
+            try { return PickedNup.forHost(this, t, nupFds); } catch (IOException e) { aocProblems.add("[RED] [nxlaunch] DLC: " + e.getMessage()); return t; }
+        }, (target, path) -> {
             try { Os.symlink(target, path); } catch (ErrnoException e) { throw new IOException(android.system.OsConstants.errnoName(e.errno) + " (" + e.getMessage() + ")"); }
         })) aocProblems.add("[RED] [nxlaunch] DLC: " + p);
         aocLine = "[nxlaunch] DLC: " + links.size() + " link" + (links.size() == 1 ? "" : "s") + " in DM_AOC_DIR " + dir + (links.isEmpty() ? "" : " " + links.keySet());

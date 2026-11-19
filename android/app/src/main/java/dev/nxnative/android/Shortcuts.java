@@ -53,7 +53,7 @@ final class Shortcuts {
         java.util.concurrent.atomic.AtomicBoolean done = new java.util.concurrent.atomic.AtomicBoolean();
         android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
         main.postDelayed(() -> { if (done.compareAndSet(false, true)) request(c, sm, g, icon(c, g.name)); }, ICON_WAIT_MS);   // no icon in the game's data (the callback never comes): the letter
-        GameMeta.loadControl(new java.io.File(g.gameDir), Edition.control(c, g), m -> {
+        GameMeta.loadControl(new java.io.File(g.gameDir), Edition.tag(c, g), () -> Edition.control(c, g), m -> {
             if (done.compareAndSet(false, true)) request(c, sm, g, m.icon != null ? icon(m.icon) : icon(c, g.name));
         });
     }

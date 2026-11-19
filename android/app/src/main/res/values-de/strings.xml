@@ -1409,4 +1409,19 @@
     <string name="game_fast_fp16_shader_math">Schnelle FP16-Shader-Berechnung</string>
     <string name="game_fp16_on_turnip_faster">16-Bit-Halbpräzision auf Turnip: schnellere Shader-Berechnung, weniger Hitze</string>
     <string name="game_fp16_default_precision">Standardpräzision</string>
+    <string name="home_a_games_folder">Ein Spieleordner (fügt jedes Spiel darin hinzu, auch später neue)</string>
+    <string name="games_folders_pick">Wähle den Ordner mit deinen Spielen.</string>
+    <string name="games_folders_title">Spieleordner</string>
+    <string name="games_folders_value">Ordner, in denen die App nach neuen Spielen sucht</string>
+    <string name="games_folders_none">Noch kein Spieleordner.</string>
+    <string name="games_folders_add">Spieleordner hinzufügen</string>
+    <string name="games_folders_look">Nach neuen Spielen suchen</string>
+    <string name="games_folders_removed">%1$s ist kein Spieleordner mehr. Seine Spiele bleiben auf dem Startbildschirm.</string>
+    <string name="games_folders_looking">Suche nach neuen Spielen…</string>
+    <string name="games_folders_nothing_new">Keine neuen Spiele in den Spieleordnern.</string>
+    <string name="games_folders_no_game">In %1$s wurde kein Spiel gefunden. Er bleibt ein Spieleordner: Spiele, die du später dort ablegst, werden beim Start der App hinzugefügt.</string>
+    <string name="games_folders_cannot_keep">Dieser Ordner erlaubt der App nicht, ihn nach einem Neustart weiter zu lesen. Wähle einen Ordner im Telefonspeicher oder auf einer SD-Karte.</string>
+    <string name="games_folders_cannot_read">%1$s kann gerade nicht gelesen werden. Er wurde vielleicht verschoben oder gelöscht, oder die Berechtigung wurde entzogen. Entferne ihn unter Einstellungen › Spieleordner und füge ihn erneut hinzu.</string>
+    <string name="games_folders_dump_needs_access">%1$s ist ein Dump-Ordner: Die App liest ihn über seinen Pfad, das braucht den Zugriff auf alle Dateien (oder Spiel hinzufügen › in die App kopieren).</string>
+    <string name="games_folders_hint">Eine .nup-, .nsp- oder .nx-Datei ist ein Spiel, ebenso ein Dump-Ordner; ein Update oder DLC neben seinem Spiel gehört zu diesem Spiel. Die App durchsucht diese Ordner, wenn einer hinzugefügt wird, bei jedem Start der App und mit „Nach neuen Spielen suchen“ und fügt die Spiele hinzu, die noch keine Karte haben (beim Start nur neue oder geänderte Dateien, eine entfernte Karte bleibt also entfernt). Sie entfernt nie eine Karte.</string>
 </resources>

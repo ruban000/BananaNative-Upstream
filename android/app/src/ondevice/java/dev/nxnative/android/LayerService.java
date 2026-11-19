@@ -167,11 +167,7 @@ public final class LayerService extends Service {
         String nupFd = "";
         if (Nup.picked(dump)) {
             try {
-                synchronized (nupFds) {
-                    android.os.ParcelFileDescriptor p = nupFds.get(dump.getAbsolutePath());
-                    if (p == null) nupFds.put(dump.getAbsolutePath(), p = PickedNup.descriptor(this, dump));
-                    nupFd = p.getFd() + ":" + dump.getAbsolutePath();
-                }
+                nupFd = PickedNup.toolsFd(this, dump, nupFds);
             } catch (java.io.IOException e) { Log.w(TAG, "starter set: " + e.getMessage()); return; }
         }
         PackEngine.setenv("DM_GAME", game);
@@ -201,13 +197,7 @@ public final class LayerService extends Service {
         Profile prof = Profile.of(game);
         if (prof == null || PackLock.layerStopAsked()) return;
         String nupFd = "";
-        if (Nup.picked(dump)) {
-            synchronized (nupFds) {
-                android.os.ParcelFileDescriptor p = nupFds.get(dump.getAbsolutePath());
-                if (p == null) nupFds.put(dump.getAbsolutePath(), p = PickedNup.descriptor(this, dump));
-                nupFd = p.getFd() + ":" + dump.getAbsolutePath();
-            }
-        }
+        if (Nup.picked(dump)) nupFd = PickedNup.toolsFd(this, dump, nupFds);
         PackEngine.setenv("DM_GAME", game);
         PackEngine.setenv("J", "1");
         PackEngine.setenv("DM_NUP_FD", nupFd);

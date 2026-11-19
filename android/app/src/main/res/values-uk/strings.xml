@@ -1425,4 +1425,19 @@
     <string name="game_fast_fp16_shader_math">Швидка математика шейдерів FP16</string>
     <string name="game_fp16_on_turnip_faster">16-бітна половинна точність на Turnip: швидші шейдери, менше тепла</string>
     <string name="game_fp16_default_precision">Точність за замовчуванням</string>
+    <string name="home_a_games_folder">Тека з іграми (додає кожну гру в ній, а згодом і нові)</string>
+    <string name="games_folders_pick">Виберіть теку, де лежать ваші ігри.</string>
+    <string name="games_folders_title">Теки з іграми</string>
+    <string name="games_folders_value">Теки, у яких застосунок шукає нові ігри</string>
+    <string name="games_folders_none">Теки з іграми ще немає.</string>
+    <string name="games_folders_add">Додати теку з іграми</string>
+    <string name="games_folders_look">Шукати нові ігри</string>
+    <string name="games_folders_removed">%1$s більше не тека з іграми. Її ігри лишаються на головному екрані.</string>
+    <string name="games_folders_looking">Пошук нових ігор…</string>
+    <string name="games_folders_nothing_new">У теках з іграми немає нових ігор.</string>
+    <string name="games_folders_no_game">У %1$s не знайдено жодної гри. Вона лишається текою з іграми: ігри, які ви покладете туди пізніше, додаються під час запуску застосунку.</string>
+    <string name="games_folders_cannot_keep">Ця тека не дозволяє застосунку читати її й далі після перезапуску. Виберіть теку в пам\'яті телефона або на SD-картці.</string>
+    <string name="games_folders_cannot_read">Зараз не вдається прочитати %1$s. Можливо, її переміщено чи видалено, або дозвіл відкликано. Вилучіть її в Налаштування › Теки з іграми й додайте знову.</string>
+    <string name="games_folders_dump_needs_access">%1$s — тека дампу: застосунок читає її за шляхом, а для цього потрібен доступ до всіх файлів (або Додати гру › скопіювати в застосунок).</string>
+    <string name="games_folders_hint">Файл .nup, .nsp або .nx — це гра, як і тека дампу; оновлення або DLC поруч зі своєю грою належить до цієї гри. Застосунок переглядає ці теки, коли додано нову, під час кожного запуску та за командою «Шукати нові ігри» й додає ігри, які ще не мають картки (під час запуску лише нові або змінені файли, тож вилучена картка не повертається). Він ніколи не вилучає картку.</string>
 </resources>

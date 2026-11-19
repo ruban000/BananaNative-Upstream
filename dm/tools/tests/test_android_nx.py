@@ -1,5 +1,5 @@
 """The launcher's .nx reading (android/NX.md) on the JVM: android/app/src/jvmtest NxJvmTest with Nx, Nup, Nsp, Zstd, Pack, DumpLayout, BuildCheck, RomfsCheck,
-Profile, ShaderLibs, PickedPath, CopyPlan, PackFind, Words and a stub BuildConfig. Its fixtures come from dm/tools/nx_pack.py (run with this Python, which needs a
+Profile, ShaderLibs, PickedPath, CopyPlan, PackFind, GamesFolder, Words and a stub BuildConfig. Its fixtures come from dm/tools/nx_pack.py (run with this Python, which needs a
 zstd module for the ZSTD archives) and from the test's own small writer. Skipped without a JDK."""
 import os
 import shutil
@@ -36,7 +36,7 @@ def compile_test(case, t):
     (t / 'BuildConfig.java').write_text(STUB, encoding='utf-8')
     r = subprocess.run(['javac', '-encoding', 'UTF-8', '-d', str(t / 'classes')]
                        + [str(SRC / f'{c}.java') for c in ('Nx', 'Nacp', 'Nup', 'Nsp', 'Zstd', 'Pack', 'DumpLayout', 'BuildCheck', 'RomfsCheck', 'Profile', 'ShaderLibs',
-                                                          'PickedPath', 'CopyPlan', 'PackFind', 'Words')]
+                                                          'PickedPath', 'CopyPlan', 'PackFind', 'GamesFolder', 'Words')]
                        + [str(TEST), str(t / 'BuildConfig.java')], capture_output=True, text=True, errors='replace')
     case.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 

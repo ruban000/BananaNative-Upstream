@@ -157,6 +157,12 @@ final class Nup {
 
         /** f's bytes; an IOException with a sentence when it cannot be opened (moved, deleted, its permission taken back) */
         Source open(File f) throws IOException;
+
+        /**
+         * The game files beside f in its folder, as stand-in paths, f's own among them (a games folder's file read through the provider: its folder's .nup,
+         * .nsp and .nx files, for {@link #companions}); null when f has no folder the opener can list (a file picked alone)
+         */
+        default List<File> siblings(File f) { return null; }
     }
 
     /** Set once per process by the app (NxApp); null on the JVM unless a test sets one */
@@ -419,7 +425,10 @@ final class Nup {
         List<Nup> out = new ArrayList<>();
         if (game == null || extOf(game.getName()) == null) return out;   // a game finds the NUP files and NSPs beside it (an update, DLC)
         File parent = game.getAbsoluteFile().getParentFile();
-        File[] l = parent == null ? null : parent.listFiles(f -> f.isFile() && extOf(f.getName()) != null && !f.getName().startsWith("."));
+        Opener o = opener;
+        List<File> sib = o != null && o.owns(game) ? o.siblings(game) : null;   // a games folder's file read through the provider: its folder's files by stand-in paths
+        File[] l = sib != null ? sib.stream().filter(f -> extOf(f.getName()) != null && !f.getName().startsWith(".")).toArray(File[]::new)
+                : parent == null ? null : parent.listFiles(f -> f.isFile() && extOf(f.getName()) != null && !f.getName().startsWith("."));
         if (l == null) return out;
         long app;
         boolean full;   // the game has a base package: the updates of a .nup beside it are versions of it (else they are games of their own)

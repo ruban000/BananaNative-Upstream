@@ -1441,4 +1441,19 @@
     <string name="game_fast_fp16_shader_math">حسابات تظليل FP16 سريعة</string>
     <string name="game_fp16_on_turnip_faster">نصف دقة 16 بت على Turnip: تظليل أسرع وحرارة أقل</string>
     <string name="game_fp16_default_precision">الدقة الافتراضية</string>
+    <string name="home_a_games_folder">مجلد ألعاب (يضيف كل لعبة فيه، والألعاب الجديدة لاحقًا)</string>
+    <string name="games_folders_pick">اختر المجلد الذي يحتوي على ألعابك.</string>
+    <string name="games_folders_title">مجلدات الألعاب</string>
+    <string name="games_folders_value">مجلدات يبحث فيها التطبيق عن ألعاب جديدة</string>
+    <string name="games_folders_none">لا يوجد مجلد ألعاب بعد.</string>
+    <string name="games_folders_add">إضافة مجلد ألعاب</string>
+    <string name="games_folders_look">البحث عن ألعاب جديدة</string>
+    <string name="games_folders_removed">لم يعد %1$s مجلد ألعاب. تبقى ألعابه في الشاشة الرئيسية.</string>
+    <string name="games_folders_looking">جارٍ البحث عن ألعاب جديدة…</string>
+    <string name="games_folders_nothing_new">لا توجد ألعاب جديدة في مجلدات الألعاب.</string>
+    <string name="games_folders_no_game">لم يُعثر على أي لعبة في %1$s. يبقى مجلد ألعاب: الألعاب التي تضعها فيه لاحقًا تُضاف عند بدء التطبيق.</string>
+    <string name="games_folders_cannot_keep">لا يسمح هذا المجلد للتطبيق بمواصلة قراءته بعد إعادة التشغيل. اختر مجلدًا في وحدة تخزين الهاتف أو على بطاقة SD.</string>
+    <string name="games_folders_cannot_read">تتعذر قراءة %1$s الآن. ربما نُقل أو حُذف، أو سُحب إذنه. أزله من الإعدادات › مجلدات الألعاب ثم أضفه مرة أخرى.</string>
+    <string name="games_folders_dump_needs_access">%1$s مجلد تفريغ: يقرأه التطبيق عبر مساره، وهذا يتطلب الوصول إلى جميع الملفات (أو إضافة لعبة › نسخه إلى التطبيق).</string>
+    <string name="games_folders_hint">ملف ‎.nup أو ‎.nsp أو ‎.nx هو لعبة، وكذلك مجلد التفريغ؛ والتحديث أو المحتوى الإضافي بجانب لعبته ينتمي إلى تلك اللعبة. يفحص التطبيق هذه المجلدات عند إضافة أحدها، وفي كل مرة يبدأ فيها، وعند البحث عن ألعاب جديدة، ويضيف الألعاب التي ليست لها بطاقة بعد (عند البدء الملفات الجديدة أو المعدلة فقط، لذا تبقى البطاقة التي أزلتها محذوفة). ولا يزيل أي بطاقة أبدًا.</string>
 </resources>

@@ -628,7 +628,7 @@ final class GameSettings {
         }
         outer.addView(bar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(a, 48)));
         boolean ownCover = Covers.show(tile, g);   // the player's own cover wins over the game's icon
-        GameMeta.loadControl(new File(g.gameDir), Edition.control(a, g), m -> {
+        GameMeta.loadControl(new File(g.gameDir), Edition.tag(a, g), () -> Edition.control(a, g), m -> {
             if (m.icon != null && !ownCover) Ui.tileIcon(tile, m.icon);
             String l = m.line();
             if (l != null) { meta.setText(l); meta.setVisibility(View.VISIBLE); }

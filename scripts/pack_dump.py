@@ -162,7 +162,7 @@ def nup_scan(path):
         if p.romfs == nup.NONE: raise Error(f'{path}: add-on {p.title_id:016X} has no RomFS')
         dlc[(app & ~0xFF) + 0x1000 + index] = pkg(p, '/romfs')   # named in the game's range, as scan() names them
     if True:   # NSP Box writes each DLC, and each version of the game, as an NSP of its own, and a .nup can be split the same way: the NSPs and .nup files beside the game's that are of it (found by their content, whatever they are called)
-        for f in sorted(g for ext in ('*.nsp', '*.nup', '*.nx') for g in Path(n.path).parent.glob(ext)):
+        for f in map(Path, nup.beside(Path(n.path).parent)):   # with the files DM_NUP_FD names there (a games folder read through the provider)
             if str(f) == n.path: continue
             try: m = nup.open_nup(f)
             except (nup.Error, OSError): continue

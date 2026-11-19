@@ -45,7 +45,7 @@ import java.util.Locale;
  * readable width, centered on a wide window. The activity handles rotation itself (configChanges), so a size change builds the page again (onConfigurationChanged).
  */
 public final class MainActivity extends Activity {
-    private static final int PICK_GAME = 1, PICK_PACK = 2, PICK_DLL = 3, PICK_DRIVER = 4, PICK_NUP = 5, PICK_NUP_HERE = 6, PICK_BG = 7, PICK_SND = 8;
+    private static final int PICK_GAME = 1, PICK_PACK = 2, PICK_DLL = 3, PICK_DRIVER = 4, PICK_NUP = 5, PICK_NUP_HERE = 6, PICK_BG = 7, PICK_SND = 8, PICK_GAMES_FOLDER = 12;   // (9 is UsersUi.PICK_PHOTO)
 
     private final List<Game> games = new ArrayList<>();
     private LinearLayout gameBox;   // the game cards (refresh)
@@ -93,6 +93,8 @@ public final class MainActivity extends Activity {
         GpuGl.probe(this, () -> { if (!isFinishing() && settingsGame != null) gameSettingsAgain(); });   // the GPU's name and, before any readiness check, the system driver's facts for the recommendations
         Updater.changed = this::updatesChanged;
         Updater.onStart(this);   // the release app: a newer release on GitHub opens the update popup (once per process start: not on a resume or a rotation)
+        // the games folders (GamesFolders): looked through once per process start, never on a resume or a rotation; new games get cards (GamesFolder.Trigger)
+        if (GamesFolder.startDue() && !GamesFolders.folders(this).isEmpty()) lookForGames(GamesFolder.Trigger.START, null);
     }
 
     @Override protected void onSaveInstanceState(Bundle out) {
@@ -871,6 +873,8 @@ public final class MainActivity extends Activity {
         advRow.value(AdvancedSettings.count(this, null) == 0 ? Tx.s(R.string.common_search_every_switch_each_starts) : Tx.n(R.plurals.common_n_set, AdvancedSettings.count(this, null), AdvancedSettings.count(this, null)));
         sys.addView(advRow.view);
         sys.addView(new Ui.Setting(this, "📁", Tx.s(R.string.common_folders), v -> Folders.dialog(this)).value(Tx.s(R.string.common_game_pack_and_save_folders)).chevron(this).view);
+        gamesFoldersRow = new Ui.Setting(this, "🗂️", Tx.s(R.string.games_folders_title), v -> GamesFolders.sheet(this)).value(GamesFolders.summary(this)).chevron(this);   // (GamesFolders.java)
+        sys.addView(gamesFoldersRow.view);
         sys.addView(new Ui.Setting(this, "🧹", Tx.s(R.string.settings_storage), v -> StorageUi.dialog(this)).value(Tx.s(R.string.settings_remove_leftovers_and_old_files)).chevron(this).view);   // (StorageUi.java)
         // some phones stop or slow a background job once the screen is off (GitHub discussion 58): Home keeps the screen on while preparing (Ondevice), the service its wake lock
         sys.addView(new Ui.Setting(this, "🔆", Tx.s(R.string.settings_keep_the_screen_on_while), null).toggle(this, Prefs.keepScreenPreparing(this), (b, on) -> Prefs.keepScreenPreparing(this, on))
@@ -947,8 +951,11 @@ public final class MainActivity extends Activity {
     /** A settings group's card of rows, under its section label */
     private LinearLayout settingsCard(LinearLayout content) { return Ui.add(content, Ui.listCard(this), 8); }
 
+    private Ui.Setting gamesFoldersRow;
+
     /** The settings rows' current values (after a dialog, on resume) */
-    private void refreshSettings() {
+    void refreshSettings() {
+        if (gamesFoldersRow != null) gamesFoldersRow.value(GamesFolders.summary(this));
         if (overlayRow == null) return;
         updateRow.value(Updater.versionText(this));
         boolean ov = Prefs.overlay(this);
@@ -1513,7 +1520,7 @@ public final class MainActivity extends Activity {
         c.setOnLongClickListener(v -> { optionsMenu(g); return true; });   // the game's options (workTile puts the job's sheet back on the tile being prepared)
         TextView tile = (TextView) c.getChildAt(0);
         boolean ownCover = Covers.show(tile, g);   // the player's own cover wins over the game's icon
-        GameMeta.loadControl(new File(g.gameDir), Edition.control(this, g), m -> {
+        GameMeta.loadControl(new File(g.gameDir), Edition.tag(this, g), () -> Edition.control(this, g), m -> {
             if (m.icon != null && !ownCover) Ui.tileIcon(tile, m.icon);
             TileInfo ti = (TileInfo) c.getTag();
             ti.version = m.version;
@@ -1877,9 +1884,10 @@ public final class MainActivity extends Activity {
     void addGame() {
         if (!Environment.isExternalStorageManager()) { addWithoutAccess(); return; }
         new PadFocus.Builder(this).setTitle(Tx.s(R.string.home_add_game_your_dump_is))
-                .setItems(new String[] {Tx.s(R.string.home_a_folder_with_base_and), Tx.s(R.string.home_a_nup_file_or_an)}, (d, w) -> {
+                .setItems(new String[] {Tx.s(R.string.home_a_folder_with_base_and), Tx.s(R.string.home_a_nup_file_or_an), Tx.s(R.string.home_a_games_folder)}, (d, w) -> {
                     if (w == 0) pickFolder(PICK_GAME, Tx.s(R.string.home_pick_your_dump_folder_with));
-                    else pickNup();
+                    else if (w == 1) pickNup();
+                    else pickGamesFolder();
                 })
                 .setNegativeButton(Tx.s(R.string.common_cancel), null).show();
     }
@@ -1891,13 +1899,53 @@ public final class MainActivity extends Activity {
      */
     private void addWithoutAccess() {
         new PadFocus.Builder(this).setTitle(Tx.s(R.string.home_add_game_your_dump_is))
-                .setItems(new String[] {Tx.s(R.string.home_a_nup_or_nsp_file), Tx.s(R.string.home_a_dump_folder_copied_into),
+                .setItems(new String[] {Tx.s(R.string.home_a_nup_or_nsp_file), Tx.s(R.string.home_a_games_folder), Tx.s(R.string.home_a_dump_folder_copied_into),
                         Tx.s(R.string.home_allow_all_files_access)}, (d, w) -> {
                     if (w == 0) pickNupHere();
-                    else if (w == 1) { Toast.makeText(this, Tx.s(R.string.home_pick_your_dump_folder_with), Toast.LENGTH_LONG).show(); GameCopy.pickTree(this); }
+                    else if (w == 1) pickGamesFolder();
+                    else if (w == 2) { Toast.makeText(this, Tx.s(R.string.home_pick_your_dump_folder_with), Toast.LENGTH_LONG).show(); GameCopy.pickTree(this); }
                     else openAccessSettings();
                 })
                 .setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+    }
+
+    /** Add game › A games folder: the folder picker (GamesFolders); the picked folder is kept and looked through at once */
+    void pickGamesFolder() {
+        Toast.makeText(this, Tx.s(R.string.games_folders_pick), Toast.LENGTH_LONG).show();
+        startActivityForResult(GamesFolders.pickIntent(), PICK_GAMES_FOLDER);
+    }
+
+    /** A picked games folder: its read permission kept, then its games looked for (off the main thread) */
+    private void gamesFolderPicked(Uri tree) {
+        String t;
+        try { t = GamesFolders.add(this, tree); } catch (IOException e) { error(e.getMessage()); return; }
+        refreshSettings();
+        lookForGames(GamesFolder.Trigger.ADDED, List.of(t));
+    }
+
+    /**
+     * Looks through the games folders (trees: these only; null: all) off the main thread (Background.LOOK: one look at a time), checks what it found as Add game
+     * does for several games (checkGames), and says on the main thread what it added and what it could not (added). The start look says nothing when it found
+     * nothing new; Look for new games says so in a toast; a folder just added says when it holds no game
+     */
+    void lookForGames(GamesFolder.Trigger t, List<String> trees) {
+        if (t != GamesFolder.Trigger.START) Toast.makeText(this, Tx.s(R.string.games_folders_looking), Toast.LENGTH_SHORT).show();
+        Background.LOOK.execute(() -> {
+            GamesFolders.Outcome o = GamesFolders.look(this, t, trees);
+            List<Pick> picks = o.add.isEmpty() ? new ArrayList<>() : checkGames(o.add, false);
+            List<Game> cards = Game.load(this);   // a look never replaces a card: a game of the same title and build as one on Home (another copy of it) is left out
+            picks.removeIf(k -> k.id != null && k.error == null && !GameList.matches(cards, k.id, k.game.getPath(), k.key, Game::key).isEmpty());
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                if (o.moved > 0) refresh();
+                if (!picks.isEmpty() || !o.problems.isEmpty()) { added(picks, false, o.problems); return; }
+                if (t == GamesFolder.Trigger.LOOK) Toast.makeText(this, Tx.s(R.string.games_folders_nothing_new), Toast.LENGTH_LONG).show();
+                else if (t == GamesFolder.Trigger.ADDED && o.games == 0)
+                    new PadFocus.Builder(this).setTitle(Tx.s(R.string.home_no_game_added)).setMessage(Tx.s(R.string.games_folders_no_game, trees == null || trees.isEmpty() ? "" : GamesFolders.name(trees.get(0))))
+                            .setPositiveButton(android.R.string.ok, null).show();
+                else if (t == GamesFolder.Trigger.ADDED) Toast.makeText(this, Tx.s(R.string.games_folders_nothing_new), Toast.LENGTH_LONG).show();
+            });
+        });
     }
 
     /** The file picker for a .nup used where it is (PickedNup) */
@@ -2015,6 +2063,7 @@ public final class MainActivity extends Activity {
         if (CheatsUi.documentResult(this, request, data.getData())) return;
         if (ModsUi.documentResult(this, request, data.getData())) return;
         if (request == PICK_NUP_HERE) { nupHere(data.getData()); return; }
+        if (request == PICK_GAMES_FOLDER) { gamesFolderPicked(data.getData()); return; }
         if (request == PICK_NUP) {
             String p = PathUtil.documentToPath(data.getData());
             if (p == null) { nupHere(data.getData()); return; }   // Recent, Downloads: no path, but the file can be used where it is (PickedNup)
@@ -2067,6 +2116,8 @@ public final class MainActivity extends Activity {
         boolean unsupported;      // no profile in this APK
         boolean dump;             // a dump Prepare starts from (Pack.isDump)
         PackFind.Found pack;      // a pack that plays now or after the automatic shader update (Folders.find), null: none
+        boolean addChecked;       // addProblem ran in the background pass (several games): addError is its answer
+        String addError;
         DumpLayout.Found found;   // without a pack: the version Prepare would start from, or why it cannot (DumpLayout.find)
         String key;               // its game build (Game.key: title, version, main's build ID), null when it cannot be told
         final List<Game> others = new ArrayList<>();   // Home's entries of the same title that are another dump (GameList.others): the user decides
@@ -2087,6 +2138,13 @@ public final class MainActivity extends Activity {
     private void addAll(List<File> picked, boolean single) {
         Toast.makeText(this, single ? Tx.s(R.string.home_checking_name, picked.get(0).getName()) : Tx.n(R.plurals.home_checking_games, picked.size(), picked.size()), Toast.LENGTH_SHORT).show();
         new Thread(() -> {
+            List<Pick> out = checkGames(picked, single);
+            runOnUiThread(() -> { if (!isFinishing()) added(out, single, List.of()); });
+        }, "nx-add-game").start();
+    }
+
+    /** addAll's checks of each game, off the main thread (they read the files): its title, profile, pack, and for several games whether its pack's RomFS is there */
+    private List<Pick> checkGames(List<File> picked, boolean single) {
             List<Pick> out = new ArrayList<>();
             for (File g : picked) {
                 Pick k = new Pick(g);
@@ -2114,12 +2172,13 @@ public final class MainActivity extends Activity {
                 for (int i : GameList.others(list, k.id, g.getPath(), k.key, Game::key)) k.others.add(list.get(i));
                 android.util.Log.i("nxnative", "Add game: " + g + " (" + k.id + ", " + k.key + "): " + (k.pack == null ? "no usable pack" : "pack " + k.pack.dir + (k.pack.tier == PackFind.READY ? " (ready)" : k.pack.tier == PackFind.ON_DEMAND ? " (shaders on demand)" : " (shader update)"))
                         + (k.others.isEmpty() ? "" : "; " + k.others.size() + " other dump(s) of it on the list"));
+                if (!single && k.pack != null) { k.addChecked = true; k.addError = addProblem(g, k.id, k.pack.dir); }   // here, not on the main thread: it reads the game's file
             }
-            runOnUiThread(() -> { if (!isFinishing()) added(out, single); });
-        }, "nx-add-game").start();
+            return out;
     }
 
-    private void added(List<Pick> picks, boolean single) {
+    /** What Add game found (added), and what a games folder look could not add (more: one sentence each), said in one message for several games */
+    private void added(List<Pick> picks, boolean single, List<String> more) {
         if (single) {
             Pick k = picks.get(0);
             if (k.error != null) {
@@ -2156,7 +2215,7 @@ public final class MainActivity extends Activity {
             if (k.unsupported) { unsupported.add(k.game.getName() + " (" + k.id + ")"); continue; }
             if (k.error != null) { failed.add(k.plain != null ? k.game.getName() + ": " + k.plain : k.error); continue; }
             if (k.pack != null) {
-                String err = add(k.game, k.id, k.pack.dir, null);
+                String err = k.addChecked ? k.addError != null ? k.addError : put(k.game, k.id, k.pack.dir, null) : add(k.game, k.id, k.pack.dir, null);
                 if (err == null) ok.add(k.pack.pack.name.isEmpty() ? k.name : k.pack.pack.name);
                 else failed.add(k.game.getName() + ": " + err);
             } else if (k.dump) {
@@ -2165,6 +2224,7 @@ public final class MainActivity extends Activity {
             } else noPack.add(k.game.getName());
             if (!k.others.isEmpty() && (k.pack != null || k.dump)) twice.add(k.game.getName());
         }
+        failed.addAll(more);
         refresh();
         StringBuilder m = new StringBuilder();
         if (!ok.isEmpty()) m.append(Tx.s(R.string.home_added_list, TextUtils.join(", ", ok)));
@@ -2246,6 +2306,12 @@ public final class MainActivity extends Activity {
      * the user chose to replace); null when added, else why not in a sentence
      */
     private String add(File game, String id, File packDir, List<String> replace) {
+        String err = addProblem(game, id, packDir);
+        return err != null ? err : put(game, id, packDir, replace);
+    }
+
+    /** Why the game cannot be added with this pack folder, null when it can (it reads the game's file: off the main thread for several games) */
+    private String addProblem(File game, String id, File packDir) {
         Pack pack;
         try { pack = Pack.read(packDir); } catch (IOException e) { return e.getMessage(); }
         if (!pack.titleId.equals(id)) return "The pack is for " + pack.titleId + ", the game " + (Nup.isNup(game) ? Nup.word(game) : "folder") + " holds " + id + ".";
@@ -2256,6 +2322,13 @@ public final class MainActivity extends Activity {
             try { romfs = pack.romfsPath(game); } catch (IOException e) { return Tx.s(R.string.err_game_cannot_be_used, game.getName(), e.getMessage()); }
             if (romfs == null) return Tx.s(R.string.err_game_has_no_romfs, game.getName(), pack.romfsSelector(), pack.version);
         } else if (pack.romfs(game) == null) return Tx.s(R.string.err_no_romfs_in, game.toString(), pack.romfsRel);
+        return null;
+    }
+
+    /** The checked game into the list with this pack folder (Game.put); null, or why not when the pack cannot be read now */
+    private String put(File game, String id, File packDir, List<String> replace) {
+        Pack pack;
+        try { pack = Pack.read(packDir); } catch (IOException e) { return e.getMessage(); }
         Game.put(this, new Game(id, pack.name.isEmpty() ? id : pack.name, game.getPath(), packDir.getPath()), replace);
         return null;
     }

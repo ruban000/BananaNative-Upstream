@@ -1492,4 +1492,20 @@
     <string name="game_fast_fp16_shader_math">Fast FP16 shader math</string>
     <string name="game_fp16_on_turnip_faster">16-bit half precision on Turnip: faster shader math, lower heat</string>
     <string name="game_fp16_default_precision">Default precision</string>
+    <!-- Games folders (GamesFolders, GamesFolder: Add game › A games folder, Settings › Games folders) -->
+    <string name="home_a_games_folder">A games folder (adds every game in it, and new ones later)</string>
+    <string name="games_folders_pick">Pick the folder that holds your games.</string>
+    <string name="games_folders_title">Games folders</string>
+    <string name="games_folders_value">Folders the app looks through for new games</string>
+    <string name="games_folders_none">No games folder yet.</string>
+    <string name="games_folders_add">Add a games folder</string>
+    <string name="games_folders_look">Look for new games</string>
+    <string name="games_folders_removed">%1$s is no longer a games folder. Its games stay on Home.</string>
+    <string name="games_folders_looking">Looking for new games…</string>
+    <string name="games_folders_nothing_new">No new games in the games folders.</string>
+    <string name="games_folders_no_game">No game was found in %1$s. It stays a games folder: games you put there later are added when the app starts.</string>
+    <string name="games_folders_cannot_keep">That folder does not let the app keep reading it after a restart. Pick a folder on the phone\'s storage or an SD card.</string>
+    <string name="games_folders_cannot_read">%1$s cannot be read now. It may have been moved or deleted, or its permission taken back. Remove it in Settings › Games folders and add it again.</string>
+    <string name="games_folders_dump_needs_access">%1$s is a dump folder: the app reads one by its path, which needs All files access (or Add game › copy it into the app).</string>
+    <string name="games_folders_hint">A .nup, .nsp or .nx file is a game, and so is a dump folder; an update or DLC beside its game belongs to that game. The app looks through these folders when one is added, each time the app starts and with Look for new games, and adds the games that have no card yet (at a start only files that are new or changed, so a card you removed stays removed). It never removes a card.</string>
 </resources>

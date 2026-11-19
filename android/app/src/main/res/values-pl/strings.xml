@@ -1425,4 +1425,19 @@
     <string name="game_fast_fp16_shader_math">Szybkie obliczenia shaderów FP16</string>
     <string name="game_fp16_on_turnip_faster">16-bitowa połowiczna precyzja na Turnip: szybsze shadery, mniej ciepła</string>
     <string name="game_fp16_default_precision">Domyślna precyzja</string>
+    <string name="home_a_games_folder">Folder z grami (dodaje każdą grę w nim, także nowe później)</string>
+    <string name="games_folders_pick">Wybierz folder, w którym są twoje gry.</string>
+    <string name="games_folders_title">Foldery z grami</string>
+    <string name="games_folders_value">Foldery, w których aplikacja szuka nowych gier</string>
+    <string name="games_folders_none">Nie ma jeszcze folderu z grami.</string>
+    <string name="games_folders_add">Dodaj folder z grami</string>
+    <string name="games_folders_look">Szukaj nowych gier</string>
+    <string name="games_folders_removed">%1$s nie jest już folderem z grami. Jego gry zostają na ekranie głównym.</string>
+    <string name="games_folders_looking">Szukanie nowych gier…</string>
+    <string name="games_folders_nothing_new">Brak nowych gier w folderach z grami.</string>
+    <string name="games_folders_no_game">W %1$s nie znaleziono żadnej gry. Pozostaje folderem z grami: gry, które tam później umieścisz, zostaną dodane przy uruchomieniu aplikacji.</string>
+    <string name="games_folders_cannot_keep">Ten folder nie pozwala aplikacji czytać go dalej po ponownym uruchomieniu. Wybierz folder w pamięci telefonu lub na karcie SD.</string>
+    <string name="games_folders_cannot_read">Nie można teraz odczytać %1$s. Mógł zostać przeniesiony lub usunięty albo cofnięto jego uprawnienie. Usuń go w Ustawienia › Foldery z grami i dodaj ponownie.</string>
+    <string name="games_folders_dump_needs_access">%1$s to folder zrzutu: aplikacja czyta go po ścieżce, co wymaga dostępu do wszystkich plików (albo Dodaj grę › skopiuj go do aplikacji).</string>
+    <string name="games_folders_hint">Plik .nup, .nsp lub .nx to gra, podobnie jak folder zrzutu; aktualizacja lub DLC obok swojej gry należy do tej gry. Aplikacja przegląda te foldery, gdy jeden zostanie dodany, przy każdym uruchomieniu i po wybraniu Szukaj nowych gier, i dodaje gry, które nie mają jeszcze karty (przy uruchomieniu tylko nowe lub zmienione pliki, więc usunięta karta nie wraca). Nigdy nie usuwa karty.</string>
 </resources>

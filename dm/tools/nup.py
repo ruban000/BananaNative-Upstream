@@ -18,11 +18,12 @@ Nup whose files are block lists (dm/tools/nx.py).
 
 A .nup may also be read through a descriptor in place of its path (android/NUP.md "A .nup used where it is"): DM_NUP_FD=<fd>:<path> names a path that is read
 through descriptor fd (duplicated for each reader, read with pread only), whether or not anything is at that path. The phone's packer sets it for a .nup the user
-picked with the system file picker, which the app may not open by any path; the tools name the file by its stand-in path as usual.
+picked with the system file picker, which the app may not open by any path; the tools name the file by its stand-in path as usual. It may hold several such lines,
+one per file: a game of a games folder read through the provider and the files beside it (its updates and DLC), which beside() lists with the folder's own.
 
 Usage: nup.py <file>.nup [packages | ls [<name>] | cat <name> | verify [<name>]]   (exit 1 on a bad file; <name> is a selector with a path)
 """
-import errno, functools, hashlib, io, os, re, stat as _stat, struct, sys, tempfile
+import errno, fnmatch, functools, glob, hashlib, io, os, re, stat as _stat, struct, sys, tempfile
 
 MAGIC, TOC_MAGIC = b'NUP\x01', b'TOC\x01'
 SB = struct.Struct('<4sHHQQ32sQQII16s32s')     # superblock, 0x80 bytes (SPEC §2)
@@ -66,15 +67,37 @@ else:
         return b''.join(out)
 
 
+def fd_paths():
+    """DM_NUP_FD's (descriptor, path) pairs: one `<fd>:<path>` per line (a game file and the files beside it of a games folder read through the provider). Read at
+    each call: the phone's packer runs the tools in one Python, with the environment of each run"""
+    out = []
+    for line in os.environ.get('DM_NUP_FD', '').split('\n'):
+        fd, sep, named = line.partition(':')
+        if sep and fd.isdigit() and named: out.append((int(fd), named))
+    return out
+
+
 def fd_of(path):
-    """The descriptor DM_NUP_FD gives for path (`<fd>:<path>`, the paths compared after realpath), else None. Read at each call: the phone's packer runs the tools
-    in one Python, with the environment of each run"""
-    v = os.environ.get('DM_NUP_FD', '')
-    fd, sep, named = v.partition(':')
-    if not sep or not fd.isdigit() or not named: return None
-    try: same = os.path.realpath(os.fsdecode(path)) == os.path.realpath(named)
+    """The descriptor DM_NUP_FD gives for path (`<fd>:<path>`, the paths compared after realpath), else None"""
+    pairs = fd_paths()
+    if not pairs: return None
+    try: real = os.path.realpath(os.fsdecode(path))
     except (TypeError, ValueError): return None
-    return int(fd) if same else None
+    for fd, named in pairs:
+        if real == os.path.realpath(named): return fd
+    return None
+
+
+def beside(folder, patterns=('*.nsp', '*.nup', '*.nx')):
+    """The game files in a folder (glob patterns), with the paths DM_NUP_FD names in it, which may be stand-ins with nothing at them (a games folder's files read
+    through the provider): sorted, each once"""
+    folder = os.fspath(folder)
+    found = {os.path.join(folder, os.path.basename(g)) for p in patterns for g in glob.glob(os.path.join(glob.escape(folder), p))}
+    real = os.path.realpath(folder)
+    for _, named in fd_paths():
+        if os.path.realpath(os.path.dirname(named)) == real and any(fnmatch.fnmatchcase(os.path.basename(named), p) for p in patterns):
+            found.add(os.path.join(folder, os.path.basename(named)))
+    return sorted(found)
 
 
 def open_fd(path):

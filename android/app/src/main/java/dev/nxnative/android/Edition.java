@@ -67,6 +67,9 @@ final class Edition {
         return ctl != null && new File(ctl, "control.nacp").isFile() ? ctl.getPath() : null;
     }
 
+    /** Which details control() would name, told without opening anything (its title ID and the switch): GameMeta's kept details are per tag */
+    static String tag(Context c, Game g) { return g.titleId + (on(c, g.titleId) ? ":program1" : ""); }
+
     /** The switch's state for an application: true = program 1 */
     static boolean on(Context c, String appId) { return Prefs.of(c).getBoolean(Prefs.gameKey("edition_program1", appId), false); }
 

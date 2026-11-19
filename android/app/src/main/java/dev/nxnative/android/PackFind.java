@@ -20,7 +20,7 @@ import java.util.Set;
  *     restamp or delta shader update brings current ({@link #UPDATE}); within a tier the first candidate wins (the picked folder, then the app's, then the nearest).
  *     A pack whose code is of another game build is never chosen.</li>
  * <li>{@link #gamesIn}: the games a picked folder holds (Add game on a folder adds all of them): each .nup (.nx, .nsp) in it and each dump subfolder (base/exefs/main.npdm
- *     or exefs/main.npdm) one level deep, not work or pack folders.</li>
+ *     or exefs/main.npdm) one level deep, not work or pack folders: the games folders' rule (GamesFolder) at depth 0.</li>
  * </ul>
  */
 final class PackFind {
@@ -144,58 +144,17 @@ final class PackFind {
 
     /**
      * The games a picked folder holds, sorted by name: its .nup files (and files named .NUP, which Add game then asks to rename), and its subfolders with
-     * base/exefs/main.npdm or exefs/main.npdm, one level deep; not an &lt;id&gt;-work folder (extraction and work files) and not a pack folder (pack.tsv)
+     * base/exefs/main.npdm or exefs/main.npdm, one level deep; not an &lt;id&gt;-work folder (extraction and work files) and not a pack folder (pack.tsv); a file that
+     * is a part of a game beside it (GamesFolder.companion) is not listed
      */
     static List<File> gamesIn(File dir) {
+        GamesFolder.Result r = GamesFolder.scan(new GamesFolder.PathTree(dir) {
+            @Override public GamesFolder.Dump dump(GamesFolder.Entry d) { return d.rel.isEmpty() ? GamesFolder.Dump.NONE : super.dump(d); }   // the picked folder is not a dump (Add game asked first)
+        }, 0, e -> GamesFolder.Facts.read(e.file));   // the games folders' rule (GamesFolder), one level: the folder's files and its dump subfolders
         List<File> out = new ArrayList<>();
-        File[] l = dir.listFiles();
-        if (l == null) return out;
-        Arrays.sort(l);
-        for (File f : l) {
-            if (f.getName().startsWith(".")) continue;
-            if (f.isFile() && (Nup.isNup(f) || Nup.wrongCase(f))) {
-                if (!companion(f, l)) out.add(f);
-            }
-            else if (f.isDirectory() && !f.getName().matches("(?i)[0-9a-f]{16}-work") && !new File(f, "pack.tsv").isFile() && Pack.npdmOf(f) != null) out.add(f);
-        }
+        for (GamesFolder.Entry e : r.games) out.add(e.file);
+        for (GamesFolder.Entry e : r.wrongCase) out.add(e.file);   // Add game asks to rename them
+        out.sort(java.util.Comparator.comparing(File::getName));
         return out;
-    }
-
-    /**
-     * Whether a file of the list is a part of a game that another file of the list stands for, so that Add game lists that one only and it finds the rest beside
-     * it (Nup.companions): a DLC NSP; an NSP of a version that a newer NSP of the game outranks, or of a game with a .nup beside it that has its base; a .nup with no
-     * base package (an update or DLC of its own) beside a .nup of its game that has one. A .nup with a base package stands for itself, whatever else is beside it
-     */
-    private static boolean companion(File f, File[] folder) {
-        boolean nup = Nup.container(f.getName());   // a .nup or an .nx
-        if (!nup && !f.getName().endsWith(Nup.EXT_NSP)) return false;
-        try {
-            Nup me = Nup.peek(f);
-            if (nup && me.base() != null) return false;
-            Nup.Pkg mine = me.newest();
-            if (mine == null && !nup) return true;   // a DLC NSP: it belongs to a game beside it, or to none (then nothing is lost: it is no game)
-            for (File g : folder) {
-                if (g.equals(f) || g.getName().startsWith(".") || !g.isFile()) continue;
-                boolean gnup = Nup.container(g.getName());
-                if (!gnup && !g.getName().endsWith(Nup.EXT_NSP)) continue;
-                Nup o;
-                try { o = Nup.peek(g); } catch (IOException | RuntimeException e) { continue; }
-                Nup.Pkg p = o.newest();
-                if (p == null) continue;
-                if (mine == null) {   // a .nup of DLC only: hidden when a game beside it has that DLC, else listed (Add game says why it is no game)
-                    for (Nup.Pkg a : me.packages) {
-                        long idx = a.titleId - p.titleId - 0x1000;
-                        if (a.kind == Nup.ADDON && idx > 0 && idx <= 2000) return true;
-                    }
-                    continue;
-                }
-                if (p.titleId != mine.titleId) continue;   // another game
-                if (gnup || nup) { if (gnup && o.base() != null) return true; continue; }
-                if (p.version > mine.version || p.version == mine.version && g.getName().compareTo(f.getName()) < 0) return true;
-            }
-        } catch (IOException | RuntimeException e) {
-            return false;   // unreadable: listed, so that Add game says why
-        }
-        return false;
     }
 }

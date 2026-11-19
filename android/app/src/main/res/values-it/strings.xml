@@ -1417,4 +1417,19 @@
     <string name="game_fast_fp16_shader_math">Calcolo shader FP16 veloce</string>
     <string name="game_fp16_on_turnip_faster">Mezza precisione a 16 bit su Turnip: calcolo shader più veloce, meno calore</string>
     <string name="game_fp16_default_precision">Precisione predefinita</string>
+    <string name="home_a_games_folder">Una cartella di giochi (aggiunge ogni gioco che contiene, e quelli nuovi in seguito)</string>
+    <string name="games_folders_pick">Scegli la cartella che contiene i tuoi giochi.</string>
+    <string name="games_folders_title">Cartelle di giochi</string>
+    <string name="games_folders_value">Cartelle in cui l\'app cerca nuovi giochi</string>
+    <string name="games_folders_none">Ancora nessuna cartella di giochi.</string>
+    <string name="games_folders_add">Aggiungi una cartella di giochi</string>
+    <string name="games_folders_look">Cerca nuovi giochi</string>
+    <string name="games_folders_removed">%1$s non è più una cartella di giochi. I suoi giochi restano nella Home.</string>
+    <string name="games_folders_looking">Ricerca di nuovi giochi…</string>
+    <string name="games_folders_nothing_new">Nessun nuovo gioco nelle cartelle di giochi.</string>
+    <string name="games_folders_no_game">Nessun gioco trovato in %1$s. Resta una cartella di giochi: i giochi che ci metterai in seguito vengono aggiunti all\'avvio dell\'app.</string>
+    <string name="games_folders_cannot_keep">Quella cartella non consente all\'app di continuare a leggerla dopo un riavvio. Scegli una cartella nella memoria del telefono o su una scheda SD.</string>
+    <string name="games_folders_cannot_read">%1$s non può essere letta ora. Potrebbe essere stata spostata o eliminata, o il permesso è stato revocato. Rimuovila in Impostazioni › Cartelle di giochi e aggiungila di nuovo.</string>
+    <string name="games_folders_dump_needs_access">%1$s è una cartella di dump: l\'app la legge tramite il suo percorso, che richiede l\'accesso a tutti i file (oppure Aggiungi gioco › copiala nell\'app).</string>
+    <string name="games_folders_hint">Un file .nup, .nsp o .nx è un gioco, come una cartella di dump; un aggiornamento o un DLC accanto al suo gioco appartiene a quel gioco. L\'app esamina queste cartelle quando ne viene aggiunta una, a ogni avvio e con Cerca nuovi giochi, e aggiunge i giochi che non hanno ancora una scheda (all\'avvio solo i file nuovi o modificati, quindi una scheda rimossa resta rimossa). Non rimuove mai una scheda.</string>
 </resources>

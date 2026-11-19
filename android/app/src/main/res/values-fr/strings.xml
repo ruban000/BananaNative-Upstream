@@ -1417,4 +1417,19 @@
     <string name="game_fast_fp16_shader_math">Calcul de shaders FP16 rapide</string>
     <string name="game_fp16_on_turnip_faster">Demi-précision 16 bits sur Turnip : shaders plus rapides, moins de chaleur</string>
     <string name="game_fp16_default_precision">Précision par défaut</string>
+    <string name="home_a_games_folder">Un dossier de jeux (ajoute chaque jeu qu\'il contient, et les nouveaux plus tard)</string>
+    <string name="games_folders_pick">Choisissez le dossier qui contient vos jeux.</string>
+    <string name="games_folders_title">Dossiers de jeux</string>
+    <string name="games_folders_value">Dossiers où l\'app cherche de nouveaux jeux</string>
+    <string name="games_folders_none">Aucun dossier de jeux pour l\'instant.</string>
+    <string name="games_folders_add">Ajouter un dossier de jeux</string>
+    <string name="games_folders_look">Chercher de nouveaux jeux</string>
+    <string name="games_folders_removed">%1$s n\'est plus un dossier de jeux. Ses jeux restent sur l\'accueil.</string>
+    <string name="games_folders_looking">Recherche de nouveaux jeux…</string>
+    <string name="games_folders_nothing_new">Aucun nouveau jeu dans les dossiers de jeux.</string>
+    <string name="games_folders_no_game">Aucun jeu trouvé dans %1$s. Il reste un dossier de jeux : les jeux que vous y mettrez plus tard seront ajoutés au démarrage de l\'app.</string>
+    <string name="games_folders_cannot_keep">Ce dossier ne permet pas à l\'app de continuer à le lire après un redémarrage. Choisissez un dossier du stockage du téléphone ou d\'une carte SD.</string>
+    <string name="games_folders_cannot_read">%1$s ne peut pas être lu pour le moment. Il a peut-être été déplacé ou supprimé, ou son autorisation retirée. Retirez-le dans Réglages › Dossiers de jeux et ajoutez-le à nouveau.</string>
+    <string name="games_folders_dump_needs_access">%1$s est un dossier de dump : l\'app le lit par son chemin, ce qui demande l\'accès à tous les fichiers (ou Ajouter un jeu › le copier dans l\'app).</string>
+    <string name="games_folders_hint">Un fichier .nup, .nsp ou .nx est un jeu, tout comme un dossier de dump ; une mise à jour ou un DLC à côté de son jeu appartient à ce jeu. L\'app parcourt ces dossiers quand l\'un d\'eux est ajouté, à chaque démarrage et avec Chercher de nouveaux jeux, et ajoute les jeux qui n\'ont pas encore de carte (au démarrage, seulement les fichiers nouveaux ou modifiés : une carte retirée le reste). Elle ne retire jamais de carte.</string>
 </resources>

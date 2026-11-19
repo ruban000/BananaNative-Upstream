@@ -67,8 +67,10 @@ works (`/proc/self/fd/<n>` reopened by path is not reliable on every provider). 
   link, a closed descriptor refused).
 - Tools: `DM_NUP_FD=<fd>:<path>` (`nup.py` `fd_of`, `open_fd`, `stat`): that path, compared after realpath, is read through a
   duplicate of `<fd>` whether or not anything is there, so `pack_android.py`, `pack_dump.py` and `shader_split.py` take the
-  stand-in path as any `.nup` path. The phone's packer sets it per run (`PackService`); empty means none. Tests: test_nup.py
-  `Descriptor` (the trees, streams and mmap, pack_dump.scan, and pack_android.py's pack equal to the file's own).
+  stand-in path as any `.nup` path. The phone's packer sets it per run (`PackService`); empty means none. It may hold one
+  `<fd>:<path>` line per file: a games folder's game read through the provider and the update and DLC files beside it
+  (`PickedNup.toolsFd`), which `nup.beside` lists with the folder's own files (`pack_dump.nup_scan`). Tests: test_nup.py
+  `Descriptor` (the trees, streams and mmap, pack_dump.scan, several files, and pack_android.py's pack equal to the file's own).
 - Launcher: `Nup.Source` (a channel read by position, its size, its cache key) for every read; `Nup.opener` (`PickedNup`,
   installed by `NxApp` in every process) answers for the stand-in paths `files/picked/<key>/<name>`. Tests: NupJvmTest
   `picked` (the stand-in read through an opener, its DM_ROMFS and add-on link in the host's form, a lost file).
@@ -106,7 +108,9 @@ works (`/proc/self/fd/<n>` reopened by path is not reliable on every provider). 
   [A .nup used where it is](#a-nup-used-where-it-is)). A picked folder holding `.nup` files (or dump subfolders) adds
   all of them (`PackFind.gamesIn`; a title without a profile in this APK is named in the summary). adb: `--es game <file.nup>`, or
   `--es add_game <file.nup or folder>` for Add game's own path. A `.nup`'s pack is looked for beside it and in `<title ID>-work/<any name>`
-  of its folder and up to three folders above it (`PackFind`).
+  of its folder and up to three folders above it (`PackFind`). Add game › "A games folder" keeps a folder and adds the games it
+  finds there, now, at each app start and from Settings › Games folders › Look for new games, with the same rule four levels down
+  ([README, Games folders](README.md#the-launcher); `GamesFolder`, `GamesFolders`).
 - `Nup.java` reads the superblock and TOC (SHA-256 checked, cached by path, size and mtime), `Zstd.java` is a pure-Java zstd
   frame decoder (RFC 8878, no dictionaries) for main.npdm, NSO build IDs and the rewrite key check: the launcher process
   loads no native code.

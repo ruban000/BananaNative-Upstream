@@ -29,6 +29,12 @@ final class PickedPath {
         return s.toString();
     }
 
+    /**
+     * The key of a games folder's directory read through the provider (its tree URI and the directory's document ID): the game files of one directory share one
+     * stand-in folder, picked/&lt;this key&gt;/, so the files beside a game are beside its stand-in too (GamesFolders)
+     */
+    static String dirKey(String treeUri, String dirDocumentId) { return key(treeUri + "#" + dirDocumentId); }
+
     /** &lt;app storage&gt;/picked/&lt;key&gt;/&lt;name&gt; */
     static File standIn(File appRoot, String key, String name) { return new File(new File(root(appRoot), key), name); }
 

@@ -449,15 +449,6 @@ public final class PackService extends Service {
     /** The open descriptors of the .nup files used where they are, by stand-in path: opened once per process, kept for its life (the tools duplicate them) */
     private static final java.util.Map<String, android.os.ParcelFileDescriptor> nupFds = new java.util.HashMap<>();
 
-    /** A descriptor of a picked .nup for the tools (PickedNup.descriptor: a plain sentence when the app can no longer open it) */
-    private int nupFd(File dump) throws IOException {
-        synchronized (nupFds) {
-            android.os.ParcelFileDescriptor p = nupFds.get(dump.getAbsolutePath());
-            if (p == null) nupFds.put(dump.getAbsolutePath(), p = PickedNup.descriptor(this, dump));
-            return p.getFd();
-        }
-    }
-
     /** Runs step i; null when it is done, else why it failed */
     private String step(Job j, int i) throws IOException {
         String s = Job.STEPS[i];
@@ -614,7 +605,7 @@ public final class PackService extends Service {
         String nupFd = "";
         if (Nup.picked(dump)) {
             try {
-                nupFd = nupFd(dump) + ":" + dump.getAbsolutePath();
+                nupFd = PickedNup.toolsFd(this, dump, nupFds);   // a games folder's game read through the provider: the update and DLC files beside it too, one line each
             } catch (IOException e) {   // moved, deleted, or its permission taken back: the user picks it again (its card), then Retry
                 failure = new PrepareText.Failure(e.getMessage(), "", PrepareText.FIX_RETRY);
                 return e.getMessage();

@@ -374,7 +374,7 @@ public final class BuildConfig {
     def test_packages(self):
         src = REPO / 'android/app/src/main/java/dev/nxnative/android'
         (self.dir / 'BuildConfig.java').write_text(self.STUB)
-        subprocess.run(['javac', '-d', str(self.dir / 'classes')] + [str(src / f'{c}.java') for c in ('Nup', 'Nsp', 'Nx', 'Zstd', 'Pack', 'DumpLayout', 'BuildCheck', 'RomfsCheck', 'Profile', 'ShaderLibs', 'PickedPath', 'CopyPlan', 'PackFind', 'Words')]
+        subprocess.run(['javac', '-d', str(self.dir / 'classes')] + [str(src / f'{c}.java') for c in ('Nup', 'Nsp', 'Nx', 'Zstd', 'Pack', 'DumpLayout', 'BuildCheck', 'RomfsCheck', 'Profile', 'ShaderLibs', 'PickedPath', 'CopyPlan', 'PackFind', 'GamesFolder', 'Words')]
                        + [str(REPO / 'android/app/src/jvmtest/java/dev/nxnative/android/NspJvmTest.java'), str(self.dir / 'BuildConfig.java')], check=True, capture_output=True, text=True)
         out = self.dir / 'dump'
         big = dict(GAME1, **{'big.bin': bytes(range(251)) * 9000, 'sub/more/e.bin': b'e' * 33})
