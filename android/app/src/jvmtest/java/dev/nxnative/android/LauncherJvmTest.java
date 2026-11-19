@@ -565,16 +565,19 @@ public final class LauncherJvmTest {
         write(new File(SaveStore.device(old5), "dev.bin"), "device five");
         before = snapshot(old5.getParentFile());
         new File(app5, "stuck").mkdirs();
-        check(app5.setWritable(false), "set up: a folder that cannot be cleared");   // the move of the main save fails after the device save went in
-        r = SaveMigrate.migrate(old5, app5);
-        app5.setWritable(true);
-        check(r.state == SaveMigrate.State.FAILED, "the failed move is reported: " + r);
-        check(SaveStore.hasFiles(SaveStore.device(app5)), "set up: the failure came after the device save went in");
-        check(!SaveStore.hasFiles(app5) && SaveMigrate.needed(old5, app5), "no main save in the app: the old folder is played, and the copy is needed still");
-        check(!SaveMigrate.staging(app5).exists() && snapshot(old5.getParentFile()).equals(before), "no staging left; the old folder untouched");
-        r = SaveMigrate.migrate(old5, app5);
-        check(r.state == SaveMigrate.State.COPIED && SaveStore.scanParts(SaveStore.parts(app5)).diff(SaveStore.scanParts(SaveStore.parts(old5))) == null,
-                "the next start copies it whole (the device save left in the app was the old one's copy): " + r);
+        // the move of the main save fails after the device save went in: a folder that cannot be cleared (a POSIX permission; Java on Windows cannot make a
+        // folder unwritable, so a Windows host cannot set this up: not checked there)
+        if (app5.setWritable(false)) {
+            r = SaveMigrate.migrate(old5, app5);
+            app5.setWritable(true);
+            check(r.state == SaveMigrate.State.FAILED, "the failed move is reported: " + r);
+            check(SaveStore.hasFiles(SaveStore.device(app5)), "set up: the failure came after the device save went in");
+            check(!SaveStore.hasFiles(app5) && SaveMigrate.needed(old5, app5), "no main save in the app: the old folder is played, and the copy is needed still");
+            check(!SaveMigrate.staging(app5).exists() && snapshot(old5.getParentFile()).equals(before), "no staging left; the old folder untouched");
+            r = SaveMigrate.migrate(old5, app5);
+            check(r.state == SaveMigrate.State.COPIED && SaveStore.scanParts(SaveStore.parts(app5)).diff(SaveStore.scanParts(SaveStore.parts(old5))) == null,
+                    "the next start copies it whole (the device save left in the app was the old one's copy): " + r);
+        } else System.err.println("a failed move: not checked, this host cannot make a folder unwritable");
         // a device save in the app that is not the old one's copy: not played as half a save
         File t6 = new File(t, "foreigndevice"), old6 = save(new File(t6, "Switch2"), "six"), app6 = new File(t6, "appdata/saves/040074A01BF12000");
         write(new File(SaveStore.device(old6), "dev.bin"), "device six");

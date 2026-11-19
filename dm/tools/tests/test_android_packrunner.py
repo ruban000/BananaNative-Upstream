@@ -46,6 +46,7 @@ def runner_source():
     return ''.join(codecs.decode(s, 'unicode_escape') for s in re.findall(r'"((?:[^"\\\n]|\\.)*)"', body))
 
 
+@unittest.skipUnless(hasattr(__import__('os'), 'fork'), 'the runner forks each tool, as on the phone: a POSIX host (Linux, macOS, WSL)')
 class Runner(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

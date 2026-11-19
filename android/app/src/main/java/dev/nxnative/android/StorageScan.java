@@ -89,7 +89,11 @@ final class StorageScan {
 
     // ---- The guard ----
 
-    private static String canon(File f) throws IOException { return f.getCanonicalPath(); }
+    /** The canonical path; for a file that is there, toRealPath: it resolves symbolic links on every platform (a Windows JVM's canonical path keeps them), the same on Android */
+    private static String canon(File f) throws IOException {
+        try { if (f.exists()) return f.toPath().toRealPath().toString(); } catch (IOException | SecurityException | java.nio.file.InvalidPathException e) { /* the canonical path */ }
+        return f.getCanonicalPath();
+    }
 
     private static boolean inside(String child, String parent) { return child.startsWith(parent.endsWith(File.separator) ? parent : parent + File.separator); }
 

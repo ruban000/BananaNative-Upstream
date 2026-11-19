@@ -360,7 +360,9 @@ class Launcher(unittest.TestCase):
         p = self.tmp / 'h/v-222222222222/dmsh_vk.lib'
         write_lib(p, '222222222222', abi='0123456789ab', shaders=[('00000000000000aa', [spirv(10, 1)], b'')])
         L = delta.Library(str(p))
-        self.assertEqual(self.java('header', p), '\t'.join([L.chain, L.version, L.game, L.inputs, L.abi]))
+        want = '\t'.join([L.chain, L.version, L.game, L.inputs, L.abi])
+        L.close()   # its map: the file is written again below (Windows refuses to truncate a mapped file)
+        self.assertEqual(self.java('header', p), want)
         write_lib(p, '222222222222', shaders=[])
         self.assertEqual(self.java('header', p).split('\t')[4], '')
         p.write_bytes(b'not a library' * 20)

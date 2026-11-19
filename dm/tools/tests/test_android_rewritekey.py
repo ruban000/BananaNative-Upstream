@@ -52,7 +52,7 @@ class Tree(unittest.TestCase):   # a tree of rewriter files (two with earlier eq
         (tools / 'rewriter_equiv/nso.py.bbbbbbbbbbbb').write_bytes(b'old nso')
         (tools / 'rewriter_equiv/README').write_bytes(b'not a rewriter file')   # no <file>.<commit> of a REWRITER file: ignored
         self.gdir = self.tree / 'dm/games' / GAME; self.gdir.mkdir(parents=True)
-        (self.gdir / 'game.tsv').write_text('name\tTest\n'); (self.gdir / 'patches.py').write_text('# patches\n')
+        (self.gdir / 'game.tsv').write_text('name\tTest\n', newline='\n'); (self.gdir / 'patches.py').write_text('# patches\n', newline='\n')
         self.mod = self.t / 'main'; self.mod.write_bytes(bytes(range(256)) * 300)
         self.cur = [(f, b'current ' + f.encode()) for f in pack_android.REWRITER]
         self.saved = pack_android.REPO, pack_android.EQUIV
@@ -81,7 +81,7 @@ class Equiv(Tree):
     def test_rewrite_keeps_an_equivalent_pack(self):
         out = self.t / 'pack'; out.mkdir()
         (out / 'main.patched.bin').write_bytes(b'code')
-        (out / 'main.android.key').write_text(key_with(self.tree, self.swap('patch_nso.py', b'old patch_nso'), self.mod, self.gdir) + '\n')
+        (out / 'main.android.key').write_text(key_with(self.tree, self.swap('patch_nso.py', b'old patch_nso'), self.mod, self.gdir) + '\n', newline='\n')
         pack_android.rewrite(sys.executable, {'main': self.mod}, out, 1, types.SimpleNamespace(dir=self.gdir, id=GAME))
         self.assertEqual((out / 'main.patched.bin').read_bytes(), b'code')   # kept: no rewrite ran
 
@@ -101,14 +101,14 @@ class Formula(Tree):
     """The key hashes game.tsv's build rows; an earlier key (the whole game.tsv) counts with the profile's or with the pack's copy of the same build rows"""
     def setUp(self):
         super().setUp()
-        (self.gdir / 'game.tsv').write_text(PROFILE)
+        (self.gdir / 'game.tsv').write_text(PROFILE, newline='\n')
         self.pack = self.t / 'pack'; self.pack.mkdir()
 
     def old_key(self, gt): return key_with(self.tree, self.cur, self.mod, self.gdir, gt.encode(), v1=True)
 
     def accepted(self, key, pack_gt):   # (Python, Java) verdicts on a key, the pack's game.tsv pack_gt (None: the pack has none)
         (self.pack / 'game.tsv').unlink(missing_ok=True)
-        if pack_gt is not None: (self.pack / 'game.tsv').write_text(pack_gt)
+        if pack_gt is not None: (self.pack / 'game.tsv').write_text(pack_gt, newline='\n')
         py = key in pack_android.rewrite_keys(self.mod, types.SimpleNamespace(dir=self.gdir), self.pack)
         if not (shutil.which('javac') and shutil.which('java')): return py, py
         return py, key in java_keys(self.t, self.tree, self.mod, self.pack / 'game.tsv' if pack_gt is not None else None)
@@ -121,9 +121,9 @@ class Formula(Tree):
     def test_current_key_ignores_other_rows(self):
         k = pack_android.rewrite_key(self.mod, types.SimpleNamespace(dir=self.gdir))
         self.assertEqual(k, key_with(self.tree, self.cur, self.mod, self.gdir))
-        (self.gdir / 'game.tsv').write_text(PROFILE + 'android_window\t1280x720\n')
+        (self.gdir / 'game.tsv').write_text(PROFILE + 'android_window\t1280x720\n', newline='\n')
         self.assertEqual(pack_android.rewrite_key(self.mod, types.SimpleNamespace(dir=self.gdir)), k)
-        (self.gdir / 'game.tsv').write_text(PROFILE.replace('main=aa', 'main=ac'))
+        (self.gdir / 'game.tsv').write_text(PROFILE.replace('main=aa', 'main=ac'), newline='\n')
         self.assertNotEqual(pack_android.rewrite_key(self.mod, types.SimpleNamespace(dir=self.gdir)), k)
 
     def test_old_key_other_rows_differ(self):   # the profile gained host rows since the pack was made: accepted through the pack's copy
@@ -144,23 +144,23 @@ class Formula(Tree):
         for files, mod, pp in ((self.swap('patch_nso.py', b'unrelated bytes'), self.mod, None), (self.cur, None, None), (self.cur, self.mod, b'# other patches\n')):
             m = self.mod if mod else self.t / 'other'; m.write_bytes(m.read_bytes() if mod else b'another module')
             g = self.gdir
-            if pp: g = self.t / 'g2'; g.mkdir(exist_ok=True); (g / 'patches.py').write_bytes(pp); (g / 'game.tsv').write_text(old)
+            if pp: g = self.t / 'g2'; g.mkdir(exist_ok=True); (g / 'patches.py').write_bytes(pp); (g / 'game.tsv').write_text(old, newline='\n')
             self.assertEqual(self.accepted(key_with(self.tree, files, m, g, old.encode(), v1=True), old), (False, False))
 
     def test_rewrite_keeps_and_upgrades(self):   # pack_android: the module is kept, its key brought to the current formula before the copy is replaced
         old = PROFILE.replace('segment', 'none')
-        (self.pack / 'main.patched.bin').write_bytes(b'code'); (self.pack / 'game.tsv').write_text(old)
-        (self.pack / 'main.android.key').write_text(self.old_key(old) + '\n')
+        (self.pack / 'main.patched.bin').write_bytes(b'code'); (self.pack / 'game.tsv').write_text(old, newline='\n')
+        (self.pack / 'main.android.key').write_text(self.old_key(old) + '\n', newline='\n')
         g = types.SimpleNamespace(dir=self.gdir, id=GAME)
         pack_android.upgrade_keys({'main': self.mod}, self.pack, g)
         self.assertEqual((self.pack / 'main.android.key').read_text().strip(), pack_android.rewrite_key(self.mod, g))
-        (self.pack / 'main.android.key').write_text(self.old_key(old) + '\n')
+        (self.pack / 'main.android.key').write_text(self.old_key(old) + '\n', newline='\n')
         pack_android.rewrite(sys.executable, {'main': self.mod}, self.pack, 1, g)
         self.assertEqual((self.pack / 'main.patched.bin').read_bytes(), b'code')   # kept: no rewrite ran
         self.assertEqual((self.pack / 'main.android.key').read_text().strip(), pack_android.rewrite_key(self.mod, g))
 
     def test_upgrade_leaves_other_keys(self):
-        (self.pack / 'main.android.key').write_text('other target=android\n')
+        (self.pack / 'main.android.key').write_text('other target=android\n', newline='\n')
         pack_android.upgrade_keys({'main': self.mod}, self.pack, types.SimpleNamespace(dir=self.gdir, id=GAME))
         self.assertEqual((self.pack / 'main.android.key').read_text(), 'other target=android\n')
 

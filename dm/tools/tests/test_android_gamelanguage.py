@@ -27,7 +27,9 @@ class GameLanguage(unittest.TestCase):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
     def run_on(self, *args):
-        r = subprocess.run(['java', '-cp', str(self.tmp), 'dev.nxnative.android.GameLanguageJvmTest', *args], capture_output=True, text=True)
+        # UTF-8 both ways: Java prints in the platform's encoding otherwise (a Windows code page), and the language names are not ASCII
+        r = subprocess.run(['java', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8', '-cp', str(self.tmp), 'dev.nxnative.android.GameLanguageJvmTest', *args],
+                           capture_output=True, encoding='utf-8')
         self.assertEqual(r.returncode, 0, r.stderr)
         return [l.split('\t') for l in r.stdout.splitlines()]
 

@@ -623,7 +623,11 @@ final class SaveStore {
                 if (!pb.isDirectory() && !pb.mkdir()) throw new IOException("cannot create " + pb);
                 stage2(pa, pb);
                 pa.delete();
-            } else if (!pa.renameTo(pb)) throw new IOException("cannot move " + pa + " to " + pb);
+            } else {
+                // over b's file in one step: rename(2) on the phone, as File.renameTo; an atomic move also replaces an existing file where renameTo would not (Windows)
+                try { Files.move(pa.toPath(), pb.toPath(), java.nio.file.StandardCopyOption.ATOMIC_MOVE); }
+                catch (IOException | RuntimeException e) { throw new IOException("cannot move " + pa + " to " + pb + " (" + e.getMessage() + ")"); }
+            }
         }
     }
 
@@ -662,8 +666,12 @@ final class SaveStore {
         f.delete();
     }
 
-    /** The canonical path (links and /sdcard vs /storage/emulated/0 resolved), else the absolute one */
+    /**
+     * The canonical path (links and /sdcard vs /storage/emulated/0 resolved), else the absolute one; for a file that is there, toRealPath: it resolves symbolic
+     * links on every platform (a Windows JVM's canonical path keeps them), the same on Android
+     */
     static String canon(File f) {
+        try { if (f.exists()) return f.toPath().toRealPath().toString(); } catch (IOException | SecurityException | java.nio.file.InvalidPathException e) { /* the canonical path */ }
         try { return f.getCanonicalPath(); } catch (IOException e) { return f.getAbsolutePath(); }
     }
 

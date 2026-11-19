@@ -58,7 +58,8 @@ class GameListJvm(unittest.TestCase):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
     def java(self, *args):
-        return subprocess.run(['java', '-cp', str(self.tmp / 'classes'), 'dev.nxnative.android.GameListJvmTest', *map(str, args)], capture_output=True, text=True)
+        return subprocess.run(['java', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8', '-cp', str(self.tmp / 'classes'), 'dev.nxnative.android.GameListJvmTest', *map(str, args)],
+                              capture_output=True, encoding='utf-8')
 
     def test_list_and_build_check(self):
         run = self.tmp / 'run'
