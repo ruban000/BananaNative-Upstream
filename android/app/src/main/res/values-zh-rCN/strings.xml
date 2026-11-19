@@ -1413,7 +1413,7 @@
     <string name="games_folders_nothing_new">游戏文件夹中没有新游戏。</string>
     <string name="games_folders_no_game">在 %1$s 中没有找到游戏。它仍是游戏文件夹：以后放入的游戏会在应用启动时添加。</string>
     <string name="games_folders_cannot_keep">该文件夹不允许应用在重启后继续读取。请选择手机存储或 SD 卡上的文件夹。</string>
-    <string name="games_folders_cannot_read">现在无法读取 %1$s。它可能已被移动或删除，或者权限已被收回。请在 设置 › 游戏文件夹 中移除它，然后重新添加。</string>
+    <string name="games_folders_cannot_read">现在无法读取 %1$s。它可能已被移动或删除，或者权限已被收回。请在 设置 › 文件夹 中移除它，然后重新添加。</string>
     <string name="games_folders_dump_needs_access">%1$s 是一个转储文件夹：应用按路径读取它，这需要“所有文件访问权限”。</string>
     <string name="games_folders_hint">.nup、.nsp 或 .nx 文件就是一个游戏，转储文件夹也是；放在游戏旁边的更新或 DLC 属于该游戏。应用会在添加文件夹时、每次启动时以及“查找新游戏”时浏览这些文件夹，并添加还没有卡片的游戏（启动时只看新增或改动的文件，因此你移除的卡片不会再回来）。它从不移除卡片。</string>
 </resources>

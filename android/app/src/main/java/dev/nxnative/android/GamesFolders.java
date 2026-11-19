@@ -342,7 +342,7 @@ final class GamesFolders {
         return out;
     }
 
-    // ---- Settings › Games folders ----
+    // ---- Settings › Folders (the games folders; a game's own folders from there) ----
 
     /** The Settings row's line: the folders' names, else what the row is for */
     static String summary(Context c) {
@@ -351,7 +351,7 @@ final class GamesFolders {
         return names.isEmpty() ? Tx.s(R.string.games_folders_value) : String.join(", ", names);
     }
 
-    /** The sheet: each folder with Remove, then Add a games folder and Look for new games */
+    /** Settings › Folders: each games folder with Remove, then Add a games folder and Look for new games, then a game's own game, pack and save folders (Folders.dialog) */
     static void sheet(MainActivity a) {
         LinearLayout box = new LinearLayout(a);
         box.setOrientation(LinearLayout.VERTICAL);
@@ -383,6 +383,7 @@ final class GamesFolders {
         }
         Ui.add(box, r, 12);
         Ui.add(box, Ui.small(a, Tx.s(R.string.games_folders_hint)), 16);
-        d[0] = Ui.sheet(a, Tx.s(R.string.games_folders_title), box).setPositiveButton(Tx.s(R.string.common_done), null).show();
+        Ui.add(box, Ui.button(a, Tx.s(R.string.common_game_pack_and_save_folders), Ui.Kind.QUIET, x -> { d[0].dismiss(); Folders.dialog(a); }), 16);   // one Folders entry in Settings
+        d[0] = Ui.sheet(a, Tx.s(R.string.common_folders), box).setPositiveButton(Tx.s(R.string.common_done), null).show();
     }
 }

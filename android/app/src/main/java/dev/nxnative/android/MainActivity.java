@@ -872,8 +872,8 @@ public final class MainActivity extends Activity {
         advRow.view.setOnClickListener(v -> AdvancedPage.show(this, null, null, () -> advRow.value(AdvancedSettings.count(this, null) == 0 ? Tx.s(R.string.common_search_every_switch_each_starts) : Tx.n(R.plurals.common_n_set, AdvancedSettings.count(this, null), AdvancedSettings.count(this, null)))));
         advRow.value(AdvancedSettings.count(this, null) == 0 ? Tx.s(R.string.common_search_every_switch_each_starts) : Tx.n(R.plurals.common_n_set, AdvancedSettings.count(this, null), AdvancedSettings.count(this, null)));
         sys.addView(advRow.view);
-        sys.addView(new Ui.Setting(this, "📁", Tx.s(R.string.common_folders), v -> Folders.dialog(this)).value(Tx.s(R.string.common_game_pack_and_save_folders)).chevron(this).view);
-        gamesFoldersRow = new Ui.Setting(this, "🗂️", Tx.s(R.string.games_folders_title), v -> GamesFolders.sheet(this)).value(GamesFolders.summary(this)).chevron(this);   // (GamesFolders.java)
+        // One Folders row: the games folders (GamesFolders.java), and from its sheet each game's game, pack and save folders (Folders.dialog)
+        gamesFoldersRow = new Ui.Setting(this, "📁", Tx.s(R.string.common_folders), v -> GamesFolders.sheet(this)).value(GamesFolders.summary(this)).chevron(this);
         sys.addView(gamesFoldersRow.view);
         sys.addView(new Ui.Setting(this, "🧹", Tx.s(R.string.settings_storage), v -> StorageUi.dialog(this)).value(Tx.s(R.string.settings_remove_leftovers_and_old_files)).chevron(this).view);   // (StorageUi.java)
         // some phones stop or slow a background job once the screen is off (GitHub discussion 58): Home keeps the screen on while preparing (Ondevice), the service its wake lock

@@ -109,7 +109,7 @@ works (`/proc/self/fd/<n>` reopened by path is not reliable on every provider). 
   all of them (`PackFind.gamesIn`; a title without a profile in this APK is named in the summary). adb: `--es game <file.nup>`, or
   `--es add_game <file.nup or folder>` for Add game's own path. A `.nup`'s pack is looked for beside it and in `<title ID>-work/<any name>`
   of its folder and up to three folders above it (`PackFind`). Add game › "A games folder" keeps a folder and adds the games it
-  finds there, now, at each app start and from Settings › Games folders › Look for new games, with the same rule four levels down
+  finds there, now, at each app start and from Settings › Folders › Look for new games, with the same rule four levels down
   ([README, Games folders](README.md#the-launcher); `GamesFolder`, `GamesFolders`).
 - `Nup.java` reads the superblock and TOC (SHA-256 checked, cached by path, size and mtime), `Zstd.java` is a pure-Java zstd
   frame decoder (RFC 8878, no dictionaries) for main.npdm, NSO build IDs and the rewrite key check: the launcher process

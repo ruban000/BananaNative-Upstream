@@ -1429,7 +1429,7 @@
     <string name="games_folders_nothing_new">Aucun nouveau jeu dans les dossiers de jeux.</string>
     <string name="games_folders_no_game">Aucun jeu trouvé dans %1$s. Il reste un dossier de jeux : les jeux que vous y mettrez plus tard seront ajoutés au démarrage de l\'app.</string>
     <string name="games_folders_cannot_keep">Ce dossier ne permet pas à l\'app de continuer à le lire après un redémarrage. Choisissez un dossier du stockage du téléphone ou d\'une carte SD.</string>
-    <string name="games_folders_cannot_read">%1$s ne peut pas être lu pour le moment. Il a peut-être été déplacé ou supprimé, ou son autorisation retirée. Retirez-le dans Réglages › Dossiers de jeux et ajoutez-le à nouveau.</string>
+    <string name="games_folders_cannot_read">%1$s ne peut pas être lu pour le moment. Il a peut-être été déplacé ou supprimé, ou son autorisation retirée. Retirez-le dans Réglages › Dossiers et ajoutez-le à nouveau.</string>
     <string name="games_folders_dump_needs_access">%1$s est un dossier de dump : l\'app le lit par son chemin, ce qui demande l\'accès à tous les fichiers.</string>
     <string name="games_folders_hint">Un fichier .nup, .nsp ou .nx est un jeu, tout comme un dossier de dump ; une mise à jour ou un DLC à côté de son jeu appartient à ce jeu. L\'app parcourt ces dossiers quand l\'un d\'eux est ajouté, à chaque démarrage et avec Chercher de nouveaux jeux, et ajoute les jeux qui n\'ont pas encore de carte (au démarrage, seulement les fichiers nouveaux ou modifiés : une carte retirée le reste). Elle ne retire jamais de carte.</string>
 </resources>

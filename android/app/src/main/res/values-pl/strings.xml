@@ -1437,7 +1437,7 @@
     <string name="games_folders_nothing_new">Brak nowych gier w folderach z grami.</string>
     <string name="games_folders_no_game">W %1$s nie znaleziono żadnej gry. Pozostaje folderem z grami: gry, które tam później umieścisz, zostaną dodane przy uruchomieniu aplikacji.</string>
     <string name="games_folders_cannot_keep">Ten folder nie pozwala aplikacji czytać go dalej po ponownym uruchomieniu. Wybierz folder w pamięci telefonu lub na karcie SD.</string>
-    <string name="games_folders_cannot_read">Nie można teraz odczytać %1$s. Mógł zostać przeniesiony lub usunięty albo cofnięto jego uprawnienie. Usuń go w Ustawienia › Foldery z grami i dodaj ponownie.</string>
+    <string name="games_folders_cannot_read">Nie można teraz odczytać %1$s. Mógł zostać przeniesiony lub usunięty albo cofnięto jego uprawnienie. Usuń go w Ustawienia › Foldery i dodaj ponownie.</string>
     <string name="games_folders_dump_needs_access">%1$s to folder zrzutu: aplikacja czyta go po ścieżce, co wymaga dostępu do wszystkich plików.</string>
     <string name="games_folders_hint">Plik .nup, .nsp lub .nx to gra, podobnie jak folder zrzutu; aktualizacja lub DLC obok swojej gry należy do tej gry. Aplikacja przegląda te foldery, gdy jeden zostanie dodany, przy każdym uruchomieniu i po wybraniu Szukaj nowych gier, i dodaje gry, które nie mają jeszcze karty (przy uruchomieniu tylko nowe lub zmienione pliki, więc usunięta karta nie wraca). Nigdy nie usuwa karty.</string>
 </resources>

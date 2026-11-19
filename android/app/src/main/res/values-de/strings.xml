@@ -1421,7 +1421,7 @@
     <string name="games_folders_nothing_new">Keine neuen Spiele in den Spieleordnern.</string>
     <string name="games_folders_no_game">In %1$s wurde kein Spiel gefunden. Er bleibt ein Spieleordner: Spiele, die du später dort ablegst, werden beim Start der App hinzugefügt.</string>
     <string name="games_folders_cannot_keep">Dieser Ordner erlaubt der App nicht, ihn nach einem Neustart weiter zu lesen. Wähle einen Ordner im Telefonspeicher oder auf einer SD-Karte.</string>
-    <string name="games_folders_cannot_read">%1$s kann gerade nicht gelesen werden. Er wurde vielleicht verschoben oder gelöscht, oder die Berechtigung wurde entzogen. Entferne ihn unter Einstellungen › Spieleordner und füge ihn erneut hinzu.</string>
+    <string name="games_folders_cannot_read">%1$s kann gerade nicht gelesen werden. Er wurde vielleicht verschoben oder gelöscht, oder die Berechtigung wurde entzogen. Entferne ihn unter Einstellungen › Ordner und füge ihn erneut hinzu.</string>
     <string name="games_folders_dump_needs_access">%1$s ist ein Dump-Ordner: Die App liest ihn über seinen Pfad, das braucht den Zugriff auf alle Dateien.</string>
     <string name="games_folders_hint">Eine .nup-, .nsp- oder .nx-Datei ist ein Spiel, ebenso ein Dump-Ordner; ein Update oder DLC neben seinem Spiel gehört zu diesem Spiel. Die App durchsucht diese Ordner, wenn einer hinzugefügt wird, bei jedem Start der App und mit „Nach neuen Spielen suchen“ und fügt die Spiele hinzu, die noch keine Karte haben (beim Start nur neue oder geänderte Dateien, eine entfernte Karte bleibt also entfernt). Sie entfernt nie eine Karte.</string>
 </resources>
