@@ -121,7 +121,7 @@
     <string name="home_pick_pack_folder">Paket klasörü seç</string>
     <string name="home_pick_the_pack_folder_android">Paket klasörünü seçin (pack.tsv bulunan android-pack)</string>
     <string name="home_pick_your_dump_folder_with">Döküm klasörünüzü seçin (base/ ile, varsa updates/ ile)</string>
-    <string name="home_pick_your_game_s_nup">Oyununuzun .nup veya .nsp dosyasını seçin</string>
+    <string name="home_pick_your_game_s_nup">Oyununuzun .nup, .nsp veya .nx dosyasını seçin</string>
     <string name="home_play_anyway">Yine de oyna</string>
     <string name="home_ported_from_eden_gpl_3">Eden\'den aktarıldı (GPL-3.0-or-later). Lossless.dll size aittir; uygulamanın parçası değildir.</string>
     <string name="home_reading_the_game_files">Oyun dosyaları okunuyor…</string>
@@ -453,8 +453,8 @@
     <string name="settings_pick_another_sound">Başka bir ses seç</string>
     <string name="settings_use_the_built_in_sounds">Yerleşik sesleri kullan</string>
     <string name="home_a_folder_with_base_and">Bir klasör (base/ ile, varsa updates/ ile)</string>
-    <string name="home_a_nup_file_or_an">Bir .nup dosyası veya NSP Box .nsp dosyası</string>
-    <string name="home_a_nup_or_nsp_file">Bir .nup veya .nsp dosyası (bulunduğu yerde kullanılır)</string>
+    <string name="home_a_nup_file_or_an">Bir .nup veya .nx dosyası ya da NSP Box .nsp dosyası</string>
+    <string name="home_a_nup_or_nsp_file">Bir .nup, .nsp veya .nx dosyası (bulunduğu yerde kullanılır)</string>
     <string name="home_allow_all_files_access">Tüm dosyalara erişime izin ver</string>
     <string name="prepare_a_zip_file_made_by">Bir .zip dosyası (Paketi dışa aktar… ile yapılmış)</string>
     <string name="prepare_a_pack_folder_with_pack">Bir paket klasörü (pack.tsv ve shaders/ ile)</string>
@@ -481,6 +481,7 @@
     <string name="settings_turn_on">Aç</string>
     <string name="home_cannot_use_this_file">Bu dosya kullanılamıyor</string>
     <string name="home_cannot_use_this_nsp">Bu NSP kullanılamıyor</string>
+    <string name="home_cannot_use_this_nx">Bu .nx dosyası kullanılamıyor</string>
     <string name="common_remove">Kaldır</string>
     <string name="home_no_pack_for_the_switch">Switch 2 Edition için henüz paket yok</string>
     <string name="home_game_file_gone">Oyun dosyası yok</string>
@@ -559,7 +560,7 @@
     <string name="settings_adb_control_warning">Açıkken adb ve bu telefondaki diğer tüm uygulamalar, Banana Native\'in başlatıcısı üzerinden size sormadan oyun ekleyebilir, Hazırla\'yı başlatabilir, GPU sürücüsü kurabilir veya seçebilir. GPU sürücüsü, oyunun içinde çalışan koddur. Yalnızca adb kullanırken açın, sonra yeniden kapatın.</string>
     <string name="home_pick_dump_folder_again">%1$s dökümünün klasörünü yeniden seçin</string>
     <string name="err_no_game_in_folder">%1$s içinde main.npdm (base/exefs/, updates/&lt;version&gt;/exefs/ veya exefs/), .nup dosyası ve oyun klasörü yok. Oyunun kendi klasörünü, .nup dosyasını veya oyunlarınızı barındıran klasörü seçin.</string>
-    <string name="err_nup_rename">%1$s: adı \".nup\" veya \".nsp\" ile (küçük harf) bitecek şekilde yeniden adlandırın; oyun ve araçlar yalnızca bu adı okur.</string>
+    <string name="err_nup_rename">%1$s: adı \".nup\", \".nsp\" veya \".nx\" ile (küçük harf) bitecek şekilde yeniden adlandırın; oyun ve araçlar yalnızca bu adı okur.</string>
     <string name="err_cannot_be_read">%1$s okunamıyor. Tüm dosyalara erişimin açık olduğunu denetleyin.</string>
     <string name="home_no_pack_found_for_this">Bu %1$s için paket bulunamadı ve Hazırla\'nın başlayabileceği bir döküm değil.</string>
     <string name="home_no_pack_for_this_what">Bu %1$s için paket yok</string>
@@ -1240,10 +1241,12 @@
     <string name="ready_is_not_a_folder_this">" bu uygulamanın okuyabileceği bir klasör değil."</string>
     <string name="ready_cannot_be_used">" kullanılamıyor: "</string>
     <string name="ready_a_nup_that_reads_and">: okunan ve doğrulanan bir .nup (</string>
+    <string name="ready_an_nx_that_reads_and">: okunan ve doğrulanan bir .nx (</string>
     <string name="ready_its_card_s_button_picks">; kartındaki düğme onu seçer.)</string>
     <string name="ready_its_card_s_button_picks_2">" (kartındaki düğme onu seçer.)"</string>
     <string name="ready_packages_its_table_of_contents">" paket, içindekiler tablosu denetlendi). Tüm dosyalara erişim gerekmez."</string>
     <string name="ready_a_nup_used_where_it">": olduğu yerde kullanılan bir .nup (dosya seçiciyle seçildi; "</string>
+    <string name="ready_an_nx_used_where_it">": olduğu yerde kullanılan bir .nx (dosya seçiciyle seçildi; "</string>
     <string name="ready_with_less_here">" burada daha azıyla."</string>
     <string name="ready_what_it_needs">" ihtiyaç duyduğu"</string>
     <string name="ready_the_check_before_the_game">. Oyun başlamadan önceki denetim oyunun sürücüsünü kullanır ve sonucu bundan farklı olabilir.</string>
@@ -1256,7 +1259,7 @@
     <string name="err_no_game_with_title_id">"Şu oyun kimliğine sahip oyun yok: "</string>
     <string name="err_cannot_be_read_check_that">" okunamıyor. Tüm dosyalara erişimin açık olduğunu denetleyin."</string>
     <string name="err_is_not_there_the_frontend">" yok (ön yüz şunu gönderdi: "</string>
-    <string name="err_rename_it_so_that_its">: adı \".nup\" veya \".nsp\" ile bitecek şekilde yeniden adlandırın (küçük harf); oyun ve araçlar yalnızca bu adı okur.</string>
+    <string name="err_rename_it_so_that_its">: adı \".nup\", \".nsp\" veya \".nx\" ile bitecek şekilde yeniden adlandırın (küçük harf); oyun ve araçlar yalnızca bu adı okur.</string>
     <string name="err_the_frontend_sent_no_game">Ön yüz oyun göndermedi: .nup\'u (veya oyun klasörünü) intent verisi olarak ya da \"game\" ekstrasını yoluyla gönderin.</string>
     <string name="err_which_is_not_a_file">, telefonun depolamasında uygulamanın okuyabileceği bir yolla bir dosya değil. Ön yüzü dosyanın yolunu veya telefonun kendi depolamasından depolama (SAF) URI\'sini gönderecek şekilde ayarlayın.</string>
     <string name="err_the_frontend_sent">"Ön yüz şunu gönderdi: "</string>

@@ -8,7 +8,7 @@
 // ---------- aoc add-on content (the DLC NSPs in the player's folder) / ec shop (excluded) ----------
 // Owned add-on content indices (ascending), fixed at the first query:
 //   numeric subdirectories of DM_AOC_DIR: each is one DLC's RomFS, which the packing script extracts only from DLC NSPs really in the player's folder (title ID = base + 0x1000 + index),
-//   or <index>.img (a RomFS image) or <index>.nup (a .nup holding that add-on, or a link to one: hle_fs.c aoc_dir).
+//   or <index>.img (a RomFS image) or <index>.nup / .nsp / .nx (a .nup, plaintext NSP or NX archive holding that add-on, or a link to one: hle_fs.c aoc_dir).
 //     Engage: F001 → 1 (E0), F002 → 2 (H0); the content itself is in the 2.0.0 update's RomFS and each DLC package holds one empty marker file; the game calls MountAddOnContent for each index ListAddOnContent returns (hle_fs.c).
 //   No DM_AOC_DIR: none (on a Switch 2 Mario 1.2.1 uses it to tell whether the upgrade pack is owned, and the user has no Mario add-on content files).
 //   Each must open (hle_fs.c dm_aoc_usable): one that cannot be read is left out with a [RED] line, and the game runs without it.
@@ -26,7 +26,7 @@ static void aoc_load(void) {
         why = dir; DIR *d = opendir(dir); struct dirent *ent;
         while (d && (ent = readdir(d)) && g_naoc < (int)(sizeof g_aoc / sizeof *g_aoc)) {
             char *end; long i = strtol(ent->d_name, &end, 10);
-            if (ent->d_name[0] >= '1' && ent->d_name[0] <= '9' && (!*end || !strcmp(end, ".img") || !strcmp(end, ".nup") || !strcmp(end, ".nsp")) && i <= 2000) g_aoc[g_naoc++] = (int)i;
+            if (ent->d_name[0] >= '1' && ent->d_name[0] <= '9' && (!*end || !strcmp(end, ".img") || !strcmp(end, ".nup") || !strcmp(end, ".nsp") || !strcmp(end, ".nx")) && i <= 2000) g_aoc[g_naoc++] = (int)i;
         }
         if (d) closedir(d);
         qsort(g_aoc, g_naoc, sizeof *g_aoc, aoc_int_cmp);

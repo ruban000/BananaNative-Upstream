@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
@@ -78,14 +80,39 @@ final class Nacp {
         File f = new File(control, "control.nacp");
         if (!f.isFile()) return null;
         try {
-            byte[] b = Files.readAllBytes(f.toPath());
             int lang = language(langTag);
-            byte[] t = titles(b);
-            int e = entry(t, lang);
-            String title = e < 0 ? null : text(t, e * 0x300, 0x200), publisher = e < 0 ? null : text(t, e * 0x300 + 0x200, 0x100);
-            String version = b.length >= 0x3070 ? text(b, 0x3060, 0x10) : null;
-            return new Control(title, publisher, version, icon(control, lang));
+            return control(Files.readAllBytes(f.toPath()), lang, icon(control, lang));
         } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private static Control control(byte[] b, int lang, byte[] icon) {
+        byte[] t = titles(b);
+        int e = entry(t, lang);
+        String title = e < 0 ? null : text(t, e * 0x300, 0x200), publisher = e < 0 ? null : text(t, e * 0x300 + 0x200, 0x100);
+        String version = b.length >= 0x3070 ? text(b, 0x3060, 0x10) : null;
+        return new Control(title, publisher, version, icon);
+    }
+
+    /**
+     * The same, of a control folder inside an .nx package (DumpLayout.nxControl: a spec such as &lt;file&gt;.nx:program1/update/&lt;v&gt;/data/control), its files
+     * read through Nup; null when it has no control.nacp or it cannot be read
+     */
+    static Control read(String spec, String langTag) {
+        try {
+            Nup.At at = Nup.at(spec + "/control.nacp");
+            if (at == null || at.node == null || at.node.dir) return null;
+            int lang = language(langTag);
+            byte[] icon = null;
+            Nup.At dir = Nup.at(spec);
+            List<String> names = new ArrayList<>();
+            for (Nup.Node c : dir.nup.children(dir.node)) if (!c.dir && c.name.startsWith("icon_") && c.name.endsWith(".dat")) names.add(c.name);
+            java.util.Collections.sort(names);
+            for (String n : new String[] {"icon_" + LANGUAGES[lang][1] + ".dat", "icon_" + LANGUAGES[0][1] + ".dat", names.isEmpty() ? null : names.get(0)})   // as icon(File, lang)
+                if (n != null && names.contains(n)) { icon = dir.nup.read(dir.nup.lookup(dir.pkg, Nup.parse(spec).sub + "/" + n), -1); break; }
+            return control(at.nup.read(at.node, -1), lang, icon);
+        } catch (IOException | RuntimeException e) {
             return null;
         }
     }

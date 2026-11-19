@@ -72,20 +72,23 @@ static void nup_aux_free(void *p) {
 }
 
 // "<file>.nup[:<selector>[/romfs]]" → the file's path in file (NUL-terminated) and the selector in sel ("" for none, "/romfs" dropped). 0 for a
-// spec that does not name a .nup.
+// spec that does not name a .nup. A plaintext NSP ("<file>.nsp...", nsp_toc.h) and an NX archive ("<file>.nx...", nx_image.h) are named the same way
 static int nup_split(const char *spec, char *file, size_t fn, char *sel, size_t sn) {
-    const char *c = NULL;
-    for (const char *p = spec; *p; p++) if (!strncmp(p, ".nup:", 5) || !strncmp(p, ".nsp:", 5)) c = p;   // a plaintext NSP is read as a NUP file (nsp_toc.h)
+    const char *c = NULL; size_t xl = 0;   // xl: the extension's length with its dot
+    for (const char *p = spec; *p; p++) {
+        if (!strncmp(p, ".nup:", 5) || !strncmp(p, ".nsp:", 5)) { c = p; xl = 4; }
+        else if (!strncmp(p, ".nx:", 4)) { c = p; xl = 3; }
+    }
     size_t L = strlen(spec);
     if (!c) {
-        if (L < 4 || (strcmp(spec + L - 4, ".nup") && strcmp(spec + L - 4, ".nsp"))) return 0;
+        if (!((L >= 4 && (!strcmp(spec + L - 4, ".nup") || !strcmp(spec + L - 4, ".nsp"))) || (L >= 3 && !strcmp(spec + L - 3, ".nx")))) return 0;
         if (L >= fn) return 0;
         memcpy(file, spec, L + 1); if (sn) sel[0] = 0; return 1;
     }
-    size_t flen = (size_t)(c - spec) + 4;
-    if (flen >= fn || strlen(c + 5) >= sn) return 0;
+    size_t flen = (size_t)(c - spec) + xl;
+    if (flen >= fn || strlen(c + xl + 1) >= sn) return 0;
     memcpy(file, spec, flen); file[flen] = 0;
-    strlcpy(sel, c + 5, sn);
+    strlcpy(sel, c + xl + 1, sn);
     size_t s = strlen(sel);
     while (s && sel[s - 1] == '/') sel[--s] = 0;
     if (s >= 6 && !strcmp(sel + s - 6, "/romfs")) sel[s - 6] = 0;
@@ -114,6 +117,8 @@ static int nup_open_file(const char *file) {
 
 static uint32_t nup_u32(const uint8_t *p) { uint32_t v; memcpy(&v, p, 4); return v; }
 static uint64_t nup_u64(const uint8_t *p) { uint64_t v; memcpy(&v, p, 8); return v; }
+// An NX archive (nx_image.h, included at the end of this file): a file that begins with "NXAR" is opened there, whatever its name
+static romfs_img *nx_image_open_fd(int fd, uint64_t fsize, const char *file, const char *sel, char *why, size_t wn);
 
 // Opens spec as an image; NULL with errno set (EINVAL for a file that is not a valid NUP or a selector naming no package) and a reason in why.
 static romfs_img *nup_image_open(const char *spec, char *why, size_t wn) {
@@ -124,6 +129,7 @@ static romfs_img *nup_image_open(const char *spec, char *why, size_t wn) {
     if ((fd = nup_open_file(file)) < 0) { e = errno; NUP_BAD("cannot open %s", file); }
     if (fstat(fd, &st) || !S_ISREG(st.st_mode) || !romfs_image_read(fd, sb, sizeof sb, 0)) { e = errno ? errno : EINVAL; NUP_BAD("cannot read the superblock (not a file?)"); }
     e = EINVAL;
+    if (!memcmp(sb, "NXAR", 4)) { int f = fd; fd = -1; return nx_image_open_fd(f, (uint64_t)st.st_size, file, sel, why, wn); }   // (nothing else is allocated yet)
     int nsp = !memcmp(sb, "PFS0", 4);   // a plaintext NSP: its TOC is made from it, its files are extents of it at any alignment (nsp_toc.h)
     if (!nsp && memcmp(sb, "NUP\x01", 4)) NUP_BAD("not a NUP file (magic)");
     uint16_t hsize; memcpy(&hsize, sb + 4, 2);
@@ -353,3 +359,4 @@ static void nup_z_put(romfs_img *m, uint64_t zi) {
     if (a->z[zi].refs) a->z[zi].refs--;
     nup_z_trim(a); pthread_mutex_unlock(&a->lock);
 }
+#include "nx_image.h"   // NX archives (android/NX.md): nx_image_open_fd, IMG_ENT_NX, nx_read

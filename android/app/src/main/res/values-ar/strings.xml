@@ -121,7 +121,7 @@
     <string name="home_pick_pack_folder">اختر مجلد الحزمة</string>
     <string name="home_pick_the_pack_folder_android">اختر مجلد الحزمة (android-pack، ويحتوي على pack.tsv)</string>
     <string name="home_pick_your_dump_folder_with">اختر مجلد التفريغ لديك (ويحتوي على base/، وعلى updates/ إن وُجد)</string>
-    <string name="home_pick_your_game_s_nup">اختر ملف .nup أو .nsp الخاص بلعبتك</string>
+    <string name="home_pick_your_game_s_nup">اختر ملف .nup أو .nsp أو .nx الخاص بلعبتك</string>
     <string name="home_play_anyway">العب على أي حال</string>
     <string name="home_ported_from_eden_gpl_3">منقول من Eden (GPL-3.0-or-later). ملف Lossless.dll ملكك أنت؛ وهو ليس جزءًا من التطبيق إطلاقًا.</string>
     <string name="home_reading_the_game_files">جارٍ قراءة ملفات اللعبة…</string>
@@ -457,8 +457,8 @@
     <string name="settings_pick_another_sound">اختر صوتًا آخر</string>
     <string name="settings_use_the_built_in_sounds">استخدام الأصوات المدمجة</string>
     <string name="home_a_folder_with_base_and">مجلد (يحتوي على base/، وعلى updates/ إن وُجد)</string>
-    <string name="home_a_nup_file_or_an">ملف .nup، أو ملف .nsp من NSP Box</string>
-    <string name="home_a_nup_or_nsp_file">ملف .nup أو .nsp (يُستخدم في مكانه)</string>
+    <string name="home_a_nup_file_or_an">ملف .nup أو .nx، أو ملف .nsp من NSP Box</string>
+    <string name="home_a_nup_or_nsp_file">ملف .nup أو .nsp أو .nx (يُستخدم في مكانه)</string>
     <string name="home_allow_all_files_access">السماح بالوصول إلى كل الملفات</string>
     <string name="prepare_a_zip_file_made_by">ملف .zip (أنشأه «تصدير الحزمة…»)</string>
     <string name="prepare_a_pack_folder_with_pack">مجلد حزمة (يحتوي على pack.tsv وshaders/)</string>
@@ -485,6 +485,7 @@
     <string name="settings_turn_on">تفعيل</string>
     <string name="home_cannot_use_this_file">تعذّر استخدام هذا الملف</string>
     <string name="home_cannot_use_this_nsp">تعذّر استخدام ملف NSP هذا</string>
+    <string name="home_cannot_use_this_nx">تعذّر استخدام ملف .nx هذا</string>
     <string name="common_remove">إزالة</string>
     <string name="home_no_pack_for_the_switch">لا توجد حزمة لإصدار Switch 2 Edition بعد</string>
     <string name="home_game_file_gone">ملف اللعبة مفقود</string>
@@ -567,7 +568,7 @@
     <string name="settings_adb_control_warning">أثناء تفعيله، يستطيع adb وأي تطبيق آخر على هذا الهاتف إضافة الألعاب وبدء التجهيز وتثبيت تعريف GPU أو اختياره عبر مشغّل Banana Native دون سؤالك. تعريف GPU رمز يعمل داخل اللعبة. فعّله فقط أثناء استخدام adb، ثم أوقفه.</string>
     <string name="home_pick_dump_folder_again">اختر مجلد التفريغ الخاص بـ %1$s مرة أخرى</string>
     <string name="err_no_game_in_folder">لا يحتوي %1$s على main.npdm (في base/exefs/ أو updates/&lt;version&gt;/exefs/ أو exefs/) ولا على ملف .nup ولا على مجلد لعبة. اختر مجلد اللعبة نفسه، أو ملف .nup الخاص بها، أو المجلد الذي يضم ألعابك.</string>
-    <string name="err_nup_rename">%1$s: أعد تسميته بحيث ينتهي اسمه بـ «.nup» أو «.nsp» (بأحرف صغيرة)؛ فاللعبة والأدوات تقرأ هذا الاسم فقط.</string>
+    <string name="err_nup_rename">%1$s: أعد تسميته بحيث ينتهي اسمه بـ «.nup» أو «.nsp» أو «.nx» (بأحرف صغيرة)؛ فاللعبة والأدوات تقرأ هذا الاسم فقط.</string>
     <string name="err_cannot_be_read">تعذّرت قراءة %1$s. تأكد من تفعيل «الوصول إلى كل الملفات».</string>
     <string name="home_no_pack_found_for_this">لم يُعثر على حزمة لـ %1$s هذا، وهو ليس تفريغًا يستطيع «التجهيز» البدء منه.</string>
     <string name="home_no_pack_for_this_what">لا توجد حزمة لـ %1$s هذا</string>
@@ -1272,10 +1273,12 @@
     <string name="ready_is_not_a_folder_this">" ليس مجلدًا يستطيع هذا التطبيق قراءته."</string>
     <string name="ready_cannot_be_used">" تعذّر استخدامه: "</string>
     <string name="ready_a_nup_that_reads_and">: ملف .nup يُقرأ ويجتاز الفحص (</string>
+    <string name="ready_an_nx_that_reads_and">: ملف .nx يُقرأ ويجتاز الفحص (</string>
     <string name="ready_its_card_s_button_picks">؛ زر بطاقته يختاره.)</string>
     <string name="ready_its_card_s_button_picks_2">" (زر بطاقته يختاره.)"</string>
     <string name="ready_packages_its_table_of_contents">" حزم، وفُحص جدول محتوياته). لا يحتاج إلى إذن الوصول إلى كل الملفات."</string>
     <string name="ready_a_nup_used_where_it">": ملف .nup مستخدم في مكانه (اختير بمنتقي الملفات؛ "</string>
+    <string name="ready_an_nx_used_where_it">": ملف .nx مستخدم في مكانه (اختير بمنتقي الملفات؛ "</string>
     <string name="ready_with_less_here">" بإمكانات أقل هنا."</string>
     <string name="ready_what_it_needs">" ما تحتاج إليه"</string>
     <string name="ready_the_check_before_the_game">. الفحص قبل بدء اللعبة يستخدم تعريف اللعبة، وقد تختلف نتيجته عن هذه.</string>
@@ -1288,7 +1291,7 @@
     <string name="err_no_game_with_title_id">"لا توجد لعبة بمعرّف العنوان "</string>
     <string name="err_cannot_be_read_check_that">" تعذّرت قراءته. تأكد من تفعيل الوصول إلى كل الملفات."</string>
     <string name="err_is_not_there_the_frontend">" غير موجود (أرسلت الواجهة "</string>
-    <string name="err_rename_it_so_that_its">: أعد تسميته لينتهي اسمه بـ «.nup» أو «.nsp» (بأحرف صغيرة)؛ فاللعبة والأدوات تقرأ هذا الاسم فقط.</string>
+    <string name="err_rename_it_so_that_its">: أعد تسميته لينتهي اسمه بـ «.nup» أو «.nsp» أو «.nx» (بأحرف صغيرة)؛ فاللعبة والأدوات تقرأ هذا الاسم فقط.</string>
     <string name="err_the_frontend_sent_no_game">لم ترسل الواجهة لعبة: أرسل ملف .nup (أو مجلد اللعبة) كبيانات الـ intent، أو الإضافة «game» مع مسارها.</string>
     <string name="err_which_is_not_a_file">، وهو ليس ملفًا على تخزين هذا الهاتف بمسار يستطيع التطبيق قراءته. اضبط الواجهة لترسل مسار الملف، أو عنوان تخزينه (SAF) من تخزين الهاتف نفسه.</string>
     <string name="err_the_frontend_sent">"أرسلت الواجهة "</string>

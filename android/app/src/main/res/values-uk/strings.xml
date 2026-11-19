@@ -121,7 +121,7 @@
     <string name="home_pick_pack_folder">Обрати папку паку</string>
     <string name="home_pick_the_pack_folder_android">Оберіть папку паку (android-pack із файлом pack.tsv)</string>
     <string name="home_pick_your_dump_folder_with">Оберіть папку дампа (з base/ та updates/, якщо є)</string>
-    <string name="home_pick_your_game_s_nup">Оберіть файл .nup або .nsp вашої гри</string>
+    <string name="home_pick_your_game_s_nup">Оберіть файл .nup, .nsp або .nx вашої гри</string>
     <string name="home_play_anyway">Усе одно грати</string>
     <string name="home_ported_from_eden_gpl_3">Портовано з Eden (GPL-3.0-or-later). Lossless.dll належить вам і ніколи не входить до складу додатка.</string>
     <string name="home_reading_the_game_files">Читання файлів гри…</string>
@@ -455,8 +455,8 @@
     <string name="settings_pick_another_sound">Обрати інший звук</string>
     <string name="settings_use_the_built_in_sounds">Використовувати вбудовані звуки</string>
     <string name="home_a_folder_with_base_and">Папка (з base/ та updates/, якщо є)</string>
-    <string name="home_a_nup_file_or_an">Файл .nup або файл .nsp із NSP Box</string>
-    <string name="home_a_nup_or_nsp_file">Файл .nup або .nsp (використовується з місця зберігання)</string>
+    <string name="home_a_nup_file_or_an">Файл .nup або .nx чи файл .nsp із NSP Box</string>
+    <string name="home_a_nup_or_nsp_file">Файл .nup, .nsp або .nx (використовується з місця зберігання)</string>
     <string name="home_allow_all_files_access">Надати доступ до всіх файлів</string>
     <string name="prepare_a_zip_file_made_by">Файл .zip (створений через «Експортувати пак…»)</string>
     <string name="prepare_a_pack_folder_with_pack">Папка паку (з pack.tsv та shaders/)</string>
@@ -483,6 +483,7 @@
     <string name="settings_turn_on">Увімкнути</string>
     <string name="home_cannot_use_this_file">Не вдається використати цей файл</string>
     <string name="home_cannot_use_this_nsp">Не вдається використати цей NSP</string>
+    <string name="home_cannot_use_this_nx">Не вдається використати цей файл .nx</string>
     <string name="common_remove">Вилучити</string>
     <string name="home_no_pack_for_the_switch">Для Switch 2 Edition ще немає паку</string>
     <string name="home_game_file_gone">Файл гри зник</string>
@@ -563,7 +564,7 @@
     <string name="settings_adb_control_warning">Поки цей параметр увімкнено, adb і будь-який інший додаток на цьому телефоні можуть додавати ігри, запускати підготовку та встановлювати чи обирати драйвер GPU через лаунчер Banana Native без вашого підтвердження. Драйвер GPU — це код, що виконується всередині гри. Вмикайте цю опцію лише на час роботи з adb, а потім вимикайте знову.</string>
     <string name="home_pick_dump_folder_again">Знову оберіть папку дампа для %1$s</string>
     <string name="err_no_game_in_folder">%1$s не містить main.npdm (base/exefs/, updates/&lt;version&gt;/exefs/ або exefs/), файлу .nup чи папки гри всередині. Оберіть власну папку гри, її файл .nup або папку, у якій зберігаються ваші ігри.</string>
-    <string name="err_nup_rename">%1$s: перейменуйте файл так, щоб його назва закінчувалася на \".nup\" або \".nsp\" (малими літерами); гра та інструменти читають лише таку назву.</string>
+    <string name="err_nup_rename">%1$s: перейменуйте файл так, щоб його назва закінчувалася на \".nup\", \".nsp\" або \".nx\" (малими літерами); гра та інструменти читають лише таку назву.</string>
     <string name="err_cannot_be_read">%1$s не вдається прочитати. Перевірте, чи ввімкнено доступ до всіх файлів.</string>
     <string name="home_no_pack_found_for_this">Не знайдено паку для цього %1$s, і це не дамп, із якого може початися підготовка.</string>
     <string name="home_no_pack_for_this_what">Немає паку для цього %1$s</string>
@@ -1256,10 +1257,12 @@
     <string name="ready_is_not_a_folder_this">" не є папкою, яку цей додаток може прочитати."</string>
     <string name="ready_cannot_be_used">" не можна використати: "</string>
     <string name="ready_a_nup_that_reads_and">: файл .nup читається та проходить перевірку (</string>
+    <string name="ready_an_nx_that_reads_and">: файл .nx читається та проходить перевірку (</string>
     <string name="ready_its_card_s_button_picks">; кнопка на її картці дозволяє обрати її.)</string>
     <string name="ready_its_card_s_button_picks_2">" (кнопка на її картці дозволяє обрати її.)"</string>
     <string name="ready_packages_its_table_of_contents">" пакетів, зміст перевірено). Доступ до всіх файлів не потрібен."</string>
     <string name="ready_a_nup_used_where_it">": файл .nup використовується з місця зберігання (обрано через системний провідник; "</string>
+    <string name="ready_an_nx_used_where_it">": файл .nx використовується з місця зберігання (обрано через системний провідник; "</string>
     <string name="ready_with_less_here">" зі спрощеннями на цьому пристрої."</string>
     <string name="ready_what_it_needs">" те, що їй потрібно"</string>
     <string name="ready_the_check_before_the_game">. Перевірка перед запуском гри використовує драйвер самої гри, тому її результат може відрізнятися від цього.</string>
@@ -1272,7 +1275,7 @@
     <string name="err_no_game_with_title_id">"Немає гри з Title ID "</string>
     <string name="err_cannot_be_read_check_that">" не вдається прочитати. Перевірте, чи ввімкнено доступ до всіх файлів."</string>
     <string name="err_is_not_there_the_frontend">" не знайдено (фронтенд передав "</string>
-    <string name="err_rename_it_so_that_its">: перейменуйте його так, щоб назва закінчувалася на \".nup\" або \".nsp\" (малими літерами); гра та інструменти читають лише таку назву.</string>
+    <string name="err_rename_it_so_that_its">: перейменуйте його так, щоб назва закінчувалася на \".nup\", \".nsp\" або \".nx\" (малими літерами); гра та інструменти читають лише таку назву.</string>
     <string name="err_the_frontend_sent_no_game">Фронтенд не передав гру: передайте .nup (або папку гри) як дані інтенту або в параметрі extra \"game\" із її шляхом.</string>
     <string name="err_which_is_not_a_file">, що не є файлом у сховищі цього телефона за шляхом, доступним для читання додатку. Налаштуйте фронтенд на передачу шляху до файлу або його SAF URI із власного сховища телефона.</string>
     <string name="err_the_frontend_sent">"Фронтенд передав "</string>

@@ -16,7 +16,7 @@ import java.util.Random;
  * and Pack's DM_ROMFS and DM_AOC_DIR links for a .nup game and a folder game. Compiled with Nup.java, Zstd.java, Pack.java, Profile.java and a stub BuildConfig
  * (NX_PROFILES, NX_DMSH_VK_CHAIN). The fixtures are made by dm/tools/nup_pack.py, a second implementation written from the spec:
  * <ul>
- * <li>{@code <repo> <scratch folder> [<python with zstandard>]}: makes a small dump folder in the scratch folder, packs it raw (python3 -I nup_pack.py --raw)
+ * <li>{@code <repo> <scratch folder> [<python with zstandard>]}: makes a small dump folder in the scratch folder, packs it raw (python3 -I nup_pack.py --raw; -Dnx.test.python=&lt;python&gt; names another)
  *     and, given that python, with zstd too, then every case; prints "ok <n>" and exits 0, or the first failure and exits 1</li>
  * <li>{@code real <file.nup> <dump folder>}: reads a real .nup made from that dump folder (read only): its packages, each exefs file of each package whole
  *     (checked against the folder's file and its SHA-256) and the first files of each RomFS</li>
@@ -24,6 +24,8 @@ import java.util.Random;
  */
 public final class NupJvmTest {
     private static int n;
+    /** The Python that runs nup_pack.py --raw: -Dnx.test.python (the test runner's own), else python3 (Windows has no python3 command) */
+    static final String PYTHON = System.getProperty("nx.test.python", "python3");
 
     static void check(boolean ok, String what) {
         if (!ok) throw new AssertionError(what);
@@ -140,7 +142,7 @@ public final class NupJvmTest {
         Zstd.contentSize(new byte[] {(byte) 0x28, (byte) 0xB5, 0x2F, (byte) 0xFD, 0x20, 0x05, 0x01, 0, 0});   // a header alone parses
         File d = new File(t, "Game");
         dump(d);
-        File raw = pack(repo, d, new File(t, "game-raw.nup"), "python3", true);
+        File raw = pack(repo, d, new File(t, "game-raw.nup"), PYTHON, true);
         reader(raw, d, true);
         damage(raw, t);
         if (args.length > 2) {
@@ -151,7 +153,7 @@ public final class NupJvmTest {
         packRows(raw, t);
         picked(raw, d, t);
         // A .nup without the add-on: its aoc row's own .nup (beside it, with the add-on) is linked instead
-        File nodlc = pack(repo, d, new File(t, "NoDlc.nup"), "python3", true, "--only", "base,update");
+        File nodlc = pack(repo, d, new File(t, "NoDlc.nup"), PYTHON, true, "--only", "base,update");
         Pack p = Pack.read(packDir(t, "pack-nodlc", raw.getName() + ":update/458752/romfs", "1	" + raw.getName() + ":addon/" + AOC + "/romfs"));
         check(Nup.open(nodlc).of(Nup.ADDON).isEmpty() && raw.getAbsolutePath().equals(p.aocLinks(nodlc).get("1.nup")), "no add-on in the game's .nup: the row's .nup " + p.aocLinks(nodlc));
         check(p.romfsPath(nodlc).equals(nodlc.getAbsolutePath() + ":update/458752/romfs"), "the game's own RomFS all the same");
@@ -183,9 +185,9 @@ public final class NupJvmTest {
         check(Pack.isDump(b), "the base game alone, with its code and RomFS: a dump (version 0)");
         new File(b, "updates").mkdirs();
         check(Pack.isDump(b), "with an updates/ folder too");
-        File nb = pack(repo, d, new File(t, "BaseOnly.nup"), "python3", true, "--only", "base");
+        File nb = pack(repo, d, new File(t, "BaseOnly.nup"), PYTHON, true, "--only", "base");
         check(Nup.open(nb).of(Nup.UPDATE).isEmpty() && Pack.isDump(nb), "a .nup of the base game alone: a dump (version 0)");
-        File nu = pack(repo, d, new File(t, "UpdateOnly.nup"), "python3", true, "--only", "update");
+        File nu = pack(repo, d, new File(t, "UpdateOnly.nup"), PYTHON, true, "--only", "update");
         check(Nup.open(nu).base() == null && Pack.isDump(nu) && DumpLayout.versions(nu).equals(List.of(458752L)), "an update-only .nup that carries the whole game (its exefs and RomFS): a dump of that update (DumpLayout)");
         check(Pack.isDump(new File(t, "game-raw.nup")), "a .nup with the base and an update: a dump");
         check(!Pack.isDump(new File(t, "missing.nup")), "a .nup that is not there");
@@ -216,7 +218,8 @@ public final class NupJvmTest {
             check(threw, "refused: " + bad);
         }
         check(Nup.versionSelector(0).equals("base") && Nup.versionSelector(458752).equals("update/458752"), "versionSelector");
-        check(Nup.spec(new File("/s/G.nup"), "update/1", "romfs").equals("/s/G.nup:update/1/romfs") && Nup.spec(new File("/s/G.nup"), "base", "").equals("/s/G.nup:base"), "spec");
+        String g = new File("/s/G.nup").getAbsolutePath();   // "/s/G.nup" on Android and POSIX; the JVM's own spelling elsewhere (a drive and '\\' on Windows)
+        check(Nup.spec(new File("/s/G.nup"), "update/1", "romfs").equals(g + ":update/1/romfs") && Nup.spec(new File("/s/G.nup"), "base", "").equals(g + ":base"), "spec");
         check(Nup.isNup(new File("/nonexistent/G.nup")) && !Nup.isNup(new File("/nonexistent/G.NUP")) && !Nup.isNup(new File("/nonexistent/G")), "isNup by name");
     }
 
@@ -438,8 +441,10 @@ public final class NupJvmTest {
         List<String> bad = Pack.makeAocLinks(dir, l, x -> x, real);
         File one = new File(dir, "1");
         check(bad.isEmpty() && !new File(dir, "7").exists() && Files.isSymbolicLink(one.toPath()) && one.isDirectory(), "aoc link 1 → the DLC folder: " + bad);
-        bad = Pack.makeAocLinks(dir, Map.of("1.nup", "x.nup"), x -> "fd:9/" + x, real);
-        check(bad.isEmpty() && Files.readSymbolicLink(new File(dir, "1.nup").toPath()).toString().equals("fd:9/x.nup") && !one.exists(), "a mapped target (fd:<n>/<name>) and the old link gone");
+        // the link as the launcher's linker (Os.symlink) gets it: the mapped target as a string, which no java.nio Path need spell (Windows refuses "fd:9/x.nup")
+        Map<String, String> made = new java.util.HashMap<>();
+        bad = Pack.makeAocLinks(dir, Map.of("1.nup", "x.nup"), x -> "fd:9/" + x, (target, path) -> made.put(path, target));
+        check(bad.isEmpty() && made.equals(Map.of(new File(dir, "1.nup").getPath(), "fd:9/x.nup")) && !one.exists(), "a mapped target (fd:<n>/<name>) and the old link gone: " + made);
         bad = Pack.makeAocLinks(dir, Map.of("1", "/x", "2", "/y"), x -> x, (target, path) -> { throw new IOException("EPERM (symlink failed)"); });
         check(bad.size() == 2 && bad.get(0).contains("EPERM") && bad.get(0).contains(" -> /"), "each refused link is a line: " + bad);
         Pack.removeDir(dir);

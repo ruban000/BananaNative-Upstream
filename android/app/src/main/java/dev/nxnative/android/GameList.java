@@ -29,8 +29,9 @@ final class GameList {
         String n = Frontend.normal(path);
         try {
             File f = new File(n);
-            if (f.exists()) n = Frontend.normal(f.getCanonicalPath());
-        } catch (IOException | SecurityException e) {
+            // toRealPath, not getCanonicalPath: it resolves symbolic links on every platform (a Windows JVM's canonical path keeps them), the same on Android
+            if (f.exists()) n = Frontend.normal(f.toPath().toRealPath().toString());
+        } catch (IOException | SecurityException | java.nio.file.InvalidPathException e) {
             // the plain normal form
         }
         return n;

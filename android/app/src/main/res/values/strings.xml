@@ -134,7 +134,7 @@
     <string name="home_pick_pack_folder">Pick pack folder</string>
     <string name="home_pick_the_pack_folder_android">Pick the pack folder (android-pack, with pack.tsv)</string>
     <string name="home_pick_your_dump_folder_with">Pick your dump folder (with base/, and updates/ if any)</string>
-    <string name="home_pick_your_game_s_nup">Pick your game\'s .nup or .nsp file</string>
+    <string name="home_pick_your_game_s_nup">Pick your game\'s .nup, .nsp or .nx file</string>
     <string name="home_play_anyway">Play anyway</string>
     <string name="home_ported_from_eden_gpl_3">Ported from Eden (GPL-3.0-or-later). Lossless.dll is yours; it is never part of the app.</string>
     <string name="home_reading_the_game_files">Reading the game files…</string>
@@ -478,8 +478,8 @@
     <string name="settings_pick_another_sound">Pick another sound</string>
     <string name="settings_use_the_built_in_sounds">Use the built-in sounds</string>
     <string name="home_a_folder_with_base_and">A folder (with base/, and updates/ if any)</string>
-    <string name="home_a_nup_file_or_an">A .nup file, or an NSP Box .nsp file</string>
-    <string name="home_a_nup_or_nsp_file">A .nup or .nsp file (used where it is)</string>
+    <string name="home_a_nup_file_or_an">A .nup or .nx file, or an NSP Box .nsp file</string>
+    <string name="home_a_nup_or_nsp_file">A .nup, .nsp or .nx file (used where it is)</string>
     <string name="home_allow_all_files_access">Allow All files access</string>
     <string name="prepare_a_zip_file_made_by">A .zip file (made by Export pack…)</string>
     <string name="prepare_a_pack_folder_with_pack">A pack folder (with pack.tsv and shaders/)</string>
@@ -508,6 +508,7 @@
     <string name="settings_turn_on">Turn on</string>
     <string name="home_cannot_use_this_file">Cannot use this file</string>
     <string name="home_cannot_use_this_nsp">Cannot use this NSP</string>
+    <string name="home_cannot_use_this_nx">Cannot use this .nx file</string>
     <string name="common_remove">Remove</string>
     <string name="home_no_pack_for_the_switch">No pack for the Switch 2 Edition yet</string>
     <string name="home_game_file_gone">Game file gone</string>
@@ -590,7 +591,7 @@
     <string name="settings_adb_control_warning">While it is on, adb, and any other app on this phone, can add games, start Prepare and install or pick a GPU driver through Banana Native\'s launcher, without asking you. A GPU driver is code that runs inside the game. Turn it on only while you use adb, then off again.</string>
     <string name="home_pick_dump_folder_again">Pick the dump folder of %1$s again</string>
     <string name="err_no_game_in_folder">%1$s has no main.npdm (base/exefs/, updates/&lt;version&gt;/exefs/ or exefs/), no .nup file and no game folder in it. Pick the game\'s own folder, its .nup file, or the folder that holds your games.</string>
-    <string name="err_nup_rename">%1$s: rename it so that its name ends in ".nup" or ".nsp" (lower case); the game and the tools read only that name.</string>
+    <string name="err_nup_rename">%1$s: rename it so that its name ends in ".nup", ".nsp" or ".nx" (lower case); the game and the tools read only that name.</string>
     <string name="err_cannot_be_read">%1$s cannot be read. Check that All files access is on.</string>
     <string name="home_no_pack_found_for_this">No pack found for this %1$s, and it is not a dump Prepare can start from.</string>
     <string name="home_no_pack_for_this_what">No pack for this %1$s</string>
@@ -1315,10 +1316,12 @@
     <string name="ready_is_not_a_folder_this">" is not a folder this app can read."</string>
     <string name="ready_cannot_be_used">" cannot be used: "</string>
     <string name="ready_a_nup_that_reads_and">: a .nup that reads and checks (</string>
+    <string name="ready_an_nx_that_reads_and">: an .nx that reads and checks (</string>
     <string name="ready_its_card_s_button_picks">; its card\'s button picks it.)</string>
     <string name="ready_its_card_s_button_picks_2">" (its card's button picks it.)"</string>
     <string name="ready_packages_its_table_of_contents">" packages, its table of contents checked). It needs no All files access."</string>
     <string name="ready_a_nup_used_where_it">": a .nup used where it is (picked with the file picker; "</string>
+    <string name="ready_an_nx_used_where_it">": an .nx used where it is (picked with the file picker; "</string>
     <string name="ready_with_less_here">" with less here."</string>
     <string name="ready_what_it_needs">" what it needs"</string>
     <string name="ready_the_check_before_the_game">. The check before the game starts uses the game\'s driver, and its result can differ from this one.</string>
@@ -1331,7 +1334,7 @@
     <string name="err_no_game_with_title_id">"No game with title ID "</string>
     <string name="err_cannot_be_read_check_that">" cannot be read. Check that All files access is on."</string>
     <string name="err_is_not_there_the_frontend">" is not there (the frontend sent "</string>
-    <string name="err_rename_it_so_that_its">: rename it so that its name ends in \".nup\" or \".nsp\" (lower case); the game and the tools read only that name.</string>
+    <string name="err_rename_it_so_that_its">: rename it so that its name ends in \".nup\", \".nsp\" or \".nx\" (lower case); the game and the tools read only that name.</string>
     <string name="err_the_frontend_sent_no_game">The frontend sent no game: send the .nup (or the game folder) as the intent\'s data, or the extra \"game\" with its path.</string>
     <string name="err_which_is_not_a_file">, which is not a file on this phone\'s storage by a path the app can read. Set the frontend to send the file\'s path, or its storage (SAF) URI from the phone\'s own storage.</string>
     <string name="err_the_frontend_sent">"The frontend sent "</string>

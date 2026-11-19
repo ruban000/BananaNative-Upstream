@@ -1824,7 +1824,7 @@ public final class MainActivity extends Activity {
         String lp = Pack.libraryProblem(new File(g.packDir), g.titleId);
         File save = Folders.save(this, g);
         Ui.Details info = Ui.details(this, Tx.s(R.string.home_game_details, g.titleId,
-                PickedNup.is(this, g.gameDir) ? Tx.s(R.string.home_nup_in_place, new File(g.gameDir).getName()) : g.gameDir + (Nup.isNup(new File(g.gameDir)) ? Tx.s(R.string.home_nup) : ""),
+                PickedNup.is(this, g.gameDir) ? Tx.s(R.string.home_nup_in_place, new File(g.gameDir).getName()) : g.gameDir + (Nx.isNx(new File(g.gameDir).getName()) ? " (.nx)" : Nup.isNup(new File(g.gameDir)) ? Tx.s(R.string.home_nup) : ""),
                 g.packDir, lp == null ? Tx.s(R.string.home_shaders_present, BuildConfig.NX_DMSH_VK_CHAIN) : lp, save != null ? save.getPath() : Tx.s(R.string.home_not_set)));
         info.text.setTextSize(12);
         Ui.add(content, info, 8);
@@ -2052,7 +2052,7 @@ public final class MainActivity extends Activity {
         addAll(found, false);
     }
 
-    /** A single .nup (NUP.md): its name and access checked here, the rest as every game (addAll) */
+    /** A single .nup, .nsp or .nx (NUP.md, NX.md): its name and access checked here, the rest as every game (addAll) */
     private void nupPicked(File nup) {
         if (Nup.wrongCase(nup)) { error(Tx.s(R.string.err_nup_rename, nup.getName())); return; }
         if (!Nup.picked(nup) && !nup.canRead()) { error(Tx.s(R.string.err_cannot_be_read, nup.toString())); return; }
@@ -2123,7 +2123,8 @@ public final class MainActivity extends Activity {
         if (single) {
             Pick k = picks.get(0);
             if (k.error != null) {
-                if (k.plain != null) Ui.explain(this, Tx.s(R.string.home_cannot_use_this_nsp), k.plain, k.error).setPositiveButton(android.R.string.ok, null).show();
+                if (k.plain != null) Ui.explain(this, Tx.s(Nx.isNx(k.game.getName()) ? R.string.home_cannot_use_this_nx : R.string.home_cannot_use_this_nsp), k.plain, k.error)
+                        .setPositiveButton(android.R.string.ok, null).show();
                 else error(k.error);
                 return;
             }
@@ -2139,7 +2140,7 @@ public final class MainActivity extends Activity {
                 if (k.found != null && k.found.otherBuild) { Ondevice.prepare(this, k.game, false); return; }   // a build this app does not list: Prepare says so and offers Try anyway
                 pendingGame = k.game;
                 pendingId = k.id;
-                String what = Nup.isNup(k.game) ? ".nup" : "folder";
+                String what = Nup.isNup(k.game) ? Nup.word(k.game) : "folder";
                 // Why Prepare cannot start from it (another build than this app's, an incomplete dump), plainly; a pack made elsewhere can still be picked
                 String why = k.found != null && k.found.error != null ? k.found.error
                         : Tx.s(R.string.home_no_pack_found_for_this, what);
@@ -2247,7 +2248,7 @@ public final class MainActivity extends Activity {
     private String add(File game, String id, File packDir, List<String> replace) {
         Pack pack;
         try { pack = Pack.read(packDir); } catch (IOException e) { return e.getMessage(); }
-        if (!pack.titleId.equals(id)) return "The pack is for " + pack.titleId + ", the game " + (Nup.isNup(game) ? ".nup" : "folder") + " holds " + id + ".";
+        if (!pack.titleId.equals(id)) return "The pack is for " + pack.titleId + ", the game " + (Nup.isNup(game) ? Nup.word(game) : "folder") + " holds " + id + ".";
         String why = Profile.missing(id, pack.name.isEmpty() ? null : pack.name);
         if (why != null) return why;
         if (Nup.isNup(game)) {

@@ -62,14 +62,19 @@ public final class SaveZipJvmTest {
         System.out.println("ok " + n);
     }
 
-    static void where(File t) {
+    static void where(File t) throws IOException {
         File app = new File(t, "Android/data/dev.nxnative.android/files"), shared = new File(t, "Switch2/save-backups/040074A01BF12000");
         check(SaveZip.appBackups(app, "040074A01BF12000").equals(new File(app, "save-backups/040074A01BF12000")), "the app's own backups folder");
         check(!SaveZip.export(shared, app, true), "a writable shared folder: backups go there");
         check(SaveZip.export(shared, app, false), "not writable (no All files access): export a zip");
         check(SaveZip.export(new File(app, "picked/0123456789abcdef/save-backups/040074A01BF12000"), app, true), "a folder inside app storage: export (it goes with the app)");
         new File(t, "Switch2").mkdirs();
-        check(SaveZip.writable(shared) && !SaveZip.writable(new File("/nonexistent-root-xyz/a")), "writable: the nearest existing folder decides");
+        // the nearest existing folder decides: the file system's root for a path under a folder that is not there (not writable on POSIX unless root; writable for
+        // the JVM on Windows, whose canWrite of a folder is always true), and a file in place of a folder is never a place to write
+        File gone = new File("/nonexistent-root-xyz/a").getAbsoluteFile(), top = gone;
+        while (top.getParentFile() != null) top = top.getParentFile();
+        write(new File(t, "Switch2/file"), "a file, not a folder");
+        check(SaveZip.writable(shared) && SaveZip.writable(gone) == top.canWrite() && !SaveZip.writable(new File(t, "Switch2/file/a")), "writable: the nearest existing folder decides");
         check(SaveZip.zipName("040074A01BF12000", "20261108-101010").equals("save-040074A01BF12000-20261108-101010.zip"), "zip name");
     }
 

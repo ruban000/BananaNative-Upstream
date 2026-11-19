@@ -40,12 +40,14 @@ final class RomfsCheck {
             }
             boolean ok = text != null && (main ? sameBuild(text, mainId) : text.equals(c[2]));
             if (ok) continue;
-            boolean nup = Nup.parse(romfs) != null;
+            Nup.Ref ref = Nup.parse(romfs);
+            boolean nup = ref != null;
+            String word = nup ? Nup.word(new File(ref.path)) : ".nup";
             String what = version == 0 ? "the base game's RomFS" : "version " + version + "'s full update RomFS";
             String where = key != null ? key : "line " + line;
             String found = text == null ? "missing" : where + " is \"" + (text.length() > 48 ? text.substring(0, 48) + "…" : text) + "\"";
             String want = main ? "main's build ID " + mainId.substring(0, Math.min(16, mainId.length())) + "…" : "\"" + c[2] + "\"";
-            return "This game " + (nup ? ".nup" : "folder") + "'s " + (version == 0 ? "" : "update ") + "data is not " + what + " (" + c[0] + ": " + found + ", expected " + want + (text == null ? (key != null ? " under " : " on ") + where : "")
+            return "This game " + (nup ? word : "folder") + "'s " + (version == 0 ? "" : "update ") + "data is not " + what + " (" + c[0] + ": " + found + ", expected " + want + (text == null ? (key != null ? " under " : " on ") + where : "")
                     + "). Dump or extract the " + (version == 0 ? "game" : "update") + " again as the patched RomFS" + (nup ? "." : ", or use the .nup.");
         }
         return null;

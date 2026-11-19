@@ -121,7 +121,7 @@
     <string name="home_pick_pack_folder">Choisir le dossier du pack</string>
     <string name="home_pick_the_pack_folder_android">Choisissez le dossier du pack (android-pack, avec pack.tsv)</string>
     <string name="home_pick_your_dump_folder_with">Choisissez votre dossier de dump (avec base/, et updates/ s\'il y en a)</string>
-    <string name="home_pick_your_game_s_nup">Choisissez le fichier .nup ou .nsp de votre jeu</string>
+    <string name="home_pick_your_game_s_nup">Choisissez le fichier .nup, .nsp ou .nx de votre jeu</string>
     <string name="home_play_anyway">Jouer quand même</string>
     <string name="home_ported_from_eden_gpl_3">Porté depuis Eden (GPL-3.0-or-later). Lossless.dll est à vous ; il ne fait jamais partie de l\'app.</string>
     <string name="home_reading_the_game_files">Lecture des fichiers du jeu…</string>
@@ -454,8 +454,8 @@
     <string name="settings_pick_another_sound">Choisir un autre son</string>
     <string name="settings_use_the_built_in_sounds">Utiliser les sons intégrés</string>
     <string name="home_a_folder_with_base_and">Un dossier (avec base/, et updates/ s\'il y en a)</string>
-    <string name="home_a_nup_file_or_an">Un fichier .nup, ou un fichier .nsp de NSP Box</string>
-    <string name="home_a_nup_or_nsp_file">Un fichier .nup ou .nsp (utilisé sur place)</string>
+    <string name="home_a_nup_file_or_an">Un fichier .nup ou .nx, ou un fichier .nsp de NSP Box</string>
+    <string name="home_a_nup_or_nsp_file">Un fichier .nup, .nsp ou .nx (utilisé sur place)</string>
     <string name="home_allow_all_files_access">Autoriser l\'accès à Tous les fichiers</string>
     <string name="prepare_a_zip_file_made_by">Un fichier .zip (fait par Exporter le pack…)</string>
     <string name="prepare_a_pack_folder_with_pack">Un dossier de pack (avec pack.tsv et shaders/)</string>
@@ -482,6 +482,7 @@
     <string name="settings_turn_on">Activer</string>
     <string name="home_cannot_use_this_file">Impossible d\'utiliser ce fichier</string>
     <string name="home_cannot_use_this_nsp">Impossible d\'utiliser ce NSP</string>
+    <string name="home_cannot_use_this_nx">Impossible d\'utiliser ce fichier .nx</string>
     <string name="common_remove">Retirer</string>
     <string name="home_no_pack_for_the_switch">Pas encore de pack pour la Switch 2 Edition</string>
     <string name="home_game_file_gone">Fichier du jeu introuvable</string>
@@ -561,7 +562,7 @@
     <string name="settings_adb_control_warning">Tant qu\'il est activé, adb, et toute autre app de ce téléphone, peut ajouter des jeux, lancer Préparer et installer ou choisir un pilote GPU via le lanceur de Banana Native, sans vous demander. Un pilote GPU est du code qui s\'exécute dans le jeu. Activez-le seulement pendant que vous utilisez adb, puis désactivez-le.</string>
     <string name="home_pick_dump_folder_again">Choisissez à nouveau le dossier de dump de %1$s</string>
     <string name="err_no_game_in_folder">%1$s ne contient ni main.npdm (base/exefs/, updates/&lt;version&gt;/exefs/ ou exefs/), ni fichier .nup, ni dossier de jeu. Choisissez le dossier du jeu lui-même, son fichier .nup, ou le dossier qui contient vos jeux.</string>
-    <string name="err_nup_rename">%1$s : renommez-le pour que son nom se termine par « .nup » ou « .nsp » (en minuscules) ; le jeu et les outils ne lisent que ce nom.</string>
+    <string name="err_nup_rename">%1$s : renommez-le pour que son nom se termine par « .nup », « .nsp » ou « .nx » (en minuscules) ; le jeu et les outils ne lisent que ce nom.</string>
     <string name="err_cannot_be_read">%1$s est illisible. Vérifiez que l\'accès à Tous les fichiers est activé.</string>
     <string name="home_no_pack_found_for_this">Aucun pack trouvé pour ce %1$s, et ce n\'est pas un dump à partir duquel Préparer peut démarrer.</string>
     <string name="home_no_pack_for_this_what">Aucun pack pour ce %1$s</string>
@@ -1248,10 +1249,12 @@
     <string name="ready_is_not_a_folder_this">" n'est pas un dossier que cette app peut lire."</string>
     <string name="ready_cannot_be_used">" est inutilisable : "</string>
     <string name="ready_a_nup_that_reads_and">" : un .nup lisible et vérifié ("</string>
+    <string name="ready_an_nx_that_reads_and">" : un .nx lisible et vérifié ("</string>
     <string name="ready_its_card_s_button_picks">" ; le bouton de sa carte le choisit.)"</string>
     <string name="ready_its_card_s_button_picks_2">" (le bouton de sa carte le choisit.)"</string>
     <string name="ready_packages_its_table_of_contents">" paquets, sa table des matières vérifiée). Il n'a pas besoin de l'accès à tous les fichiers."</string>
     <string name="ready_a_nup_used_where_it">" : un .nup utilisé là où il se trouve (choisi avec le sélecteur de fichiers ; "</string>
+    <string name="ready_an_nx_used_where_it">" : un .nx utilisé là où il se trouve (choisi avec le sélecteur de fichiers ; "</string>
     <string name="ready_with_less_here">" avec moins ici."</string>
     <string name="ready_what_it_needs">" ce dont il a besoin"</string>
     <string name="ready_the_check_before_the_game">. La vérification avant le démarrage du jeu utilise le pilote du jeu, et son résultat peut différer de celui-ci.</string>
@@ -1264,7 +1267,7 @@
     <string name="err_no_game_with_title_id">"Aucun jeu avec l'ID de titre "</string>
     <string name="err_cannot_be_read_check_that">" est illisible. Vérifiez que l'accès à tous les fichiers est activé."</string>
     <string name="err_is_not_there_the_frontend">" est introuvable (le frontend a envoyé "</string>
-    <string name="err_rename_it_so_that_its">" : renommez-le pour que son nom se termine par \".nup\" ou \".nsp\" (minuscules) ; le jeu et les outils ne lisent que ce nom."</string>
+    <string name="err_rename_it_so_that_its">" : renommez-le pour que son nom se termine par \".nup\", \".nsp\" ou \".nx\" (minuscules) ; le jeu et les outils ne lisent que ce nom."</string>
     <string name="err_the_frontend_sent_no_game">Le frontend n\'a envoyé aucun jeu : envoyez le .nup (ou le dossier du jeu) comme données de l\'intent, ou l\'extra \"game\" avec son chemin.</string>
     <string name="err_which_is_not_a_file">, qui n\'est pas un fichier du stockage de ce téléphone avec un chemin que l\'app peut lire. Réglez le frontend pour qu\'il envoie le chemin du fichier, ou son URI de stockage (SAF) du stockage propre du téléphone.</string>
     <string name="err_the_frontend_sent">"Le frontend a envoyé "</string>

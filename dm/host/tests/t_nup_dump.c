@@ -29,7 +29,8 @@ static void check_file(const char *host, const char *guest) {
         if (h_fs_ReadFile(&got, h, off, g_b, sizeof g_b) != RES_OK || got != want || memcmp(g_a, g_b, want)) { ok = 0; break; }
         off += (int64_t)got; if (!want) break;
     }
-    nup_aux *a = g_mnt[IMG_M(FH_IN(h))].img->aux; if (a->held > peak) peak = a->held;
+    romfs_img *im = g_mnt[IMG_M(FH_IN(h))].img;
+    uint64_t held = nx_image_is(im) ? ((nx_aux *)im->aux)->held : ((nup_aux *)im->aux)->held; if (held > peak) peak = held;   // (an .nx: its decoded-block cache)
     h_fs_CloseFile(h); fclose(f);
     uint64_t dt = ns() - t0;
     if (z) { nz_ns += dt; nz_files++; nz_bytes += (uint64_t)off; } else nraw_ns += dt;

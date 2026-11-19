@@ -12,7 +12,8 @@ import java.util.Map;
  * updates/&lt;v&gt;/program/1/ in the console's layout, DumpLayout.programDir) plays either program from one card. The card keeps the application's title ID; the
  * switch (per application, the game page) picks program 1, which has its own profile, host (libnxhost_&lt;its ID&gt;.so) and pack (pack_android.py --program 1),
  * while the save stays the application's, as on the console (GameActivity save_id). Program 1 is offered only when this APK has its profile. A .nup holds
- * program 0 only, so its card has no switch. A dump whose game this APK does not run but whose program 1 it does gets a card of program 1 itself
+ * program 0 only, so its card has no switch; an .nx's program 1 is found as its packages or folder (DumpLayout.programSpec; its card shows the Catalog's
+ * details, as it has no control folder). A dump whose game this APK does not run but whose program 1 it does gets a card of program 1 itself
  * (Pack.playableIdOf), which has no switch either: there is nothing to switch to.
  */
 final class Edition {
@@ -23,6 +24,17 @@ final class Edition {
     /** Program 1's title ID in a dump folder (upper case, from its main.npdm), null when the dump has none */
     static String program1(File game) {
         File d = DumpLayout.programDir(game, 1);
+        if (d == null && Nx.isNx(game.getName())) {   // an .nx: program 1's packages, else program 0's program1/ folder (DumpLayout.programSpec)
+            String s = DumpLayout.programSpec(game, 1);
+            if (s == null) return null;
+            String key;
+            try { key = s + ":" + Nup.open(game).identity; } catch (IOException e) { return null; }
+            synchronized (cache) { if (cache.containsKey(key)) { String v = cache.get(key); return v.isEmpty() ? null : v; } }
+            String id = "";
+            try { id = Pack.programId(DumpLayout.read(s, "exefs/main.npdm"), s + "/exefs/main.npdm"); } catch (IOException e) { /* unreadable: no edition offered */ }
+            synchronized (cache) { cache.put(key, id); }
+            return id.isEmpty() ? null : id;
+        }
         if (d == null) return null;
         File npdm = new File(d, "exefs/main.npdm");
         String key = npdm.getAbsolutePath() + ":" + npdm.length() + ":" + npdm.lastModified();
@@ -44,12 +56,15 @@ final class Edition {
 
     /**
      * Program 1's control folder when the card's switch is on and the dump has one (program 1's icon, version and publisher on the Home tile and the game page,
-     * GameMeta.loadControl), else null: the card shows the game's own
+     * GameMeta.loadControl), else null: the card shows the game's own. A folder's path, or for an .nx the full name of program 1's control data in it
+     * (DumpLayout.nxControl: its package's data/control/ or data/)
      */
-    static File control(Context c, Game g) {
+    static String control(Context c, Game g) {
         if (!isProgram1(g) && (!on(c, g.titleId) || !offered(g))) return null;
-        File d = DumpLayout.programDir(new File(g.gameDir), 1), ctl = d == null ? null : new File(d, "control");
-        return ctl != null && new File(ctl, "control.nacp").isFile() ? ctl : null;
+        File game = new File(g.gameDir);
+        if (Nx.isNx(game.getName())) return DumpLayout.nxControl(DumpLayout.programSpec(game, 1));
+        File d = DumpLayout.programDir(game, 1), ctl = d == null ? null : new File(d, "control");
+        return ctl != null && new File(ctl, "control.nacp").isFile() ? ctl.getPath() : null;
     }
 
     /** The switch's state for an application: true = program 1 */

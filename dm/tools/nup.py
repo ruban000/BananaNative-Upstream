@@ -13,6 +13,8 @@ A file's content is read through its record: codec 0 is a slice of the file (pre
 so a raw-only file needs no zstd module. A small zstd file is decompressed into memory when it is first read, a large one is streamed (a seek back starts the
 frame again) and goes to an unlinked temporary file only when a caller asks for its descriptor (mmap: romfs.py).
 romfs.py's Path / open / os / mmap take these paths as they take paths inside a RomFS image, so tools that read a RomFS folder through romfs.py read a package.
+An NX archive (`.nx`, magic NXAR, android/NX.md) is taken wherever a .nup is, by the same names (`<file>.nx:update/<version>/romfs`): open_nup gives an nx.Nx, a
+Nup whose files are block lists (dm/tools/nx.py).
 
 A .nup may also be read through a descriptor in place of its path (android/NUP.md "A .nup used where it is"): DM_NUP_FD=<fd>:<path> names a path that is read
 through descriptor fd (duplicated for each reader, read with pread only), whether or not anything is at that path. The phone's packer sets it for a .nup the user
@@ -43,7 +45,8 @@ class Error(ValueError): pass
 
 # Windows has no os.pread, and os.open there opens in text mode (CR LF read as LF) unless O_BINARY is given: every descriptor of a .nup (and romfs.py's of an
 # image) is opened with O_RDONLY | O_BINARY (0 elsewhere) and read with pread, os.pread where there is one, else a seek and reads under a lock (each stream has a
-# descriptor of its own; the lock keeps two threads reading one stream from moving its position under each other)
+# descriptor of its own; the lock keeps two threads reading one stream from moving its position under each other). As pread, the fallback leaves the position where
+# it was: a duplicate of DM_NUP_FD's descriptor shares its position with that descriptor, which its owner may read from
 O_RDONLY = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
 if hasattr(os, 'pread'): pread = os.pread
 else:
@@ -52,11 +55,14 @@ else:
     def pread(fd, n, offset):
         out = []
         with _seek_lock:
-            os.lseek(fd, offset, os.SEEK_SET)
-            while n > 0:
-                b = os.read(fd, min(n, 1 << 30))
-                if not b: break
-                out.append(b); n -= len(b)
+            was = os.lseek(fd, 0, os.SEEK_CUR)
+            try:
+                os.lseek(fd, offset, os.SEEK_SET)
+                while n > 0:
+                    b = os.read(fd, min(n, 1 << 30))
+                    if not b: break
+                    out.append(b); n -= len(b)
+            finally: os.lseek(fd, was, os.SEEK_SET)
         return b''.join(out)
 
 
@@ -461,12 +467,25 @@ class _Zstd(io.RawIOBase):
         super().close()
 
 
+NX_MAGIC = b'NXAR'   # an NX archive (android/NX.md): read by nx.py, whose Nx is a Nup of the same tree and names
+
+
+def _is_nx(path):
+    fd = open_fd(path)
+    try: return pread(fd, 4, 0) == NX_MAGIC
+    finally: os.close(fd)
+
+
 @functools.lru_cache(maxsize=8)
-def _open(path, identity): return Nup(path)
+def _open(path, identity):
+    if _is_nx(path):
+        import nx
+        return nx.Nx(path)
+    return Nup(path)
 
 
 def open_nup(path):
-    """The Nup of a .nup file, kept while the file is unchanged"""
+    """The Nup of a .nup file (or of a plaintext NSP, or an nx.Nx of an NX archive: the file's magic decides), kept while the file is unchanged"""
     path = os.path.abspath(os.fsdecode(path))
     st = stat(path)
     return _open(path, (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns))
@@ -478,17 +497,20 @@ def split(path):
     (a drive letter's colon is not '.nup:')"""
     p = os.fsdecode(path)
     i = max(p.rfind('.nup:'), p.rfind('.nsp:'))   # a plaintext NSP is read as a NUP file (nsp.py): `<file>.nsp:update/<version>/romfs`
-    if i < 0: return None
-    rest = p[i + 5:]
+    j = p.rfind('.nx:')   # an NX archive (nx.py, android/NX.md): `<file>.nx:update/<version>/romfs`
+    if i < 0 and j < 0: return None
+    n = 4 if i > j else 3   # the extension's length
+    i = max(i, j)
+    rest = p[i + n + 1:]
     if os.sep != '/': rest = rest.replace(os.sep, '/')
-    return p[:i + 4], rest.strip('/')
+    return p[:i + n], rest.strip('/')
 
 
 def is_nup(path):
-    """Whether path is a NUP file itself (no selector), or a plaintext NSP, which is read as one: its magic, whatever its name"""
+    """Whether path is a NUP file itself (no selector), or a plaintext NSP or an NX archive, which are read as one: its magic, whatever its name"""
     try:
         fd = open_fd(path)
-        try: return _stat.S_ISREG(os.fstat(fd).st_mode) and pread(fd, 4, 0) in (MAGIC, b'PFS0')
+        try: return _stat.S_ISREG(os.fstat(fd).st_mode) and pread(fd, 4, 0) in (MAGIC, b'PFS0', NX_MAGIC)
         finally: os.close(fd)
     except (OSError, TypeError, ValueError): return False
 
@@ -511,11 +533,13 @@ def default_romfs(path):
     p = os.fsdecode(path)
     s = split(p)
     if s is None:
-        if p.endswith(('.nup', '.nsp')) and is_nup(p): return f'{p}:{open_nup(p).default().selector}/romfs'
+        if p.endswith(('.nup', '.nsp', '.nx')) and is_nup(p): return f'{p}:{open_nup(p).default().selector}/romfs'
         return p
     f, rest = s
+    prog = re.fullmatch(r'(program[0-9]+/)(.*)', rest, re.S) if f.endswith('.nx') else None   # an NX archive's program n (android/NX.md): `<file>.nx:program1/update/<v>`
+    if prog: rest = prog.group(2)
     m = SELECTOR.fullmatch(rest)
-    if m and not m.group(2) and is_nup(f): return f'{f}:{m.group(1)}/romfs'
+    if m and not m.group(2) and is_nup(f): return f'{f}:{prog.group(1) if prog else ""}{m.group(1)}/romfs'
     if not rest and is_nup(f): return f'{f}:{open_nup(f).default().selector}/romfs'
     return p
 

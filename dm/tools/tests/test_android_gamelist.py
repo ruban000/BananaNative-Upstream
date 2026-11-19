@@ -48,7 +48,7 @@ class GameListJvm(unittest.TestCase):
         cls.tmp = Path(tempfile.mkdtemp(prefix='gamelist_'))
         (cls.tmp / 'stub').mkdir()
         (cls.tmp / 'stub/BuildConfig.java').write_text(STUB)
-        srcs = [SRC / f'{n}.java' for n in ('BuildCheck', 'DumpLayout', 'RomfsCheck', 'GameList', 'Frontend', 'Nup', 'Nsp', 'Zstd', 'Pack', 'Profile', 'ShaderLibs')]
+        srcs = [SRC / f'{n}.java' for n in ('BuildCheck', 'DumpLayout', 'RomfsCheck', 'GameList', 'Frontend', 'Nup', 'Nsp', 'Nx', 'Zstd', 'Pack', 'Profile', 'ShaderLibs')]
         r = subprocess.run(['javac', '-Xlint:all,-try', '-Werror', '-d', str(cls.tmp / 'classes'), str(WORDS), *map(str, srcs), str(TEST), str(cls.tmp / 'stub/BuildConfig.java')],
                            capture_output=True, text=True)
         assert r.returncode == 0, r.stdout + r.stderr
@@ -120,8 +120,9 @@ class DumpLayouts(unittest.TestCase):
                         self.assertTrue((exe / 'main.npdm').is_file() and rom.is_dir(), (exe, rom))
                         own = 'base' if name == 'base-only' else 'update/65537' if d.suffix == '.nup' else 'updates/65537'
                         base = 'base'
-                        self.assertTrue(str(exe).endswith(f'{own}/exefs'), exe)
-                        self.assertTrue(str(rom).endswith(f'{base if name == "code-in-update" else own}/romfs'), rom)
+                        # as_posix: a romfs.Path is a WindowsPath on Windows, '\\' after the .nup's colon too, which nup.split reads as '/' (the same on POSIX)
+                        self.assertTrue(exe.as_posix().endswith(f'{own}/exefs'), exe)
+                        self.assertTrue(rom.as_posix().endswith(f'{base if name == "code-in-update" else own}/romfs'), rom)
 
 
 

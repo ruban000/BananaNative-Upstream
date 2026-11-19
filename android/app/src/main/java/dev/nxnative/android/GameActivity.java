@@ -915,7 +915,7 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
             runIntent = new Intent(getIntent());
             if ("java".equals(testCrash)) { Native.note("[RED] DM_TEST_CRASH=java: an exception on the main thread in 10 s"); ExitWatch.testCrash(ui); }   // =native: nxlaunch.c
             if (readinessLine != null) Native.note(readinessLine + (triedAnyway ? "; the player chose Try anyway" : ""));   // the readiness check (readinessHold)
-            Native.note("[nxlaunch] game: " + game + (nupFd >= 0 ? " (.nup used where it is, descriptor " + nupFd + ")" : Nup.isNup(game) ? " (.nup)" : " (folder)") + ", DM_ROMFS " + romfs
+            Native.note("[nxlaunch] game: " + game + (nupFd >= 0 ? " (" + Nup.word(game) + " used where it is, descriptor " + nupFd + ")" : Nup.isNup(game) ? " (" + Nup.word(game) + ")" : " (folder)") + ", DM_ROMFS " + romfs
                     + ", pack " + packDir);
             Native.note("[nxlaunch] save: " + save + " (" + saveHow + ")" + (saveNote != null ? "; " + saveNote : ""));
             if (cheatNote != null) Native.note(cheatNote);

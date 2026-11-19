@@ -47,9 +47,10 @@ final class PickedPath {
     static String nameProblem(String name) {
         if (name == null) return "The file picker gave no name for that file. Pick it from the phone's storage.";
         if (CopyPlan.safeName(name) == null) return "That file's name cannot be used (" + name + ").";
-        if (Nup.extOf(name) == null && Nup.extOf(name.toLowerCase(Locale.ROOT)) != null) return name + ": rename it so that its name ends in \".nup\" or \".nsp\" (lower case), then pick it again.";
-        if (Nup.extOf(name) == null) return name + " is not a .nup or .nsp file. Pick a .nup (or an NSP Box .nsp), or copy a dump folder into the app.";
-        if (name.contains(".nup:") || name.contains(".nsp:")) return name + ": a name with \".nup:\" or \".nsp:\" inside it cannot be told from a package name. Rename it.";
+        if (Nup.extOf(name) == null && Nup.extOf(name.toLowerCase(Locale.ROOT)) != null)
+            return name + ": rename it so that its name ends in \"" + Nup.rightExt(name) + "\" (lower case), then pick it again.";
+        if (Nup.extOf(name) == null) return name + " is not a .nup, .nsp or .nx file. Pick a .nup or an .nx (or an NSP Box .nsp), or copy a dump folder into the app.";
+        if (name.contains(".nup:") || name.contains(".nsp:") || name.contains(".nx:")) return name + ": a name with \".nup:\", \".nsp:\" or \".nx:\" inside it cannot be told from a package name. Rename it.";
         return null;
     }
 

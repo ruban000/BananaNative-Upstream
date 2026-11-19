@@ -37,15 +37,33 @@ final class GameMeta {
 
     /**
      * As load; control names the control folder to read instead of the dump's own (another program's, such as a Switch 2 Edition's program 1), null for the
-     * dump's. A folder dump is read from its control data, a .nup from its meta block
+     * dump's: a folder's path, or the full name of a control folder inside an .nx (Edition.control). A folder dump is read from its control data, a .nup from
+     * its meta block
      */
-    static void loadControl(File dump, File control, Consumer<GameMeta> done) {
+    static void loadControl(File dump, String control, Consumer<GameMeta> done) {
         boolean nup = Nup.isNup(dump) || Nup.picked(dump);
         if (!nup && control == null && !dump.isDirectory()) return;
         new Thread(() -> {
-            GameMeta m = nup && control == null ? read(dump) : readFolder(control != null ? control : DumpLayout.controlDir(dump));
+            GameMeta m = nup && control == null ? read(dump) : control != null && Nup.parse(control) != null ? readSpec(control)
+                    : readFolder(control != null ? new File(control) : DumpLayout.controlDir(dump));
             if (m != null) main.post(() -> done.accept(m));
         }, "nx-game-meta").start();
+    }
+
+    /** A control folder inside an .nx (its files read through Nup), cached by the archive's identity */
+    private static GameMeta readSpec(String control) {
+        String key;
+        try { key = control + ":" + Nup.open(new File(Nup.parse(control).path)).identity + ":" + Nacp.phoneLanguage(); } catch (java.io.IOException | RuntimeException e) { return null; }
+        synchronized (cache) { if (cache.containsKey(key)) return cache.get(key); }
+        GameMeta g = of(Nacp.read(control, Nacp.phoneLanguage()));
+        synchronized (cache) { cache.put(key, g); }
+        return g;
+    }
+
+    private static GameMeta of(Nacp.Control c) {
+        if (c == null) return null;
+        Bitmap icon = c.icon == null ? null : BitmapFactory.decodeByteArray(c.icon, 0, c.icon.length);
+        return icon != null || c.version != null || c.publisher != null ? new GameMeta(icon, c.version, c.publisher) : null;
     }
 
     private static GameMeta readFolder(File control) {

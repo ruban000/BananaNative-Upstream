@@ -58,7 +58,7 @@ class Jvm(unittest.TestCase):
         cls.td = tempfile.TemporaryDirectory(prefix='packcheck_')
         cls.t = Path(cls.td.name).resolve()
         (cls.t / 'BuildConfig.java').write_text(test_nup.Launcher.STUB)
-        mods = ('Nup', 'Nsp', 'Zstd', 'Pack', 'DumpLayout', 'BuildCheck', 'RomfsCheck', 'Profile', 'ShaderLibs', 'PickedPath', 'CopyPlan', 'Verdict', 'GameList', 'Frontend')
+        mods = ('Nup', 'Nsp', 'Nx', 'Zstd', 'Pack', 'DumpLayout', 'BuildCheck', 'RomfsCheck', 'Profile', 'ShaderLibs', 'PickedPath', 'CopyPlan', 'Verdict', 'GameList', 'Frontend')
         subprocess.run(['javac', '-Xlint:all', '-Xlint:-deprecation', '-d', str(cls.t / 'classes')] + [str(SRC / f'{c}.java') for c in mods] + [str(SRC / 'Words.java'), str(TEST), str(cls.t / 'BuildConfig.java')],
                        check=True, capture_output=True, text=True)
 

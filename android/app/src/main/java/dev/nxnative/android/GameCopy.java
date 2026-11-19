@@ -81,7 +81,7 @@ final class GameCopy {
                 } else {
                     name = CopyPlan.safeName(displayName(cr, u));
                     if (name == null) throw new IOException("the file has no name the app can use");
-                    if (Nup.extOf(name) == null) throw new IOException(name + " is not a .nup or .nsp file (its name must end in \".nup\" or \".nsp\", lower case)");
+                    if (Nup.extOf(name) == null) throw new IOException(name + " is not a .nup, .nsp or .nx file (its name must end in \".nup\", \".nsp\" or \".nx\", lower case)");
                     items.add(new Item(u, "", size(cr, u)));
                 }
                 File dest = new File(games, name), part = CopyPlan.partOf(dest);

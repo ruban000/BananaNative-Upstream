@@ -31,6 +31,17 @@ def have_zstd():
     except nup.Error: return False
 
 
+def named(p):
+    """A path in a package as android/NUP.md names it, `<file>.nup:<rest>` with '/' in the rest: a romfs.Path (a WindowsPath on Windows) writes '\\' after the
+    colon, which nup.split reads as '/' (the same name; unchanged on POSIX)"""
+    f, rest = nup.split(str(p))
+    return f'{f}:{rest}'
+
+
+def stdout():   # a quiet sys.stdout that is a text stream as a console's is: pack_android.py reconfigure()s it on Windows (io.StringIO has no reconfigure)
+    return io.TextIOWrapper(io.BytesIO(), encoding='utf-8')
+
+
 def npdm(tid):
     d = bytearray(0x100)
     d[:4] = b'META'
@@ -268,9 +279,9 @@ class Damaged(Fixture):
 class Tools(Fixture):
     def test_pack_dump_scan(self):
         app, vers, dlc = pack_dump.scan(self.nup)
-        self.assertEqual((app, {v: str(p) for v, p in vers.items()}, {t: str(p) for t, p in dlc.items()}),
+        self.assertEqual((app, {v: named(p) for v, p in vers.items()}, {t: named(p) for t, p in dlc.items()}),
                          (TID, {VER: f'{self.nup}:update/{VER}'}, {DLC: f'{self.nup}:addon/{DLC:016x}/romfs'}))
-        self.assertEqual(str(pack_dump.version_dir(self.nup, vers, 0)), f'{self.nup}:base')
+        self.assertEqual(named(pack_dump.version_dir(self.nup, vers, 0)), f'{self.nup}:base')
         self.assertEqual(pack_dump.scan(self.dump)[0], app)
 
     def test_program_1_nup(self):   # BananaNative #356: a .nup of a folder whose base/ is a Switch 2 Edition's program 1 is that program's, as the folder is; its add-ons index as the folder's
@@ -309,7 +320,7 @@ class Tools(Fixture):
         for tag, src in (('folder', self.dump), ('nup', self.nup)):
             out = self.root / f'pack-{tag}'; self.addCleanup(shutil.rmtree, out, True)
             argv = ['pack_android.py', str(src), '--out', str(out), '--no-shaders', '--in-process']
-            with mock.patch.object(sys, 'argv', argv), mock.patch.object(pack_android, 'rewrite', fake_rewrite), mock.patch('sys.stdout', io.StringIO()):
+            with mock.patch.object(sys, 'argv', argv), mock.patch.object(pack_android, 'rewrite', fake_rewrite), mock.patch('sys.stdout', stdout()):
                 pack_android.main()
             packs[tag] = out
         rows = {t: (p / 'pack.tsv').read_text().splitlines() for t, p in packs.items()}
@@ -328,7 +339,7 @@ class Descriptor(Fixture):
     def setUp(self):
         self.stand = self.root / 'picked' / '0123456789abcdef' / 'Game.nup'
         self.stand.parent.mkdir(parents=True, exist_ok=True)
-        self.fd = os.open(self.nup, os.O_RDONLY)
+        self.fd = os.open(self.nup, nup.O_RDONLY)   # O_BINARY on Windows, where os.open is in text mode otherwise (as the phone's descriptor, a binary one)
         self.addCleanup(os.close, self.fd)
         env = mock.patch.dict(os.environ, {'DM_NUP_FD': f'{self.fd}:{self.stand}'})
         env.start(); self.addCleanup(env.stop)
@@ -349,7 +360,7 @@ class Descriptor(Fixture):
 
     def test_tools(self):
         app, vers, dlc = pack_dump.scan(self.stand)
-        self.assertEqual((app, {v: str(p) for v, p in vers.items()}, {t: str(p) for t, p in dlc.items()}),
+        self.assertEqual((app, {v: named(p) for v, p in vers.items()}, {t: named(p) for t, p in dlc.items()}),
                          (TID, {VER: f'{self.stand}:update/{VER}'}, {DLC: f'{self.stand}:addon/{DLC:016x}/romfs'}))
         self.assertEqual(romfs.Path(f'{self.stand}:update/{VER}/exefs/main').read_bytes(), (self.dump / f'updates/{VER}/exefs/main').read_bytes())
 
@@ -375,7 +386,7 @@ class Descriptor(Fixture):
         for tag, src in (('file', self.nup), ('fd', self.stand)):
             out = self.root / f'pack-{tag}'; self.addCleanup(shutil.rmtree, out, True)
             argv = ['pack_android.py', str(src), '--out', str(out), '--no-shaders', '--in-process']
-            with mock.patch.object(sys, 'argv', argv), mock.patch.object(pack_android, 'rewrite', fake_rewrite), mock.patch('sys.stdout', io.StringIO()):
+            with mock.patch.object(sys, 'argv', argv), mock.patch.object(pack_android, 'rewrite', fake_rewrite), mock.patch('sys.stdout', stdout()):
                 pack_android.main()
             packs[tag] = out
         rows = {t: [r for r in (p / 'pack.tsv').read_text().splitlines() if not r.startswith('packer\t')] for t, p in packs.items()}
@@ -404,11 +415,12 @@ public final class BuildConfig {
         t = Path(tempfile.mkdtemp(prefix='nupjvm_'))
         try:
             (t / 'BuildConfig.java').write_text(self.STUB)
-            subprocess.run(['javac', '-d', str(t / 'classes')] + [str(src / f'{c}.java') for c in ('Nup', 'Nsp', 'Zstd', 'Pack', 'DumpLayout', 'BuildCheck', 'RomfsCheck', 'Profile', 'ShaderLibs', 'PickedPath', 'CopyPlan', 'Words')]
+            subprocess.run(['javac', '-d', str(t / 'classes')] + [str(src / f'{c}.java') for c in ('Nup', 'Nsp', 'Nx', 'Zstd', 'Pack', 'DumpLayout', 'BuildCheck', 'RomfsCheck', 'Profile', 'ShaderLibs', 'PickedPath', 'CopyPlan', 'Words')]
                            + [str(REPO / 'android/app/src/jvmtest/java/dev/nxnative/android/NupJvmTest.java'), str(t / 'BuildConfig.java')], check=True, capture_output=True, text=True)
             (t / 'run').mkdir()
-            r = subprocess.run(['java', '-cp', str(t / 'classes'), 'dev.nxnative.android.NupJvmTest', str(REPO), str(t / 'run')] + ([sys.executable] if have_zstd() else []),
-                               capture_output=True, text=True)
+            # -Dnx.test.python: nup_pack.py --raw runs in this Python (Windows has no python3 command)
+            r = subprocess.run(['java', f'-Dnx.test.python={sys.executable}', '-cp', str(t / 'classes'), 'dev.nxnative.android.NupJvmTest', str(REPO), str(t / 'run')]
+                               + ([sys.executable] if have_zstd() else []), capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-2000:])
             self.assertRegex(r.stdout, r'^ok \d+')
         finally: shutil.rmtree(t, ignore_errors=True)

@@ -31,6 +31,9 @@ import java.util.regex.Pattern;
  * Reading goes through a {@link Source}: a plain file, or, for a .nup the user picked with the system file picker (no path the app may open without All files
  * access: PickedNup), a descriptor from the {@link #opener} the app installs. Such a file has a stand-in path in app storage that names it wherever a path
  * names a game; nothing exists at that path.
+ * <p>
+ * A plaintext NSP ({@link Nsp}: a TOC made from it) and an NX archive ({@link Nx}, android/NX.md: its packages, tree and block reads; {@link #nx}) are read through
+ * this class too, so every place that takes a .nup takes them, named the same way ({@code game.nx:update/458752/romfs}).
  */
 final class Nup {
     static final int BASE = 0, UPDATE = 1, ADDON = 2;
@@ -38,12 +41,34 @@ final class Nup {
     static final String EXT = ".nup";
     /** A plaintext NSP (NSP Box) is read as a NUP file too: {@link Nsp} makes its TOC, its files are extents of it */
     static final String EXT_NSP = ".nsp";
+    /** An NX archive (android/NX.md) is read as a NUP file too: {@link Nx} makes its packages, and its tree and file reads are Nx's */
+    static final String EXT_NX = Nx.EXT;
+    private static final String[] EXTS = {EXT, EXT_NSP, EXT_NX};
+    /** The codec of an .nx file's node: its bytes are Nx's blocks, not an extent */
+    static final int CODEC_NX = 0x100;
+    /** The codec of a file of an .nx's NCA snapshot: a range of an NCA section's file system (NxNca), with no SHA-256 of its own */
+    static final int CODEC_NCA = 0x101;
 
-    /** The container extension a file name ends with (".nup" or ".nsp", lower case, with something before it), else null */
+    /** The container extension a file name ends with (".nup", ".nsp" or ".nx", lower case, with something before it), else null */
     static String extOf(String name) {
         if (name == null) return null;
-        for (String e : new String[] {EXT, EXT_NSP}) if (name.endsWith(e) && name.length() > e.length()) return e;
+        for (String e : EXTS) if (name.endsWith(e) && name.length() > e.length()) return e;
         return null;
+    }
+
+    /** The extension of a file that holds packages of a game (".nup", ".nsp" or ".nx"), for link names and messages; ".nup" for anything else */
+    static String extOf(File f) {
+        String e = f == null ? null : extOf(f.getName());
+        return e != null ? e : EXT;
+    }
+
+    /** What messages call a game file: ".nx" for an .nx, else ".nup" (an NSP is read as a .nup, and its messages say so, as before) */
+    static String word(File f) { return f != null && Nx.isNx(f.getName()) ? EXT_NX : EXT; }
+
+    /** Whether a file name is a container that may hold a whole game with its updates and add-ons (a .nup or an .nx), not an NSP (one version or one DLC each) */
+    static boolean container(String name) {
+        String e = extOf(name);
+        return EXT.equals(e) || EXT_NX.equals(e);
     }
 
     /** One package record */
@@ -51,6 +76,7 @@ final class Nup {
         final int index, kind, flags;
         final long titleId, version, rootDir, exefsDir, romfsDir;
         long metaOffset, metaSize;   // where its meta block is (icon, name, version...), 0 if it has none
+        int program;   // an .nx's program index (NX.md "Programs": program_id & 0xf), 0 for the game's own program and for every .nup / NSP package and add-on
 
         Pkg(int index, long titleId, long rootDir, long exefsDir, long romfsDir, long version, int kind, int flags) {
             this.index = index;
@@ -65,9 +91,10 @@ final class Nup {
 
         /** This package's selector: base, update/&lt;version&gt;, addon/&lt;title ID, lower case&gt; (null for another kind) */
         String selector() {
+            String pre = program > 0 && kind != ADDON ? "program" + program + "/" : "";
             switch (kind) {
-                case BASE: return "base";
-                case UPDATE: return "update/" + version;
+                case BASE: return pre + "base";
+                case UPDATE: return pre + "update/" + version;
                 case ADDON: return "addon/" + String.format(Locale.ROOT, "%016x", titleId);
                 default: return null;
             }
@@ -162,9 +189,30 @@ final class Nup {
     final List<Pkg> packages;
     private final long offDir, offFile, offKids;
     private byte[] synth;   // an NSP's TOC (Nsp.build); null for a .nup, whose TOC is read from the file
+    /** An .nx's archive: its tree and its file reads are its own (Nx); null for a .nup or an NSP */
+    final Nx nx;
+
+    private Nup(File file, String identity, long fileSize, Nx nx) {
+        this.file = file;
+        this.identity = identity;
+        this.fileSize = fileSize;
+        this.tocOffset = 0;
+        this.tocSize = 0;
+        this.blobOffset = 0;
+        this.poolOff = 0;
+        this.poolSize = 0;
+        this.dirCount = nx.dirCount;
+        this.fileCount = nx.fileCount;
+        this.packages = nx.packages;
+        this.nx = nx;
+        offDir = 0;
+        offFile = 0;
+        offKids = 0;
+    }
 
     private Nup(File file, String identity, long fileSize, long tocOffset, long tocSize, long blobOffset, long dirCount, long fileCount, long poolOff, long poolSize,
                 List<Pkg> packages) {
+        this.nx = null;
         this.file = file;
         this.identity = identity;
         this.fileSize = fileSize;
@@ -187,9 +235,12 @@ final class Nup {
     /** A .nup named with another case of the extension: the tools and the host would not take it */
     static boolean wrongCase(File f) { return f != null && extOf(f.getName()) == null && extOf(f.getName().toLowerCase(Locale.ROOT)) != null && f.isFile(); }
 
+    /** The lower-case extension a file named with another case of it should have (".nx" for "Game.NX"), null when it has none of them */
+    static String rightExt(String name) { return name == null || extOf(name) != null ? null : extOf(name.toLowerCase(Locale.ROOT)); }
+
     // ---- Naming ----
 
-    private static final Pattern SEL = Pattern.compile("(base|update/[0-9]+|addon/[0-9a-fA-F]{16})(/.*)?");
+    private static final Pattern SEL = Pattern.compile("((?:program(?:[0-9]|1[0-5])/)?(?:base|update/[0-9]+|addon/[0-9a-fA-F]{16}))(/.*)?");
 
     /** A parsed name: the .nup's path, its selector (null: none, the default package) and the path after it ("" when none; no leading '/') */
     static final class Ref {
@@ -200,18 +251,29 @@ final class Nup {
         @Override public String toString() { return selector == null ? path : path + ":" + selector + (sub.isEmpty() ? "" : "/" + sub); }
     }
 
-    /** null when the name has no ".nup:" and does not end with ".nup"; IllegalArgumentException for a bad selector */
+    /** null when the name has no ".nup:" (".nsp:", ".nx:") and does not end with ".nup" (".nsp", ".nx"); IllegalArgumentException for a bad selector */
     static Ref parse(String spec) {
         if (spec == null) return null;
-        int k = Math.max(spec.lastIndexOf(EXT + ":"), spec.lastIndexOf(EXT_NSP + ":"));   // both are 4 characters
+        int k = -1, el = 0;
+        for (String e : EXTS) {   // split at the last ".nup:", ".nsp:" or ".nx:"
+            int i = spec.lastIndexOf(e + ":");
+            if (i > k) { k = i; el = e.length(); }
+        }
         if (k < 0) return extOf(spec) != null ? new Ref(spec, null, "") : null;
-        String path = spec.substring(0, k + EXT.length()), rest = spec.substring(k + EXT.length() + 1);
+        String path = spec.substring(0, k + el), rest = spec.substring(k + el + 1);
         if (rest.isEmpty()) return new Ref(path, null, "");
         Matcher m = SEL.matcher(rest);
         if (!m.matches()) throw new IllegalArgumentException("not a package of a .nup: \"" + rest + "\" (base, update/<version> or addon/<16 hex digits>)");
-        String sel = m.group(1);
+        String sel = m.group(1), pre = "";
+        if (sel.startsWith("program")) {   // an .nx's program n (NX.md "Programs"): program0/ is program 0, an add-on is the application's under any program
+            int slash = sel.indexOf('/');
+            int prog = Integer.parseInt(sel.substring(7, slash));
+            sel = sel.substring(slash + 1);
+            if (prog > 0 && !sel.startsWith("addon/")) pre = "program" + prog + "/";
+        }
         if (sel.startsWith("addon/")) sel = sel.toLowerCase(Locale.ROOT);
         if (sel.startsWith("update/")) sel = "update/" + Long.parseLong(sel.substring(7));   // no leading zeros
+        sel = pre + sel;
         String sub = m.group(2) == null ? "" : m.group(2).substring(1);
         while (sub.endsWith("/")) sub = sub.substring(0, sub.length() - 1);
         return new Ref(path, sel, sub);
@@ -219,6 +281,25 @@ final class Nup {
 
     /** The selector of a game version as the tools number it: 0 is the base game, else its update */
     static String versionSelector(long version) { return version == 0 ? "base" : "update/" + version; }
+
+    /** What a full name (&lt;file&gt;:&lt;selector&gt;[/&lt;path&gt;]) names: its file, its package (null: not there) and its node (null: not there) */
+    static final class At {
+        final Nup nup;
+        final Pkg pkg;
+        final Node node;
+
+        At(Nup nup, Pkg pkg, Node node) { this.nup = nup; this.pkg = pkg; this.node = node; }
+    }
+
+    /** The package and node a full name names; null when it is not a container's name; IOException when the file cannot be read */
+    static At at(String spec) throws IOException {
+        Ref r;
+        try { r = parse(spec); } catch (IllegalArgumentException e) { return null; }
+        if (r == null) return null;
+        Nup n = open(new File(r.path));
+        Pkg p = n.resolve(r.selector);
+        return new At(n, p, p == null ? null : n.lookup(p, r.sub));
+    }
 
     /** &lt;file&gt;.nup:&lt;selector&gt;[/&lt;sub&gt;] */
     static String spec(File nup, String selector, String sub) {
@@ -250,13 +331,14 @@ final class Nup {
 
     /** Only the superblock and the package records, TOC not hashed: quick, for the UI's "is it a dump" (never for what is read from it) */
     static Nup peek(File f) throws IOException {
-        if (f.getName().endsWith(EXT_NSP)) return open(f);   // an NSP's TOC is made from it: kept, as open keeps it
+        if (f.getName().endsWith(EXT_NSP) || f.getName().endsWith(EXT_NX)) return open(f);   // an NSP's TOC is made from it, an .nx is checked whole at open: kept, as open keeps it
         try (Source src = source(f)) {
             return read(f, src, false);
         }
     }
 
     private static Nup read(File f, Source r, boolean verify) throws IOException {
+        if (f.getName().endsWith(EXT_NX)) return new Nup(f, r.key, r.size, Nx.read(r, f.getName()));   // checked whole at open (Nx), whatever verify says
         {
             long len = r.size;
             boolean nsp = f.getName().endsWith(EXT_NSP);
@@ -330,8 +412,8 @@ final class Nup {
     /**
      * The other NSPs in an NSP game's folder that are of the same game (NSP Box writes each version of a game and each DLC as an NSP of its own), found by what they
      * hold, whatever they are called: a game snapshot with the same program ID, a DLC whose title ID is the game's plus 0x1000 plus an index of 1 to 2000. Sorted by
-     * path. Empty for a .nup (it holds its own updates and add-ons), for an NSP that is a DLC itself, and for one that cannot be read; a sibling that cannot be read is
-     * left out
+     * path. A .nup or .nx beside the game is one when it has no base package (an update or DLC of its own); one with a base is a game of its own. Empty for an
+     * NSP that is a DLC itself, and for one that cannot be read; a sibling that cannot be read is left out
      */
     static List<Nup> companions(File game) {
         List<Nup> out = new ArrayList<>();
@@ -354,8 +436,8 @@ final class Nup {
             if (f.getAbsoluteFile().equals(game.getAbsoluteFile())) continue;
             try {
                 Nup n = peek(f);   // the package records only: a .nup beside the game that is not of it is not hashed
-                boolean nupFile = f.getName().endsWith(EXT);
-                if (nupFile && n.base() != null) continue;   // a .nup with a base package is a game of its own, not a part of this one
+                boolean nupFile = container(f.getName());   // a .nup or an .nx
+                if (nupFile && n.base() != null) continue;   // a .nup (or .nx) with a base package is a game of its own, not a part of this one
                 boolean mine = false;
                 for (Pkg p : n.packages) {
                     long idx = p.titleId - app - 0x1000;
@@ -384,15 +466,28 @@ final class Nup {
 
     // ---- Packages ----
 
+    /** The base package of the game's own program (program 0; an .nx's other programs: {@link #of(int, int)}) */
     Pkg base() {
-        for (Pkg p : packages) if (p.kind == BASE) return p;
+        for (Pkg p : packages) if (p.kind == BASE && p.program == 0) return p;
         return null;
     }
 
-    List<Pkg> of(int kind) {
+    /** The packages of a kind of program 0 (with the add-ons, which are the application's) */
+    List<Pkg> of(int kind) { return of(kind, 0); }
+
+    /** The packages of a kind of program n of an .nx (n 0: the game's own; the add-ons under any program) */
+    List<Pkg> of(int kind, int program) {
         List<Pkg> out = new ArrayList<>();
-        for (Pkg p : packages) if (p.kind == kind) out.add(p);
+        for (Pkg p : packages) if (p.kind == kind && (p.program == program || kind == ADDON)) out.add(p);
         return out;
+    }
+
+    /** An .nx's program n's newest package (its highest-version update, else its base), null when it has none */
+    Pkg newest(int program) {
+        Pkg best = null;
+        for (Pkg p : of(UPDATE, program)) if (best == null || p.version > best.version) best = p;
+        if (best == null) for (Pkg p : of(BASE, program)) best = p;
+        return best;
     }
 
     /** The package a selector names, null when none (NUP.md: an error for the caller to say) */
@@ -402,11 +497,7 @@ final class Nup {
     }
 
     /** No selector: the highest-version update, else the base */
-    Pkg newest() {
-        Pkg best = null;
-        for (Pkg p : packages) if (p.kind == UPDATE && (best == null || p.version > best.version)) best = p;
-        return best != null ? best : base();
-    }
+    Pkg newest() { return newest(0); }
 
     /** The package a name's selector picks (null selector: newest) */
     Pkg resolve(String selector) { return selector == null ? newest() : find(selector); }
@@ -459,6 +550,7 @@ final class Nup {
         List<Node> out = new ArrayList<>();
         if (!dir.dir) return out;
         try (Source r = source(file)) {
+            if (nx != null) return nx.children(r, dir);
             long kids = (offKids + 4 * (dir.firstChild + dir.childCount));
             if (kids > poolOff) throw new IOException(file.getName() + ": a directory's children past the table");
             byte[] ids = toc(r, offKids + 4 * dir.firstChild, (int) (4 * dir.childCount));
@@ -471,7 +563,7 @@ final class Nup {
     Node dir(long index) throws IOException {
         if (index == NONE) return null;
         try (Source r = source(file)) {
-            return node(r, index);
+            return nx != null ? nx.dir(r, index) : node(r, index);
         }
     }
 
@@ -495,6 +587,11 @@ final class Nup {
     /** A file's bytes: max &lt; 0 all of them (checked against its SHA-256), else at least its first max bytes (fewer when it is shorter) */
     byte[] read(Node f, long max) throws IOException {
         if (f.dir) throw new IOException(f.name + " is a directory");
+        if (nx != null) {   // block by block, each slice's CRC-32C checked (a whole read: the SHA-256 too)
+            try (Source r = source(file)) {
+                return nx.read(r, f, max);
+            }
+        }
         if (f.size == 0) return new byte[0];
         if (f.extentSize > Integer.MAX_VALUE - 16 || (max < 0 && f.size > Integer.MAX_VALUE - 16)) throw new IOException(f.name + " is too large to read into memory");
         byte[] out;
@@ -542,6 +639,12 @@ final class Nup {
      */
     void hashTo(Node f, MessageDigest h) throws IOException {
         if (f.dir) throw new IOException(f.name + " is a directory");
+        if (nx != null) {
+            try (Source r = source(file)) {
+                nx.hashTo(r, f, h);
+                return;
+            }
+        }
         if (f.size == 0) return;
         MessageDigest own = sha256();
         long[] n = {0};
@@ -641,6 +744,11 @@ final class Nup {
      * says), the version from the newest update (or the base). If one package lacks something, the other one is used.
      */
     Meta gameMeta() throws IOException {
+        if (nx != null) {   // an .nx: the Catalog's title, publisher and icon (NX.md "Metadata")
+            try (Source r = source(file)) {
+                return nx.meta(r);
+            }
+        }
         Pkg app = null, upd = null;
         for (Pkg p : packages) {
             if (p.kind == BASE && app == null) app = p;

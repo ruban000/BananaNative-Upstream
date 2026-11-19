@@ -4,6 +4,7 @@ game build's pack never chosen, another title's ignored, the app's pack preferre
 several .nups (made by dm/tools/nup_pack.py), dump subfolders, a title without a profile, and folders that are not games. Skipped without a JDK."""
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -29,12 +30,14 @@ class PackFindJvm(unittest.TestCase):
             d = Path(d)
             (d / 'stub').mkdir()
             (d / 'stub/BuildConfig.java').write_text(STUB)
-            srcs = [SRC / f'{n}.java' for n in ('PackFind', 'Pack', 'DumpLayout', 'BuildCheck', 'RomfsCheck', 'Nup', 'Nsp', 'Zstd', 'Profile', 'ShaderLibs')]
+            srcs = [SRC / f'{n}.java' for n in ('PackFind', 'Pack', 'DumpLayout', 'BuildCheck', 'RomfsCheck', 'Nup', 'Nsp', 'Nx', 'Zstd', 'Profile', 'ShaderLibs')]
             r = subprocess.run(['javac', '-Xlint:all,-try', '-Werror', '-d', str(d / 'classes'), str(WORDS), *map(str, srcs), str(TEST), str(d / 'stub/BuildConfig.java')],
                                capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             (d / 'run').mkdir()
-            r = subprocess.run(['java', '-cp', str(d / 'classes'), 'dev.nxnative.android.PackFindJvmTest', str(REPO), str(d / 'run')], capture_output=True, text=True)
+            # -Dnx.test.python: nup_pack.py runs in this Python (Windows has no python3 command)
+            r = subprocess.run(['java', f'-Dnx.test.python={sys.executable}', '-cp', str(d / 'classes'), 'dev.nxnative.android.PackFindJvmTest', str(REPO), str(d / 'run')],
+                               capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertTrue(r.stdout.startswith('ok '), r.stdout)
 

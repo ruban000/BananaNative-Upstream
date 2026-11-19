@@ -23,6 +23,8 @@ import java.util.List;
 public final class PackFindJvmTest {
     static final String DKB = "040074A01BF12000", MKW = "0400C3F00006E000", OTHER = "0100ABCD00010000";
     private static int n;
+    /** The Python that runs nup_pack.py: -Dnx.test.python (the test runner's own), else python3 (Windows has no python3 command) */
+    static final String PYTHON = System.getProperty("nx.test.python", "python3");
 
     static void check(boolean ok, String what) {
         n++;
@@ -161,8 +163,10 @@ public final class PackFindJvmTest {
         File g3 = new File(root, "Game.nup");
         write(g3, "x");
         check(best(null, null, g3, root, true) == null, "a game at the volume root: nothing above it");
-        check(PackFind.volumeRoot(new File("/storage/emulated/0/Switch2/nup-test/x.nup")).getPath().equals("/storage/emulated/0"), "volume root of the shared storage");
-        check(PackFind.volumeRoot(new File("/storage/1234-ABCD/Games/x.nup")).getPath().equals("/storage/1234-ABCD"), "volume root of an SD card");
+        if (File.separatorChar == '/') {   // Android's volume paths, which a JVM with another file system cannot spell (Windows: "D:\storage\emulated\0")
+            check(PackFind.volumeRoot(new File("/storage/emulated/0/Switch2/nup-test/x.nup")).getPath().equals("/storage/emulated/0"), "volume root of the shared storage");
+            check(PackFind.volumeRoot(new File("/storage/1234-ABCD/Games/x.nup")).getPath().equals("/storage/1234-ABCD"), "volume root of an SD card");
+        }
         check(PackFind.volumeRoot(new File("/data/local/tmp/x.nup")) == null, "no volume root elsewhere");
 
         // A dump folder game: its own <id>-work/<any> and the folder above it
@@ -193,7 +197,7 @@ public final class PackFindJvmTest {
 
     static void nup(File repo, File src, File out) throws IOException, InterruptedException {
         out.getParentFile().mkdirs();
-        Process p = new ProcessBuilder("python3", "-I", new File(repo, "dm/tools/nup_pack.py").getPath(), src.getPath(), out.getPath(), "--raw").redirectErrorStream(true).start();
+        Process p = new ProcessBuilder(PYTHON, "-I", new File(repo, "dm/tools/nup_pack.py").getPath(), src.getPath(), out.getPath(), "--raw").redirectErrorStream(true).start();
         String o = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         if (p.waitFor() != 0 || !out.isFile()) throw new AssertionError("nup_pack.py failed: " + o);
     }

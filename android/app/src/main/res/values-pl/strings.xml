@@ -121,7 +121,7 @@
     <string name="home_pick_pack_folder">Wybierz folder pakietu</string>
     <string name="home_pick_the_pack_folder_android">Wybierz folder pakietu (android-pack, z pack.tsv)</string>
     <string name="home_pick_your_dump_folder_with">Wybierz folder zrzutu (z base/ oraz updates/, jeśli jest)</string>
-    <string name="home_pick_your_game_s_nup">Wybierz plik .nup lub .nsp swojej gry</string>
+    <string name="home_pick_your_game_s_nup">Wybierz plik .nup, .nsp lub .nx swojej gry</string>
     <string name="home_play_anyway">Graj mimo to</string>
     <string name="home_ported_from_eden_gpl_3">Przeniesione z Eden (GPL-3.0-or-later). Lossless.dll jest twój; nigdy nie jest częścią aplikacji.</string>
     <string name="home_reading_the_game_files">Odczytywanie plików gry…</string>
@@ -455,8 +455,8 @@
     <string name="settings_pick_another_sound">Wybierz inny dźwięk</string>
     <string name="settings_use_the_built_in_sounds">Użyj wbudowanych dźwięków</string>
     <string name="home_a_folder_with_base_and">Folder (z base/ oraz updates/, jeśli jest)</string>
-    <string name="home_a_nup_file_or_an">Plik .nup lub plik .nsp z NSP Box</string>
-    <string name="home_a_nup_or_nsp_file">Plik .nup lub .nsp (używany tam, gdzie leży)</string>
+    <string name="home_a_nup_file_or_an">Plik .nup lub .nx albo plik .nsp z NSP Box</string>
+    <string name="home_a_nup_or_nsp_file">Plik .nup, .nsp lub .nx (używany tam, gdzie leży)</string>
     <string name="home_allow_all_files_access">Zezwól na dostęp do wszystkich plików</string>
     <string name="prepare_a_zip_file_made_by">Plik .zip (utworzony przez Eksportuj pakiet…)</string>
     <string name="prepare_a_pack_folder_with_pack">Folder pakietu (z pack.tsv i shaders/)</string>
@@ -483,6 +483,7 @@
     <string name="settings_turn_on">Włącz</string>
     <string name="home_cannot_use_this_file">Nie można użyć tego pliku</string>
     <string name="home_cannot_use_this_nsp">Nie można użyć tego NSP</string>
+    <string name="home_cannot_use_this_nx">Nie można użyć tego pliku .nx</string>
     <string name="common_remove">Usuń</string>
     <string name="home_no_pack_for_the_switch">Brak jeszcze pakietu dla Switch 2 Edition</string>
     <string name="home_game_file_gone">Brak pliku gry</string>
@@ -563,7 +564,7 @@
     <string name="settings_adb_control_warning">Gdy jest włączone, adb i każda inna aplikacja na tym telefonie mogą dodawać gry, uruchamiać Przygotuj oraz instalować lub wybierać sterownik GPU przez launcher Banana Native, nie pytając cię. Sterownik GPU to kod działający wewnątrz gry. Włączaj tylko na czas używania adb, potem wyłącz.</string>
     <string name="home_pick_dump_folder_again">Wybierz ponownie folder zrzutu: %1$s</string>
     <string name="err_no_game_in_folder">W %1$s nie ma main.npdm (base/exefs/, updates/&lt;version&gt;/exefs/ ani exefs/), pliku .nup ani folderu gry. Wybierz własny folder gry, jej plik .nup albo folder z twoimi grami.</string>
-    <string name="err_nup_rename">%1$s: zmień nazwę tak, by kończyła się na „.nup” lub „.nsp” (małymi literami); gra i narzędzia odczytują tylko taką nazwę.</string>
+    <string name="err_nup_rename">%1$s: zmień nazwę tak, by kończyła się na „.nup”, „.nsp” lub „.nx” (małymi literami); gra i narzędzia odczytują tylko taką nazwę.</string>
     <string name="err_cannot_be_read">Nie można odczytać: %1$s. Sprawdź, czy dostęp do wszystkich plików jest włączony.</string>
     <string name="home_no_pack_found_for_this">Nie znaleziono pakietu dla: %1$s, a to nie jest zrzut, z którego Przygotuj może wystartować.</string>
     <string name="home_no_pack_for_this_what">Brak pakietu dla: %1$s</string>
@@ -1256,10 +1257,12 @@
     <string name="ready_is_not_a_folder_this">" nie jest folderem, który ta aplikacja może odczytać."</string>
     <string name="ready_cannot_be_used">" nie można użyć: "</string>
     <string name="ready_a_nup_that_reads_and">: plik .nup, który się odczytuje i przechodzi kontrolę (</string>
+    <string name="ready_an_nx_that_reads_and">: plik .nx, który się odczytuje i przechodzi kontrolę (</string>
     <string name="ready_its_card_s_button_picks">; przycisk na jej karcie go wybiera.)</string>
     <string name="ready_its_card_s_button_picks_2">" (przycisk na jej karcie go wybiera.)"</string>
     <string name="ready_packages_its_table_of_contents">" pakietów, spis treści sprawdzony). Nie potrzeba dostępu do wszystkich plików."</string>
     <string name="ready_a_nup_used_where_it">": plik .nup używany tam, gdzie leży (wybrany selektorem plików; "</string>
+    <string name="ready_an_nx_used_where_it">": plik .nx używany tam, gdzie leży (wybrany selektorem plików; "</string>
     <string name="ready_with_less_here">" tu w ograniczonym zakresie."</string>
     <string name="ready_what_it_needs">" tego, czego potrzebuje"</string>
     <string name="ready_the_check_before_the_game">. Kontrola przed startem gry używa sterownika gry, więc jej wynik może się różnić od tego.</string>
@@ -1272,7 +1275,7 @@
     <string name="err_no_game_with_title_id">"Brak gry z ID tytułu: "</string>
     <string name="err_cannot_be_read_check_that">" nie można odczytać. Sprawdź, czy dostęp do wszystkich plików jest włączony."</string>
     <string name="err_is_not_there_the_frontend">" nie ma (frontend wysłał "</string>
-    <string name="err_rename_it_so_that_its">: zmień jej nazwę tak, aby kończyła się na \".nup\" lub \".nsp\" (małymi literami); gra i narzędzia czytają tylko tę nazwę.</string>
+    <string name="err_rename_it_so_that_its">: zmień jej nazwę tak, aby kończyła się na \".nup\", \".nsp\" lub \".nx\" (małymi literami); gra i narzędzia czytają tylko tę nazwę.</string>
     <string name="err_the_frontend_sent_no_game">Frontend nie wysłał gry: wyślij .nup (lub folder gry) jako dane intentu albo dodatek \"game\" z jego ścieżką.</string>
     <string name="err_which_is_not_a_file">, co nie jest plikiem w pamięci tego telefonu pod ścieżką, którą aplikacja może odczytać. Ustaw frontend tak, aby wysyłał ścieżkę pliku albo jego URI pamięci (SAF) z pamięci telefonu.</string>
     <string name="err_the_frontend_sent">"Frontend wysłał: "</string>

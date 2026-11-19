@@ -87,7 +87,7 @@ class SceneResJvm(unittest.TestCase):
             d = Path(d)
             (d / 'stub').mkdir(); (d / 'run').mkdir()
             (d / 'stub/BuildConfig.java').write_text(STUB)
-            srcs = [SRC / f'{n}.java' for n in ('SceneRes', 'Pack', 'DumpLayout', 'BuildCheck', 'RomfsCheck', 'Nup', 'Nsp', 'Zstd', 'Profile', 'ShaderLibs')]
+            srcs = [SRC / f'{n}.java' for n in ('SceneRes', 'Pack', 'DumpLayout', 'BuildCheck', 'RomfsCheck', 'Nup', 'Nsp', 'Nx', 'Zstd', 'Profile', 'ShaderLibs')]
             r = subprocess.run(['javac', '-Xlint:all,-try', '-Werror', '-encoding', 'UTF-8', '-d', str(d / 'classes'), str(WORDS), *map(str, srcs), str(TEST), str(d / 'stub/BuildConfig.java')],
                                capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)

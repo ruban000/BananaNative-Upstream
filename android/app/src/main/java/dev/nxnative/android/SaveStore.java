@@ -671,7 +671,7 @@ final class SaveStore {
 
     /** Whether f is dir or inside it, by canonical paths */
     static boolean inside(File f, File dir) {
-        String fp = canon(f) + "/", dp = canon(dir) + "/";
+        String fp = canon(f) + File.separator, dp = canon(dir) + File.separator;   // (the platform's separator: canonical paths use it, "\" on a Windows JVM)
         return fp.startsWith(dp);
     }
 

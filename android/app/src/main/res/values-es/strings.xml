@@ -121,7 +121,7 @@
     <string name="home_pick_pack_folder">Elegir carpeta de paquete</string>
     <string name="home_pick_the_pack_folder_android">Elige la carpeta del paquete (android-pack, con pack.tsv)</string>
     <string name="home_pick_your_dump_folder_with">Elige tu carpeta de volcado (con base/, y updates/ si hay)</string>
-    <string name="home_pick_your_game_s_nup">Elige el archivo .nup o .nsp de tu juego</string>
+    <string name="home_pick_your_game_s_nup">Elige el archivo .nup, .nsp o .nx de tu juego</string>
     <string name="home_play_anyway">Jugar de todos modos</string>
     <string name="home_ported_from_eden_gpl_3">Portado de Eden (GPL-3.0-or-later). Lossless.dll es tuyo; nunca forma parte de la app.</string>
     <string name="home_reading_the_game_files">Leyendo los archivos del juego…</string>
@@ -454,8 +454,8 @@
     <string name="settings_pick_another_sound">Elegir otro sonido</string>
     <string name="settings_use_the_built_in_sounds">Usar los sonidos integrados</string>
     <string name="home_a_folder_with_base_and">Una carpeta (con base/, y updates/ si hay)</string>
-    <string name="home_a_nup_file_or_an">Un archivo .nup, o un archivo .nsp de NSP Box</string>
-    <string name="home_a_nup_or_nsp_file">Un archivo .nup o .nsp (se usa donde está)</string>
+    <string name="home_a_nup_file_or_an">Un archivo .nup o .nx, o un archivo .nsp de NSP Box</string>
+    <string name="home_a_nup_or_nsp_file">Un archivo .nup, .nsp o .nx (se usa donde está)</string>
     <string name="home_allow_all_files_access">Permitir acceso a Todos los archivos</string>
     <string name="prepare_a_zip_file_made_by">Un archivo .zip (hecho con Exportar paquete…)</string>
     <string name="prepare_a_pack_folder_with_pack">Una carpeta de paquete (con pack.tsv y shaders/)</string>
@@ -482,6 +482,7 @@
     <string name="settings_turn_on">Activar</string>
     <string name="home_cannot_use_this_file">No se puede usar este archivo</string>
     <string name="home_cannot_use_this_nsp">No se puede usar este NSP</string>
+    <string name="home_cannot_use_this_nx">No se puede usar este archivo .nx</string>
     <string name="common_remove">Quitar</string>
     <string name="home_no_pack_for_the_switch">Aún no hay paquete para la Switch 2 Edition</string>
     <string name="home_game_file_gone">Falta el archivo del juego</string>
@@ -561,7 +562,7 @@
     <string name="settings_adb_control_warning">Mientras esté activado, adb, y cualquier otra app de este teléfono, puede añadir juegos, iniciar Preparar e instalar o elegir un controlador de GPU a través del launcher de Banana Native, sin preguntarte. Un controlador de GPU es código que se ejecuta dentro del juego. Actívalo solo mientras uses adb y desactívalo después.</string>
     <string name="home_pick_dump_folder_again">Elige de nuevo la carpeta de volcado de %1$s</string>
     <string name="err_no_game_in_folder">%1$s no contiene main.npdm (base/exefs/, updates/&lt;version&gt;/exefs/ o exefs/), ni archivo .nup, ni carpeta de juego. Elige la carpeta propia del juego, su archivo .nup o la carpeta que contiene tus juegos.</string>
-    <string name="err_nup_rename">%1$s: renómbralo para que su nombre termine en «.nup» o «.nsp» (en minúsculas); el juego y las herramientas solo leen ese nombre.</string>
+    <string name="err_nup_rename">%1$s: renómbralo para que su nombre termine en «.nup», «.nsp» o «.nx» (en minúsculas); el juego y las herramientas solo leen ese nombre.</string>
     <string name="err_cannot_be_read">No se puede leer %1$s. Comprueba que el acceso a Todos los archivos esté activado.</string>
     <string name="home_no_pack_found_for_this">No se encontró un paquete para este %1$s, y no es un volcado desde el que Preparar pueda empezar.</string>
     <string name="home_no_pack_for_this_what">No hay paquete para este %1$s</string>
@@ -1248,10 +1249,12 @@
     <string name="ready_is_not_a_folder_this">" no es una carpeta que esta app pueda leer."</string>
     <string name="ready_cannot_be_used">" no se puede usar: "</string>
     <string name="ready_a_nup_that_reads_and">: un .nup que se lee y se comprueba (</string>
+    <string name="ready_an_nx_that_reads_and">: un .nx que se lee y se comprueba (</string>
     <string name="ready_its_card_s_button_picks">; el botón de su tarjeta lo elige.)</string>
     <string name="ready_its_card_s_button_picks_2">" (el botón de su tarjeta lo elige.)"</string>
     <string name="ready_packages_its_table_of_contents">" paquetes, su tabla de contenidos comprobada). No necesita acceso a todos los archivos."</string>
     <string name="ready_a_nup_used_where_it">": un .nup usado donde está (elegido con el selector de archivos; "</string>
+    <string name="ready_an_nx_used_where_it">": un .nx usado donde está (elegido con el selector de archivos; "</string>
     <string name="ready_with_less_here">" con menos aquí."</string>
     <string name="ready_what_it_needs">" lo que necesita"</string>
     <string name="ready_the_check_before_the_game">. La comprobación antes de iniciar el juego usa el controlador del juego, y su resultado puede diferir de este.</string>
@@ -1264,7 +1267,7 @@
     <string name="err_no_game_with_title_id">"Ningún juego con ID de título "</string>
     <string name="err_cannot_be_read_check_that">" no se puede leer. Comprueba que el acceso a todos los archivos esté activado."</string>
     <string name="err_is_not_there_the_frontend">" no está ahí (el frontend envió "</string>
-    <string name="err_rename_it_so_that_its">: renómbralo para que su nombre termine en \".nup\" o \".nsp\" (minúsculas); el juego y las herramientas solo leen ese nombre.</string>
+    <string name="err_rename_it_so_that_its">: renómbralo para que su nombre termine en \".nup\", \".nsp\" o \".nx\" (minúsculas); el juego y las herramientas solo leen ese nombre.</string>
     <string name="err_the_frontend_sent_no_game">El frontend no envió ningún juego: envía el .nup (o la carpeta del juego) como datos del intent, o el extra \"game\" con su ruta.</string>
     <string name="err_which_is_not_a_file">, que no es un archivo del almacenamiento de este móvil con una ruta que la app pueda leer. Configura el frontend para que envíe la ruta del archivo, o su URI de almacenamiento (SAF) del propio almacenamiento del móvil.</string>
     <string name="err_the_frontend_sent">"El frontend envió "</string>

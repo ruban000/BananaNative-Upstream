@@ -121,7 +121,7 @@
     <string name="home_pick_pack_folder">选择游戏包文件夹</string>
     <string name="home_pick_the_pack_folder_android">选择游戏包文件夹（android-pack，包含 pack.tsv）</string>
     <string name="home_pick_your_dump_folder_with">选择你的转储文件夹（包含 base/，如有 updates/ 也一并包含）</string>
-    <string name="home_pick_your_game_s_nup">选择游戏的 .nup 或 .nsp 文件</string>
+    <string name="home_pick_your_game_s_nup">选择游戏的 .nup、.nsp 或 .nx 文件</string>
     <string name="home_play_anyway">仍然游玩</string>
     <string name="home_ported_from_eden_gpl_3">移植自 Eden（GPL-3.0-or-later）。Lossless.dll 由你自己提供，绝不属于本应用。</string>
     <string name="home_reading_the_game_files">正在读取游戏文件…</string>
@@ -452,8 +452,8 @@
     <string name="settings_pick_another_sound">选择其他声音</string>
     <string name="settings_use_the_built_in_sounds">使用内置声音</string>
     <string name="home_a_folder_with_base_and">文件夹（包含 base/，如有 updates/ 也一并包含）</string>
-    <string name="home_a_nup_file_or_an">一个 .nup 文件，或 NSP Box 的 .nsp 文件</string>
-    <string name="home_a_nup_or_nsp_file">一个 .nup 或 .nsp 文件（在原位置使用）</string>
+    <string name="home_a_nup_file_or_an">一个 .nup 或 .nx 文件，或 NSP Box 的 .nsp 文件</string>
+    <string name="home_a_nup_or_nsp_file">一个 .nup、.nsp 或 .nx 文件（在原位置使用）</string>
     <string name="home_allow_all_files_access">允许“所有文件”访问权限</string>
     <string name="prepare_a_zip_file_made_by">一个 .zip 文件（由“导出游戏包…”生成）</string>
     <string name="prepare_a_pack_folder_with_pack">游戏包文件夹（包含 pack.tsv 和 shaders/）</string>
@@ -480,6 +480,7 @@
     <string name="settings_turn_on">开启</string>
     <string name="home_cannot_use_this_file">无法使用此文件</string>
     <string name="home_cannot_use_this_nsp">无法使用此 NSP</string>
+    <string name="home_cannot_use_this_nx">无法使用此 .nx 文件</string>
     <string name="common_remove">移除</string>
     <string name="home_no_pack_for_the_switch">尚无 Switch 2 Edition 的游戏包</string>
     <string name="home_game_file_gone">游戏文件已丢失</string>
@@ -557,7 +558,7 @@
     <string name="settings_adb_control_warning">开启后，adb 以及这部手机上的任何其他应用都可以通过 Banana Native 的启动器添加游戏、开始准备、安装或选择 GPU 驱动，而无需询问你。GPU 驱动是在游戏内部运行的代码。请仅在使用 adb 时开启，用完后再关闭。</string>
     <string name="home_pick_dump_folder_again">重新选择 %1$s 的转储文件夹</string>
     <string name="err_no_game_in_folder">%1$s 中没有 main.npdm（base/exefs/、updates/&lt;version&gt;/exefs/ 或 exefs/）、没有 .nup 文件，也没有游戏文件夹。请选择游戏自己的文件夹、其 .nup 文件，或存放你游戏的文件夹。</string>
-    <string name="err_nup_rename">%1$s：请重命名，使其名称以“.nup”或“.nsp”结尾（小写）；游戏和工具只读取该名称。</string>
+    <string name="err_nup_rename">%1$s：请重命名，使其名称以“.nup”、“.nsp”或“.nx”结尾（小写）；游戏和工具只读取该名称。</string>
     <string name="err_cannot_be_read">无法读取 %1$s。请检查“所有文件”访问权限是否已开启。</string>
     <string name="home_no_pack_found_for_this">未找到此 %1$s 的游戏包，并且它不是可供“准备”使用的转储。</string>
     <string name="home_no_pack_for_this_what">此 %1$s 没有游戏包</string>
@@ -1232,10 +1233,12 @@
     <string name="ready_is_not_a_folder_this">" 不是此应用可读取的文件夹。"</string>
     <string name="ready_cannot_be_used">" 无法使用："</string>
     <string name="ready_a_nup_that_reads_and">：可读取并通过检查的 .nup（</string>
+    <string name="ready_an_nx_that_reads_and">：可读取并通过检查的 .nx（</string>
     <string name="ready_its_card_s_button_picks">；可用其卡片上的按钮选取。）</string>
     <string name="ready_its_card_s_button_picks_2">（可用其卡片上的按钮选取。）</string>
     <string name="ready_packages_its_table_of_contents">" 个包，已检查其目录）。不需要“所有文件”访问权限。"</string>
     <string name="ready_a_nup_used_where_it">：原地使用的 .nup（通过文件选择器选取；</string>
+    <string name="ready_an_nx_used_where_it">：原地使用的 .nx（通过文件选择器选取；</string>
     <string name="ready_with_less_here">" 此处功能较少。"</string>
     <string name="ready_what_it_needs">" 它所需的内容"</string>
     <string name="ready_the_check_before_the_game">。游戏启动前的检查使用游戏的驱动，其结果可能与此处不同。</string>
@@ -1248,7 +1251,7 @@
     <string name="err_no_game_with_title_id">"没有标题 ID 为 "</string>
     <string name="err_cannot_be_read_check_that">" 的游戏无法读取。请检查“所有文件”访问权限是否已开启。"</string>
     <string name="err_is_not_there_the_frontend">" 不存在（前端发送的是 "</string>
-    <string name="err_rename_it_so_that_its">：请重命名，使其名称以“.nup”或“.nsp”结尾（小写）；游戏和工具只读取该名称。</string>
+    <string name="err_rename_it_so_that_its">：请重命名，使其名称以“.nup”、“.nsp”或“.nx”结尾（小写）；游戏和工具只读取该名称。</string>
     <string name="err_the_frontend_sent_no_game">前端没有发送游戏：请把 .nup（或游戏文件夹）作为 intent 数据发送，或用额外参数“game”带上其路径。</string>
     <string name="err_which_is_not_a_file">，它不是此手机存储上应用可读取路径的文件。请将前端设置为发送文件路径，或手机自身存储中的存储（SAF）URI。</string>
     <string name="err_the_frontend_sent">"前端发送了 "</string>

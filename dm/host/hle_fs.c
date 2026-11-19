@@ -174,14 +174,22 @@ static int swap_journal_left(const char *b) {
     char m[1100]; snprintf(m, sizeof m, "%s.pend1", b); if (!access(m, F_OK)) return 1;
     snprintf(m, sizeof m, "%s.pend2", b); return !access(m, F_OK);
 }
+// Whether a package spec names an NX archive by its name ("<file>.nx[:<selector>]"); for messages only: the open goes by the file's magic
+static int nx_named(const char *spec) {
+    char file[1100], sel[128]; size_t L;
+    return nup_split(spec, file, sizeof file, sel, sizeof sel) && (L = strlen(file)) >= 3 && !strcmp(file + L - 3, ".nx");
+}
 // Reads and checks a RomFS image's header and index; NULL (and a red line) when it is not a complete image. A NUP container package
-// ("<file>.nup[:<selector>]", nup_image.h, android/NUP.md) opens as an image too
+// ("<file>.nup[:<selector>]", nup_image.h, android/NUP.md) and an NX archive's snapshot ("<file>.nx[:<selector>]", nx_image.h, android/NX.md) open as an image too
 static romfs_img *img_open(const char *path) {
     if (nup_is_spec(path)) {
-        char why[256] = ""; romfs_img *m = nup_image_open(path, why, sizeof why);
-        if (m) LOG("fs NUP %s: %llu entries, %llu compressed files (decompressed when opened, cache %llu MiB)", path, (unsigned long long)m->n,
+        char why[400] = ""; romfs_img *m = nup_image_open(path, why, sizeof why);
+        if (m && nx_image_is(m)) { nx_aux *a = m->aux;
+            LOG("fs NX %s: %llu entries, %llu files; the archive (generation %llu) has %llu blocks, %llu of them ZSTD (decoded per block when read, cache %llu MiB)", path,
+                (unsigned long long)m->n, (unsigned long long)a->nf, (unsigned long long)a->generation, (unsigned long long)a->nblk, (unsigned long long)a->nzblk, (unsigned long long)(a->budget >> 20)); }
+        else if (m) LOG("fs NUP %s: %llu entries, %llu compressed files (decompressed when opened, cache %llu MiB)", path, (unsigned long long)m->n,
                    (unsigned long long)((nup_aux *)m->aux)->nz, (unsigned long long)(((nup_aux *)m->aux)->budget >> 20));
-        else LOG("[RED] fs NUP %s: %s (errno=%d)", path, why, errno);
+        else LOG("[RED] fs %s %s: %s (errno=%d)", nx_named(path) ? "NX" : "NUP", path, why, errno);
         return m;
     }
     romfs_img *m = romfs_image_open(path);
@@ -299,7 +307,7 @@ static Result mount_ex(const char *name, const char *dir, int ro, int txn, int s
         // A path that is neither is a stale or mistyped one (an old run command still naming the RomFS folder a rebuild replaced with RomFS.img): stop here, not at the game's
         // first failed read (Echoes of Wisdom crashed 0.3 s after nnMain, GitHub issue #615). Add-on content and system data check their own paths before they mount
         const char *bad = NULL;
-        if (nup_is_spec(dir)) { if (!(g_mnt[s].img = img_open(dir))) bad = "cannot be used as a NUP package (the log line above says why)"; }
+        if (nup_is_spec(dir)) { if (!(g_mnt[s].img = img_open(dir))) bad = nx_named(dir) ? "cannot be used as an NX package (the log line above says why)" : "cannot be used as a NUP package (the log line above says why)"; }
         else if (stat(dir, &ist) || !(S_ISDIR(ist.st_mode) || S_ISREG(ist.st_mode))) bad = "are missing: neither a folder nor a RomFS image";
         else if (S_ISREG(ist.st_mode) && !(g_mnt[s].img = img_open(dir))) bad = "are not a complete RomFS image";
         if (bad && soft) {
@@ -566,7 +574,8 @@ HLE_FORCE("_ZN2nn2fs8MountRomEPKcPvm", "fsp-srv; rom → host RomFS directory", 
     return r;
 }
 // SDK 19+ overloads with a program index after the name (Metroid Prime 4: Beyond; a Switch 2 Edition's program 1, which reads program 0's RomFS too: Super Mario Bros. Wonder
-// mounts its own as "content" and the original's as "conorig"). Index n mounts DM_ROMFS_PROGRAM_<n> (a directory or a RomFS / .nup spec, as DM_ROMFS); without one, index 0
+// mounts its own as "content" and the original's as "conorig"). Index n mounts DM_ROMFS_PROGRAM_<n> (a directory or a RomFS / .nup / .nx spec, as DM_ROMFS; an .nx names
+// another program's RomFS inside the main program's snapshot as "<file>.nx:<selector>/program<n>/romfs", nx_image.h); without one, index 0
 // is DM_ROMFS (one program, as before), and another index fails as a missing target, rather than mounting this program's files under the other's name (PR #1639 upstream)
 HLE_FORCE("_ZN2nn2fs8MountRomEPKciPvm", "fsp-srv; rom of program index n → DM_ROMFS_PROGRAM_<n> (DM_ROMFS for 0)", Result, h_fs_MountRomIdx, const char *name, int idx, void *cache, size_t sz) {
     char key[64]; snprintf(key, sizeof key, "DM_ROMFS_PROGRAM_%d", idx);
@@ -620,8 +629,8 @@ static int aoc_dir(char *dir, size_t n, int index) {
     const char *base = getenv("DM_AOC_DIR"); struct stat st;
     // <index>.nup: a NUP container (or a link to one) holding the add-on as an addon package; the mount picks it by index (nup_image.h "aoc/<index>").
     // A link whose target is fd:<n>/<name> names the launcher's descriptor of a .nup used where it is (nup_image.h nup_fd_spec): nothing is at that target
-    for (int x = 0; x < 2; x++) {   // .nup, or .nsp: a plaintext NSP is read as a NUP file (nsp_toc.h)
-        const char *ext = x ? "nsp" : "nup";
+    for (int x = 0; x < 3; x++) {   // .nup, .nsp (a plaintext NSP is read as a NUP file, nsp_toc.h) or .nx (an NX archive's add-on snapshot, nx_image.h)
+        const char *ext = x == 2 ? "nx" : x ? "nsp" : "nup";
         if (!(base && *base && snprintf(dir, n, "%s/%d.%s", base, index, ext) < (int)n)) break;
         if (!stat(dir, &st) && S_ISREG(st.st_mode)) return snprintf(dir, n, "%s/%d.%s:aoc/%d", base, index, ext, index) < (int)n;
         char t[512]; ssize_t L = readlink(dir, t, sizeof t - 1); int fd;
@@ -636,7 +645,7 @@ static int aoc_dir(char *dir, size_t n, int index) {
 int dm_aoc_usable(int index) {
     char dir[1024]; struct stat st; const char *base = getenv("DM_AOC_DIR");
     if (!aoc_dir(dir, sizeof dir, index)) {
-        LOG("[RED] aoc: add-on content %d in DM_AOC_DIR=%s is neither a folder, a RomFS image nor a .nup that is there: the game runs without it", index, base ? base : "unset");
+        LOG("[RED] aoc: add-on content %d in DM_AOC_DIR=%s is neither a folder, a RomFS image, a .nup, a .nsp nor a .nx that is there: the game runs without it", index, base ? base : "unset");
         return 0;
     }
     if (nup_is_spec(dir) || (!stat(dir, &st) && S_ISREG(st.st_mode))) {
@@ -644,7 +653,7 @@ int dm_aoc_usable(int index) {
         if (!m) { LOG("[RED] aoc: add-on content %d (%s) cannot be read (the line above says why): the game runs without it", index, dir); return 0; }
         romfs_image_close(m);
     } else if (stat(dir, &st)) {   // neither a package spec nor a path that is there: a link to the launcher's descriptor of a file whose name no reader takes
-        // (it does not end in ".nup" or ".nsp", e.g. "DLC.NSP"). It counted as owned and then did not mount
+        // (it does not end in ".nup", ".nsp" or ".nx", e.g. "DLC.NSP"). It counted as owned and then did not mount
         LOG("[RED] aoc: add-on content %d (%s) is neither a package, a RomFS image nor a folder that is there: the game runs without it", index, dir); return 0;
     }
     return 1;
@@ -1087,7 +1096,8 @@ static int64_t img_serve(mount_t *m, int64_t k, const char *path) {
     if (zstd_check_on() && ent->b >= 4) {
         uint8_t h[4];
         int got_header = 0;
-        if (m->img->aux && (ent->flags & IMG_ENT_ZSTD)) {
+        if (ent->flags & IMG_ENT_NX) got_header = nx_read(m->img, (uint64_t)k, 0, h, 4) == 4;   // an NX file: its first block (checked; a failed read says why)
+        else if (m->img->aux && (ent->flags & IMG_ENT_ZSTD)) {
             char why[400] = "";
             const uint8_t *zbytes = nup_z_get(m->img, ent->a, why, sizeof why);
             if (zbytes) {
@@ -1154,12 +1164,17 @@ HLE_FORCE("_ZN2nn2fs8OpenFileEPNS0_10FileHandleEPKci", "fsp-srv → open(2)", Re
 }
 HLE_FORCE("_ZN2nn2fs8ReadFileEPmNS0_10FileHandleElPvm", "fsp-srv → pread(2)", Result, h_fs_ReadFile, size_t *out, uint64_t h, int64_t off, void *buf, size_t sz) { dm_thread_service_request(); h = FH_IN(h);
     if (!h) { *out = 0; return RES_FAIL; }   // a file handle is an fd; 0 is stdin and never a file the game opened: the null handle the game keeps using after a failed open
-    size_t got = 0; int reprep = 0, fd = (int)h; int64_t base = 0;
+    size_t got = 0; int reprep = 0, fd = (int)h, nxdone = 0; int64_t base = 0; uint64_t fst0 = now_ns();
     if (IMG_H(h)) {   // an image entry: read the image's descriptor at the entry's offset, never past its end
         const img_ent *x = &g_mnt[IMG_M(h)].img->e[IMG_K(h)];
         fd = g_mnt[IMG_M(h)].img->fd; base = (int64_t)x->a;
         sz = off < 0 || (uint64_t)off >= x->b ? 0 : (size_t)(x->b - off) < sz ? (size_t)(x->b - off) : sz;
-        if (x->flags & IMG_ENT_ZSTD) {   // a compressed NUP file: its decompressed bytes, held by the open (one more reference for this read, in case the game reads a closed handle)
+        if (x->flags & IMG_ENT_NX) {   // a file of an NX archive: its blocks, read and checked per call (nx_image.h; a failed read is one [RED] line there)
+            dm_guest_write_prepare(buf, sz);
+            int64_t r = sz ? nx_read(g_mnt[IMG_M(h)].img, IMG_K(h), (uint64_t)off, buf, sz) : 0;
+            if (r < 0) { *out = 0; return RES_FAIL; }
+            got = (size_t)r; nxdone = 1;
+        } else if (x->flags & IMG_ENT_ZSTD) {   // a compressed NUP file: its decompressed bytes, held by the open (one more reference for this read, in case the game reads a closed handle)
             romfs_img *m = g_mnt[IMG_M(h)].img; char why[400] = ""; uint64_t f0 = now_ns();
             const uint8_t *src = nup_z_get(m, x->a, why, sizeof why);
             if (!src) { LOG("[RED] fs ReadFile: cannot decompress a file of %s: %s", ((nup_aux *)m->aux)->what, why); return RES_FAIL; }
@@ -1170,9 +1185,9 @@ HLE_FORCE("_ZN2nn2fs8ReadFileEPmNS0_10FileHandleElPvm", "fsp-srv → pread(2)", 
             return RES_OK;
         }
     }
-    uint64_t fst0 = now_ns();
-    dm_guest_write_prepare(buf, sz);   // The destination may be a texture pool page write-protected by the graphics layer: a kernel write to a read-only page returns EFAULT instead of page-faulting, so unprotect and mark dirty first
-    while (got < sz) {
+    if (!nxdone) fst0 = now_ns();
+    if (!nxdone) dm_guest_write_prepare(buf, sz);   // The destination may be a texture pool page write-protected by the graphics layer: a kernel write to a read-only page returns EFAULT instead of page-faulting, so unprotect and mark dirty first
+    while (!nxdone && got < sz) {
         ssize_t r = pread(fd, (uint8_t *)buf + got, sz - got, base + off + got);
         if (r < 0) { if (errno == EINTR) continue;
             // The graphics layer write-protects tracked pages again after each upload (nvn_dirty.c), so a page made writable above can be read-only again by the time pread

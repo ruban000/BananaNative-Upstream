@@ -29,6 +29,9 @@ public final class GameListJvmTest {
         n++;
     }
 
+    /** A folder path's tail as File spells it: '\\' on Windows (a .nup's names keep '/' after the colon) */
+    static String sep(String s) { return s.replace('/', File.separatorChar); }
+
     static final String FIX_TID = "0100000000AB0000";
 
     static void write(File f, byte[] b) throws IOException {
@@ -124,7 +127,7 @@ public final class GameListJvmTest {
                 List<Long> vs = DumpLayout.versions(d);
                 if (folder == baseOnly) {
                     check(vs.equals(List.of(0L)) && f.error == null && f.version == 0 && f.buildIds.get("main").startsWith(id(11)), tag + ": base only " + vs + " " + f.error);
-                    check(DumpLayout.path(d, 0, "romfs").endsWith(Nup.isNup(d) ? ".nup:base/romfs" : "base/romfs"), tag + ": base romfs " + DumpLayout.path(d, 0, "romfs"));
+                    check(DumpLayout.path(d, 0, "romfs").endsWith(Nup.isNup(d) ? ".nup:base/romfs" : sep("base/romfs")), tag + ": base romfs " + DumpLayout.path(d, 0, "romfs"));
                     check(Pack.isDump(d), tag + ": base only is a dump");
                 } else if (folder == updOnly) {
                     check(vs.equals(List.of(65537L)) && Pack.isDump(d), tag + ": update only " + vs);
@@ -135,14 +138,14 @@ public final class GameListJvmTest {
                     DumpLayout.Found any = DumpLayout.find(d, true);
                     check(any.error == null && any.untested && any.version == 65537 && any.build < 0 && any.buildIds.get("main").startsWith(id(12)),
                             tag + ": Try anyway takes the newest version, untested: " + any.error);
-                    check(DumpLayout.path(d, 65537, "romfs").endsWith(Nup.isNup(d) ? ".nup:update/65537/romfs" : "updates/65537/romfs"), tag + ": its own romfs");
+                    check(DumpLayout.path(d, 65537, "romfs").endsWith(Nup.isNup(d) ? ".nup:update/65537/romfs" : sep("updates/65537/romfs")), tag + ": its own romfs");
                 } else if (folder == both) {
                     check(vs.equals(List.of(0L, 65537L)) && f.error != null && f.detail.contains("the base (main " + id(10).substring(0, 16)) && f.error.contains("update 65537"), tag + ": " + f.error);
                 } else if (folder == codeInUpd) {
                     check(f.error == null && f.version == 65537 && f.buildIds.get("main").startsWith(id(11)), tag + ": the build in an update package: " + f.error);
-                    check(DumpLayout.path(d, 65537, "romfs").endsWith(Nup.isNup(d) ? ".nup:base/romfs" : "base/romfs") && DumpLayout.hasRomfs(d, 65537),
+                    check(DumpLayout.path(d, 65537, "romfs").endsWith(Nup.isNup(d) ? ".nup:base/romfs" : sep("base/romfs")) && DumpLayout.hasRomfs(d, 65537),
                             tag + ": no RomFS of its own: the base's " + DumpLayout.path(d, 65537, "romfs"));
-                    check(DumpLayout.path(d, 65537, "exefs/main").endsWith(Nup.isNup(d) ? ".nup:update/65537/exefs/main" : "updates/65537/exefs/main"), tag + ": its own code");
+                    check(DumpLayout.path(d, 65537, "exefs/main").endsWith(Nup.isNup(d) ? ".nup:update/65537/exefs/main" : sep("updates/65537/exefs/main")), tag + ": its own code");
                     // a pack of that build, version 65537, fits it and is supported (the profile's row is version 0: same build IDs)
                     Pack p = pack(new File(run, "pack-" + tag), FIX2, "65537", "main=" + id(11), "sdk=" + id(3));
                     BuildCheck.Result r = BuildCheck.build(p, d);
@@ -212,7 +215,7 @@ public final class GameListJvmTest {
                 check(DumpLayout.versionWith(d, BuildCheck.builds(v0)) == 65538 && v0.gameVersion(d).equals("65538"), tag + ": the pack's build is version " + v0.gameVersion(d));
                 BuildCheck.Result r = BuildCheck.build(v0, d);
                 check(r.ok(), tag + ": the 1.8.0 pack plays it, no rebuild: " + r.kind + " " + r.detail);
-                String romfs = v0.romfsPath(d), want = folder == noRomfs ? (Nup.isNup(d) ? ".nup:base/romfs" : "base/romfs") : (Nup.isNup(d) ? ".nup:update/65538/romfs" : "updates/65538/romfs");
+                String romfs = v0.romfsPath(d), want = folder == noRomfs ? (Nup.isNup(d) ? ".nup:base/romfs" : sep("base/romfs")) : (Nup.isNup(d) ? ".nup:update/65538/romfs" : sep("updates/65538/romfs"));
                 check(romfs != null && romfs.endsWith(want), tag + ": its RomFS " + romfs + ", want …" + want);
                 check(BuildCheck.mod(d, v0.gameVersion(d), "main").label.contains("65538"), tag + ": the code read is the update's");
             }
@@ -423,7 +426,8 @@ public final class GameListJvmTest {
         check(r.message.contains("Build IDs that differ: main"), r.message);
         Pack both = pack(new File(run, "pack2"), FIX_TID, "65536", "main=" + id(4), "sdk=" + id(5));
         r = BuildCheck.build(both, d1);
-        check(r.kind == BuildCheck.Kind.OTHER_BUILD && r.detail.contains("main: pack " + id(4).substring(0, 16)) && r.detail.contains("sdk: pack " + id(5).substring(0, 16)) && r.detail.contains("updates/65536/exefs/sdk"), r.detail);
+        check(r.kind == BuildCheck.Kind.OTHER_BUILD && r.detail.contains("main: pack " + id(4).substring(0, 16)) && r.detail.contains("sdk: pack " + id(5).substring(0, 16))
+                && r.detail.contains(sep("updates/65536/exefs/sdk")), r.detail);
 
         // A version the dump does not have: another kind and label, not "another build"
         Pack later = pack(new File(run, "pack3"), FIX_TID, "131072", "main=" + id(7));   // (a build the dump has under another number would be found there: sameBuildOtherVersion)

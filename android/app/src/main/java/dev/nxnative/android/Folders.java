@@ -171,7 +171,7 @@ final class Folders {
         File save = save(a, g);
         String saveKey = "save_" + g.titleId;
 
-        row(a, box, Nup.isNup(new File(g.gameDir)) ? "Game (.nup file)" : "Game folder", g.gameDir, Tx.s(R.string.prepare_pick), v -> { d[0].dismiss(); a.addGame(); }, null, null);
+        row(a, box, Nup.isNup(new File(g.gameDir)) ? "Game (" + Nup.word(new File(g.gameDir)) + " file)" : "Game folder", g.gameDir, Tx.s(R.string.prepare_pick), v -> { d[0].dismiss(); a.addGame(); }, null, null);
         boolean inApp = SaveStore.inside(new File(g.packDir), AppStorage.packs(a));
         row(a, box, Tx.s(R.string.prepare_pack_and_shader_folder_pack), g.packDir + (pack != null ? Tx.s(R.string.prepare_picked_paren) : inApp ? Tx.s(R.string.prepare_default_in_app_paren) : Tx.s(R.string.prepare_default_beside_game_paren)) + packState,
                 Tx.s(R.string.prepare_pick), v -> { d[0].dismiss(); a.pickFolder(PICK_PACK, Tx.s(R.string.common_pick_the_pack_folder_the)); },

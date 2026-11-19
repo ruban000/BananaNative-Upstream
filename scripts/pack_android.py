@@ -16,6 +16,7 @@
 # The RomFS is not in the pack (the app gives the host <game folder>/<romfs> as DM_ROMFS) and neither is anything else of the dump but the rewritten code.
 # The game may be a NUP file instead of a folder (android/NUP.md): its packages are read in place (pack_dump.scan, dm/tools/nup.py), the modules and the RomFS are
 # named `<name>.nup:update/<version>/...` (or `:base/...`), the DLC `<name>.nup:addon/<title ID>/romfs`, and pack.tsv's paths are relative to the folder holding the file.
+# An NX archive (.nx, android/NX.md) is taken the same way (`<name>.nx:update/<version>/romfs`), and its snapshots' program<n>/ give --program.
 # Writes <game folder>/../<title ID>-work/android-pack/ unless --out names another folder. A repeat run keeps modules whose inputs are unchanged.
 # Needs Python with Capstone 5 and lz4 (pyproject.toml, dependency group android-pack). Packs are for the user's own phone: never commit or share one.
 # The shader library: <work>/android-shaders/lib/v-<V>/ is reused when its inputs.tsv names this game and its profile's current inputs (a full build writes it last);
@@ -30,7 +31,7 @@
 # unfinished: the launcher refuses it, the next run rewrites it). Libraries of other versions in the pack's shaders/ are kept.
 # --no-shaders makes a pack without a library, a valid one (no pack.tsv shaders row); --optional-shaders takes a current library from the cache when there is one and packs without
 # otherwise. --code-only rewrites the modules and stops (pack.tsv, game.tsv and the shaders untouched); --keep-code packs without rewriting (the phone's two steps).
-# Usage: pack_android.py <game folder | .nup file> [--version N] [--out DIR] [-j N] [--shader-cache DIR] [--shader-pkg DIR] [--shader-python PY] [-J N] [--no-shaders | --optional-shaders] [--code-only | --keep-code] [--in-process]   (exit 1 on error)
+# Usage: pack_android.py <game folder | .nup or .nx file> [--version N] [--out DIR] [-j N] [--shader-cache DIR] [--shader-pkg DIR] [--shader-python PY] [-J N] [--no-shaders | --optional-shaders] [--code-only | --keep-code] [--in-process]   (exit 1 on error)
 import argparse, hashlib, os, runpy, shutil, signal, subprocess, sys, tempfile, time
 from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
@@ -458,7 +459,7 @@ def rewriter_src(src, out, m):
     """The file patch_nso.py reads for module m: src itself, or for a module in a NUP package (`game.nup:update/<v>/exefs/main`) a copy in the pack's
     .nup-src/<module>/ under the module's own name. The rewriter then reads a plain file, so its files (REWRITER, rewrite_key) are the same for a NUP
     file and a folder, and a pack made from either keeps the other's rewritten modules"""
-    if '.nup:' not in str(src) and '.nsp:' not in str(src): return src
+    if not pack_dump.in_nup(str(src)): return src   # a module of a .nup, a plaintext .nsp or an .nx (pack_dump.in_nup) is copied out
     d = out / '.nup-src' / m; d.mkdir(parents=True, exist_ok=True)
     f = d / src.name; f.write_bytes(src.read_bytes()); return f
 
@@ -884,7 +885,7 @@ def main():
         a.dlc_count = len(dlc)   # for split_shaders' message (lacking_shaders): a dump without add-on content whose missing shaders come from files it does not have
         app0, conorig = app, None
         if a.program:   # program n > 0: its package program/<n> stands where a version folder would; program 0's newest RomFS is its "conorig"
-            if pack_dump.nup.is_nup(folder): raise Error(f'--program {a.program}: {folder} is a .nup, which holds program 0 only; pack from the dump folder (updates/<version>/program/{a.program}/)')
+            if pack_dump.nup.is_nup(folder) and not pack_dump.is_nx(pack_dump.nup.open_nup(folder)): raise Error(f'--program {a.program}: {folder} is a .nup, which holds program 0 only; pack from the dump folder (updates/<version>/program/{a.program}/)')
             found = pack_dump.program_dir(folder, a.program)
             if found is None: raise Error(f'{folder}: no program/{a.program}/exefs/main.npdm in updates/<version>/ or base/ (the console\'s layout, docs/agents/01-extract.md)')
             ver, vdir = found

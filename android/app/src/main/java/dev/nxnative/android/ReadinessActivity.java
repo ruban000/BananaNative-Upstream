@@ -319,7 +319,7 @@ public final class ReadinessActivity extends Activity {
         if (PickedNup.is(c, g.gameDir)) {   // a .nup used where it is: read through the picker's permission, no All files access needed
             try {
                 Nup n = Nup.open(f);
-                return new Readiness.Check(Tx.s(R.string.home_game_files), Readiness.Status.PASS, f.getName() + Tx.s(R.string.ready_a_nup_used_where_it) + n.packages.size()
+                return new Readiness.Check(Tx.s(R.string.home_game_files), Readiness.Status.PASS, f.getName() + Tx.s(n.nx != null ? R.string.ready_an_nx_used_where_it : R.string.ready_a_nup_used_where_it) + n.packages.size()
                         + Tx.s(R.string.ready_packages_its_table_of_contents), null);
             } catch (IOException e) {
                 return new Readiness.Check(Tx.s(R.string.home_game_files), Readiness.Status.FAIL, e instanceof PickedNup.Lost ? GameFile.goneText(f.getName()) + Tx.s(R.string.ready_its_card_s_button_picks_2)
@@ -333,7 +333,7 @@ public final class ReadinessActivity extends Activity {
                 Nup n = Nup.open(f);
                 StringBuilder s = new StringBuilder();
                 for (Nup.Pkg p : n.packages) s.append(s.length() == 0 ? "" : ", ").append(p.selector() != null ? p.selector() : "kind " + p.kind);
-                return new Readiness.Check(Tx.s(R.string.home_game_files), Readiness.Status.PASS, f + Tx.s(R.string.ready_a_nup_that_reads_and) + s + ").", null);
+                return new Readiness.Check(Tx.s(R.string.home_game_files), Readiness.Status.PASS, f + Tx.s(n.nx != null ? R.string.ready_an_nx_that_reads_and : R.string.ready_a_nup_that_reads_and) + s + ").", null);
             } catch (IOException e) {
                 return new Readiness.Check(Tx.s(R.string.home_game_files), Readiness.Status.FAIL, f + Tx.s(R.string.ready_cannot_be_used) + e.getMessage(), f.canRead() ? null : "access");
             }

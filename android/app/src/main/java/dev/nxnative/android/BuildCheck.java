@@ -110,6 +110,17 @@ final class BuildCheck {
             File f = module(game, version, m);
             return new Mod(f, null, null, rel(game, f), null);
         }
+        if (version.startsWith("program/") && Nx.isNx(game.getName())) {   // a program pack of an .nx: program n's packages, else its program<n>/ folder (DumpLayout.programSpec)
+            String s = DumpLayout.programSpec(game, Integer.parseInt(version.substring(8)));
+            String label = (s == null ? version : s.substring(s.lastIndexOf(Nx.EXT + ":") + Nx.EXT.length() + 1)) + "/exefs/" + m;
+            if (s == null) return new Mod(null, null, null, label, null);   // not there: MISSING, as a folder's
+            try {
+                Nup.At a = Nup.at(s + "/exefs/" + m);
+                return new Mod(null, a.nup, a.node, label, null);
+            } catch (IOException e) {
+                return new Mod(null, null, null, label, e.getMessage());
+            }
+        }
         if (version.startsWith("program/"))   // a program pack: a .nup holds program 0 only
             return new Mod(null, null, null, version + "/exefs/" + m, Words.s("err_a_nup_holds_program_0", "a .nup holds program 0 only; this pack's ") + version + Words.s("err_is_read_from_a_dump", " is read from a dump folder"));
         long v;
@@ -164,7 +175,7 @@ final class BuildCheck {
             Mod nso = mod(game, gv, e.getKey());
             if (nso.error != null) return new Result(Kind.UNREADABLE, nso.error, nso.label + ": " + nso.error);
             if (!nso.exists())
-                return new Result(Kind.MISSING, Words.s("err_the_pack_is_for", "The pack is for ") + name + " " + Profile.versionName(parse(p.version)) + Words.s("err_but_the_game", ", but the game ") + (nso.nup != null ? ".nup" : "folder")
+                return new Result(Kind.MISSING, Words.s("err_the_pack_is_for", "The pack is for ") + name + " " + Profile.versionName(parse(p.version)) + Words.s("err_but_the_game", ", but the game ") + (nso.nup != null ? Nup.word(nso.nup.file) : "folder")
                         + " has no " + nso.label + Words.s("err_pick_the_dump_that_has", ". Pick the dump that has that update, or Prepare again from this one."), "no " + nso.label + " (pack version " + p.version + ")");
             String id;
             try {
@@ -180,7 +191,7 @@ final class BuildCheck {
         }
         if (firstMod != null)
             return new Result(Kind.OTHER_BUILD, Words.s("err_the_pack_was_made_from", "The pack was made from another build of ") + name + " (" + firstMod + " " + shortId(firstWant) + Words.s("err_than_the_one_in_the", "…) than the one in the game ")
-                    + (Nup.isNup(game) ? ".nup" : "folder") + " (" + shortId(firstHave) + "…, " + Profile.versionName(parse(p.version))
+                    + (Nup.isNup(game) ? Nup.word(game) : "folder") + " (" + shortId(firstHave) + "…, " + Profile.versionName(parse(p.version))
                     + Words.s("err_its_code_would_crash_with", "). Its code would crash with this game: Prepare again rewrites the game's code from this dump (a few minutes; shaders are kept).\n\nBuild IDs that differ: ") + diff, diff.toString());
         Profile prof = Profile.of(p.titleId);
         Map<Long, Map<String, String>> sup = prof == null ? Map.of() : prof.buildMap();

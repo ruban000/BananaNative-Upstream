@@ -17,9 +17,10 @@
 #   aoc/<index>.img   each DLC's RomFS (index = DLC title ID − base title ID − 0x1000), the host's DM_AOC_DIR
 # A dump in the console's layout has its control data (control/ with control.nacp and the icons; the launcher shows them, Nacp.java), which is not packed here.
 # A NUP file (one file holding base, updates and add-ons, android/NUP.md) stands for such a folder: its base, update/<version> and addon/<title ID> packages are
-# read in place (dm/tools/nup.py through romfs.py) as base/, updates/<version>/ and dlc/<title ID>/<n>/ are, and the build folder goes beside it.
+# read in place (dm/tools/nup.py through romfs.py) as base/, updates/<version>/ and dlc/<title ID>/<n>/ are, and the build folder goes beside it. An NX archive
+# (.nx, android/NX.md) is read the same way, by the same names (dm/tools/nx.py).
 # The title ID is the program ID in main.npdm. A repeat run keeps code modules that are the same and an image whose source tree, packer and image are unchanged (romfs_image.py --reuse).
-# Usage: pack_dump.py <dump folder | .nup file> [--version N] [--work-dir DIR]   (exit 1 on error)
+# Usage: pack_dump.py <dump folder | .nup or .nx file> [--version N] [--work-dir DIR]   (exit 1 on error)
 import argparse, filecmp, os, re, shutil, struct, subprocess, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'dm/tools'))
@@ -44,7 +45,11 @@ def program_id(npdm):   # the ACI0 program ID of main.npdm
     return struct.unpack_from('<Q', d, off + 0x10)[0]
 
 
-def in_nup(p): return nup.split(p) is not None   # a path inside a NUP file (romfs.Path), read through romfs.py
+def in_nup(p): return nup.split(p) is not None   # a path inside a NUP file, a plaintext NSP or an NX archive (romfs.Path), read through romfs.py
+
+
+def is_nx(container):   # whether a container nup.open_nup gave is an NX archive (dm/tools/nx.py): its snapshots also hold the game's other programs, program<n>/
+    return getattr(container, 'programs_inside', False)
 
 
 def clone(src, dst):   # an APFS clone on the same volume, else a copy (Windows has no cp); a file of a NUP package is written out
@@ -95,8 +100,18 @@ def program_dir(dump, n):
     keep it (github.com/a55uka/nup discover.py): program/<n>/ in the version folder in the console's layout (program/<n>/program/ when a data content shares the
     index), program<n>/ beside the version's own exefs/ and romfs/ in the flattened one (leading zeros allowed; scripts/dump_layout.py), and Yoink's switch2/base/
     and switch2/updates/<version>/ (program 1, flattened); a one-version folder's own program<n>/ is the base's. A NUP file holds program 0 only (its packages have
-    no program index)"""
-    if nup.is_nup(dump): return None
+    no program index). An NX archive (android/NX.md "Programs"): program n's own packages (`<file>.nx:program<n>/update/<v>`), else the program<n>/ folder in
+    program 0's snapshots; each the newest version's that has its exefs/main.npdm"""
+    if nup.is_nup(dump):
+        a = nup.open_nup(dump)
+        if not is_nx(a): return None
+        own = [(p.version, romfs.Path(f'{a.path}:program{n}/{p.selector}')) for p in (a.program_packages(n) if n in a.program_indexes() else [])
+               if p.kind in (nup.BASE, nup.UPDATE)]
+        own = [(ver, r) for ver, r in own if (r / 'exefs/main.npdm').is_file()]
+        if own: return max(own, key=lambda t: t[0])
+        found = [(p.version, romfs.Path(f'{a.path}:{p.selector}/program{n}')) for p in a.packages if p.kind in (nup.BASE, nup.UPDATE)]
+        found = [(ver, r) for ver, r in found if (r / 'exefs/main.npdm').is_file()]
+        return max(found, key=lambda t: t[0]) if found else None
     def numbered(p): return sorted(((int(c.name), c) for c in p.iterdir() if c.is_dir() and c.name.isdigit()), key=lambda t: t[0]) if p.is_dir() else []
     def flat(v): return sorted(c for c in v.iterdir() if c.is_dir() and re.fullmatch(r'program0*([1-9]\d*)', c.name) and int(c.name[7:]) == n) if v.is_dir() else []
     found = [(ver, r) for ver, v in numbered(dump / 'updates') + [(0, dump / 'base'), (0, dump)]
@@ -147,7 +162,7 @@ def nup_scan(path):
         if p.romfs == nup.NONE: raise Error(f'{path}: add-on {p.title_id:016X} has no RomFS')
         dlc[(app & ~0xFF) + 0x1000 + index] = pkg(p, '/romfs')   # named in the game's range, as scan() names them
     if True:   # NSP Box writes each DLC, and each version of the game, as an NSP of its own, and a .nup can be split the same way: the NSPs and .nup files beside the game's that are of it (found by their content, whatever they are called)
-        for f in sorted(g for ext in ('*.nsp', '*.nup') for g in Path(n.path).parent.glob(ext)):
+        for f in sorted(g for ext in ('*.nsp', '*.nup', '*.nx') for g in Path(n.path).parent.glob(ext)):
             if str(f) == n.path: continue
             try: m = nup.open_nup(f)
             except (nup.Error, OSError): continue

@@ -121,7 +121,7 @@
     <string name="home_pick_pack_folder">Paketordner auswählen</string>
     <string name="home_pick_the_pack_folder_android">Wähle den Paketordner (android-pack, mit pack.tsv)</string>
     <string name="home_pick_your_dump_folder_with">Wähle deinen Dump-Ordner (mit base/ und ggf. updates/)</string>
-    <string name="home_pick_your_game_s_nup">Wähle die .nup- oder .nsp-Datei deines Spiels</string>
+    <string name="home_pick_your_game_s_nup">Wähle die .nup-, .nsp- oder .nx-Datei deines Spiels</string>
     <string name="home_play_anyway">Trotzdem spielen</string>
     <string name="home_ported_from_eden_gpl_3">Aus Eden portiert (GPL-3.0-or-later). Lossless.dll gehört dir; sie ist nie Teil der App.</string>
     <string name="home_reading_the_game_files">Spieldateien werden gelesen…</string>
@@ -453,8 +453,8 @@
     <string name="settings_pick_another_sound">Anderen Sound auswählen</string>
     <string name="settings_use_the_built_in_sounds">Eingebaute Sounds verwenden</string>
     <string name="home_a_folder_with_base_and">Ein Ordner (mit base/ und ggf. updates/)</string>
-    <string name="home_a_nup_file_or_an">Eine .nup-Datei oder eine NSP-Box-.nsp-Datei</string>
-    <string name="home_a_nup_or_nsp_file">Eine .nup- oder .nsp-Datei (wird dort verwendet, wo sie liegt)</string>
+    <string name="home_a_nup_file_or_an">Eine .nup- oder .nx-Datei oder eine NSP-Box-.nsp-Datei</string>
+    <string name="home_a_nup_or_nsp_file">Eine .nup-, .nsp- oder .nx-Datei (wird dort verwendet, wo sie liegt)</string>
     <string name="home_allow_all_files_access">Zugriff auf alle Dateien erlauben</string>
     <string name="prepare_a_zip_file_made_by">Eine .zip-Datei (von „Paket exportieren…“ erstellt)</string>
     <string name="prepare_a_pack_folder_with_pack">Ein Paketordner (mit pack.tsv und shaders/)</string>
@@ -481,6 +481,7 @@
     <string name="settings_turn_on">Einschalten</string>
     <string name="home_cannot_use_this_file">Diese Datei kann nicht verwendet werden</string>
     <string name="home_cannot_use_this_nsp">Diese NSP kann nicht verwendet werden</string>
+    <string name="home_cannot_use_this_nx">Diese .nx-Datei kann nicht verwendet werden</string>
     <string name="common_remove">Entfernen</string>
     <string name="home_no_pack_for_the_switch">Noch kein Paket für die Switch 2 Edition</string>
     <string name="home_game_file_gone">Spieldatei fehlt</string>
@@ -559,7 +560,7 @@
     <string name="settings_adb_control_warning">Solange sie an ist, können adb und jede andere App auf diesem Handy über den Launcher von Banana Native Spiele hinzufügen, „Vorbereiten“ starten und einen GPU-Treiber installieren oder auswählen, ohne dich zu fragen. Ein GPU-Treiber ist Code, der im Spiel läuft. Schalte sie nur ein, solange du adb nutzt, und danach wieder aus.</string>
     <string name="home_pick_dump_folder_again">Wähle den Dump-Ordner von %1$s erneut</string>
     <string name="err_no_game_in_folder">In %1$s gibt es keine main.npdm (base/exefs/, updates/&lt;version&gt;/exefs/ oder exefs/), keine .nup-Datei und keinen Spielordner. Wähle den eigenen Ordner des Spiels, seine .nup-Datei oder den Ordner mit deinen Spielen.</string>
-    <string name="err_nup_rename">%1$s: Benenne sie so um, dass der Name auf „.nup“ oder „.nsp“ (klein geschrieben) endet; das Spiel und die Tools lesen nur diesen Namen.</string>
+    <string name="err_nup_rename">%1$s: Benenne sie so um, dass der Name auf „.nup“, „.nsp“ oder „.nx“ (klein geschrieben) endet; das Spiel und die Tools lesen nur diesen Namen.</string>
     <string name="err_cannot_be_read">%1$s kann nicht gelesen werden. Prüfe, ob der Zugriff auf alle Dateien an ist.</string>
     <string name="home_no_pack_found_for_this">Kein Paket für dieses %1$s gefunden, und es ist kein Dump, von dem „Vorbereiten“ ausgehen kann.</string>
     <string name="home_no_pack_for_this_what">Kein Paket für dieses %1$s</string>
@@ -1240,10 +1241,12 @@
     <string name="ready_is_not_a_folder_this">" ist kein Ordner, den diese App lesen kann."</string>
     <string name="ready_cannot_be_used">" kann nicht verwendet werden: "</string>
     <string name="ready_a_nup_that_reads_and">: eine .nup, die sich lesen und prüfen lässt (</string>
+    <string name="ready_an_nx_that_reads_and">: eine .nx-Datei, die sich lesen und prüfen lässt (</string>
     <string name="ready_its_card_s_button_picks">; die Taste auf seiner Karte wählt sie aus.)</string>
     <string name="ready_its_card_s_button_picks_2">" (die Taste auf seiner Karte wählt sie aus.)"</string>
     <string name="ready_packages_its_table_of_contents">" Pakete, ihr Inhaltsverzeichnis geprüft). Sie braucht keinen Zugriff auf alle Dateien."</string>
     <string name="ready_a_nup_used_where_it">": eine .nup, die dort verwendet wird, wo sie liegt (mit der Dateiauswahl gewählt; "</string>
+    <string name="ready_an_nx_used_where_it">": eine .nx-Datei, die dort verwendet wird, wo sie liegt (mit der Dateiauswahl gewählt; "</string>
     <string name="ready_with_less_here">" mit weniger hier."</string>
     <string name="ready_what_it_needs">" was es braucht"</string>
     <string name="ready_the_check_before_the_game">. Die Prüfung vor dem Spielstart nutzt den Treiber des Spiels, und ihr Ergebnis kann von diesem abweichen.</string>
@@ -1256,7 +1259,7 @@
     <string name="err_no_game_with_title_id">"Kein Spiel mit Titel-ID "</string>
     <string name="err_cannot_be_read_check_that">" kann nicht gelesen werden. Prüfe, ob der Zugriff auf alle Dateien an ist."</string>
     <string name="err_is_not_there_the_frontend">" ist nicht vorhanden (das Frontend hat gesendet: "</string>
-    <string name="err_rename_it_so_that_its">: Benenne sie so um, dass der Name auf \".nup\" oder \".nsp\" (klein geschrieben) endet; das Spiel und die Tools lesen nur diesen Namen.</string>
+    <string name="err_rename_it_so_that_its">: Benenne sie so um, dass der Name auf \".nup\", \".nsp\" oder \".nx\" (klein geschrieben) endet; das Spiel und die Tools lesen nur diesen Namen.</string>
     <string name="err_the_frontend_sent_no_game">Das Frontend hat kein Spiel gesendet: Sende die .nup (oder den Spielordner) als Daten des Intents oder das Extra \"game\" mit seinem Pfad.</string>
     <string name="err_which_is_not_a_file">, was keine Datei im Handyspeicher unter einem Pfad ist, den die App lesen kann. Stelle das Frontend so ein, dass es den Pfad der Datei oder ihre Speicher-(SAF-)URI aus dem eigenen Speicher des Handys sendet.</string>
     <string name="err_the_frontend_sent">"Das Frontend hat gesendet: "</string>

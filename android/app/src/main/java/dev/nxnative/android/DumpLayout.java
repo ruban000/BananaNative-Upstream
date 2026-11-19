@@ -28,7 +28,7 @@ final class DumpLayout {
                 for (Nup n : all)
                     for (Nup.Pkg p : n.packages) {
                         long v = p.kind == Nup.BASE ? 0L : p.version;
-                        if ((p.kind == Nup.BASE || p.kind == Nup.UPDATE) && isFile(n, p, "exefs/main") && !out.contains(v)) out.add(v);
+                        if ((p.kind == Nup.BASE || p.kind == Nup.UPDATE) && p.program == 0 && isFile(n, p, "exefs/main") && !out.contains(v)) out.add(v);   // program 0's (an .nx's other programs: programSpec)
                     }
             } else {
                 if (new File(root(new File(dump, "base")), "exefs/main").isFile()) out.add(0L);   // a one-version folder (exefs/ at its top) has no version number: not here
@@ -76,6 +76,7 @@ final class DumpLayout {
                 all.addAll(Nup.companions(dump));   // the DLC and other versions beside an NSP game, each an NSP of its own
                 for (Nup n : all)
                 for (Nup.Pkg p : n.packages) {
+                    if (p.program != 0) continue;   // an .nx's program n > 0: not one of the game's versions (a folder's program/<n>/ is not listed either)
                     if (p.kind == Nup.BASE) out.add(new Item("base", "Base game", p.exefsDir == Nup.NONE ? "no game code of its own" : null));
                     else if (p.kind == Nup.UPDATE)
                         out.add(new Item("update", "Update " + versionLabel(prof, p.version), "version " + p.version + (supported.contains(p.version) ? ", a build this app supports" : "")
@@ -167,6 +168,60 @@ final class DumpLayout {
                 if (ver > best && new File(d, "exefs/main.npdm").isFile()) { best = ver; found = d; break; }
         }
         return found;
+    }
+
+    /**
+     * Program n &gt; 0 of an .nx (NX.md "Programs"), as programDir finds it in a folder: the package root of the newest version of program n that has its
+     * exefs/main.npdm (&lt;file&gt;.nx:program&lt;n&gt;/update/&lt;v&gt;, …/base), else, in program 0's newest version that has it, its program&lt;n&gt;/ folder
+     * (&lt;file&gt;.nx:update/&lt;v&gt;/program&lt;n&gt;). In the .nx or the files beside it (Nup.companions). null when none has it, and for anything but an .nx
+     */
+    static String programSpec(File dump, int n) {
+        if (n <= 0 || !Nx.isNx(dump.getName())) return null;
+        try {
+            List<Nup> all = new ArrayList<>();
+            all.add(Nup.open(dump));
+            all.addAll(Nup.companions(dump));
+            for (int pass = 0; pass < 2; pass++) {   // program n's own packages first, else the program<n>/ folder in program 0's
+                long best = -1;
+                String found = null;
+                String sub = pass == 0 ? "" : "program" + n;
+                for (Nup x : all)
+                    for (Nup.Pkg p : x.packages) {
+                        if (p.kind != Nup.BASE && p.kind != Nup.UPDATE || p.program != (pass == 0 ? n : 0)) continue;
+                        long v = p.kind == Nup.BASE ? 0 : p.version;
+                        if (v > best && isFile(x, p, (sub.isEmpty() ? "" : sub + "/") + "exefs/main.npdm")) { best = v; found = Nup.spec(x.file, p.selector(), sub); }
+                    }
+                if (found != null) return found;
+            }
+        } catch (IOException | RuntimeException e) {
+            // unreadable: no program n (the game's own checks say why)
+        }
+        return null;
+    }
+
+    /**
+     * The control data of an .nx package (a package root's full name, as programSpec gives it), as controlDir finds a folder's control/: data/control/ (NXConvert
+     * keeps a dump's control/ there), else data/ itself (a .nup's control.nacp, and an NCA snapshot's control NCA RomFS), whichever has control.nacp; null
+     * when neither has
+     */
+    static String nxControl(String pkg) {
+        if (pkg == null) return null;
+        for (String sub : new String[] {"data/control", "data"}) {
+            try {
+                Nup.At a = Nup.at(pkg + "/" + sub + "/control.nacp");
+                if (a != null && a.node != null && !a.node.dir) return pkg + "/" + sub;
+            } catch (IOException | RuntimeException e) {
+                // unreadable: none
+            }
+        }
+        return null;
+    }
+
+    /** A file under a full .nx / .nup name (spec + "/" + sub), read whole and checked; IOException when it is not there */
+    static byte[] read(String spec, String sub) throws IOException {
+        Nup.At a = Nup.at(spec + "/" + sub);
+        if (a == null || a.node == null || a.node.dir) throw new IOException(spec + "/" + sub + " is not there");
+        return a.nup.read(a.node, -1);
     }
 
     /**
@@ -319,7 +374,7 @@ final class DumpLayout {
     private static String find(Found f, File dump, boolean anyBuild) {
         String fn = dump.getName();
         boolean nup = Nup.isNup(dump);
-        if (Nup.wrongCase(dump)) return fn + ": rename it so that its name ends in \".nup\" or \".nsp\" (lower case); the tools and the game read only that name.";
+        if (Nup.wrongCase(dump)) return fn + ": rename it so that its name ends in \"" + Nup.rightExt(fn) + "\" (lower case); the tools and the game read only that name.";
         if (nup) {
             if (!Nup.picked(dump) && (!dump.isFile() || !dump.canRead())) return dump + " is not a file this app can read. Check that All files access is on.";
             try { Nup.open(dump); } catch (IOException e) { return fn + " cannot be used: " + e.getMessage(); }

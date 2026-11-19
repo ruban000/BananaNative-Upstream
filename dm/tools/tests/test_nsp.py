@@ -302,14 +302,14 @@ class InPlace(Base):
         self.write('other.nsp', build('game', TID, 196608, GAME0))
         app, vers, dlc = pack_dump.scan(self.g)
         self.assertEqual(sorted(vers), [131072, 196608])
-        self.assertTrue(str(vers[196608]).endswith('other.nsp:update/196608'))
+        self.assertTrue(vers[196608].as_posix().endswith('other.nsp:update/196608'))
 
     def test_nup_scan_with_nup_beside(self):
         d = self.nup_split('nn')
         app, vers, dlc = pack_dump.scan(d / 'game.nup')
         self.assertEqual(app, TID)
         self.assertEqual(list(vers), [131072])
-        self.assertTrue(str(vers[131072]).endswith('update.nup:update/131072'))
+        self.assertTrue(vers[131072].as_posix().endswith('update.nup:update/131072'))
         self.assertEqual(list(dlc), [DLC])
         self.assertEqual((dlc[DLC] / 'x/y.bin').read_bytes(), b'1')
 
@@ -318,13 +318,13 @@ class InPlace(Base):
         app, vers, dlc = pack_dump.scan(d / 'game.nup')
         self.assertEqual(app, TID)
         self.assertEqual(list(vers), [131072])
-        self.assertTrue(str(vers[131072]).endswith('update.nsp:update/131072'))
+        self.assertTrue(vers[131072].as_posix().endswith('update.nsp:update/131072'))
         self.assertEqual(list(dlc), [DLC])
         self.assertEqual((dlc[DLC] / 'x/y.bin').read_bytes(), b'1')
 
     def test_descriptor(self):
         import os
-        fd = os.open(self.g, os.O_RDONLY)
+        fd = os.open(self.g, nup.O_RDONLY)   # O_BINARY on Windows (os.open is in text mode there otherwise), as the phone's descriptor
         try:
             with mock.patch.dict(os.environ, {'DM_NUP_FD': f'{fd}:{self.dir / "stand-in.nsp"}'}):
                 n = nup.open_nup(self.dir / 'stand-in.nsp')
@@ -374,7 +374,7 @@ public final class BuildConfig {
     def test_packages(self):
         src = REPO / 'android/app/src/main/java/dev/nxnative/android'
         (self.dir / 'BuildConfig.java').write_text(self.STUB)
-        subprocess.run(['javac', '-d', str(self.dir / 'classes')] + [str(src / f'{c}.java') for c in ('Nup', 'Nsp', 'Zstd', 'Pack', 'DumpLayout', 'BuildCheck', 'RomfsCheck', 'Profile', 'ShaderLibs', 'PickedPath', 'CopyPlan', 'PackFind', 'Words')]
+        subprocess.run(['javac', '-d', str(self.dir / 'classes')] + [str(src / f'{c}.java') for c in ('Nup', 'Nsp', 'Nx', 'Zstd', 'Pack', 'DumpLayout', 'BuildCheck', 'RomfsCheck', 'Profile', 'ShaderLibs', 'PickedPath', 'CopyPlan', 'PackFind', 'Words')]
                        + [str(REPO / 'android/app/src/jvmtest/java/dev/nxnative/android/NspJvmTest.java'), str(self.dir / 'BuildConfig.java')], check=True, capture_output=True, text=True)
         out = self.dir / 'dump'
         big = dict(GAME1, **{'big.bin': bytes(range(251)) * 9000, 'sub/more/e.bin': b'e' * 33})

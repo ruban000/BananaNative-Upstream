@@ -19,7 +19,7 @@ import java.util.Set;
  *     with the game (the Judge: PackCheck.blocking on the phone), and of those one with this APK's shader library ({@link #READY}) before one that the automatic
  *     restamp or delta shader update brings current ({@link #UPDATE}); within a tier the first candidate wins (the picked folder, then the app's, then the nearest).
  *     A pack whose code is of another game build is never chosen.</li>
- * <li>{@link #gamesIn}: the games a picked folder holds (Add game on a folder adds all of them): each .nup in it and each dump subfolder (base/exefs/main.npdm
+ * <li>{@link #gamesIn}: the games a picked folder holds (Add game on a folder adds all of them): each .nup (.nx, .nsp) in it and each dump subfolder (base/exefs/main.npdm
  *     or exefs/main.npdm) one level deep, not work or pack folders.</li>
  * </ul>
  */
@@ -167,7 +167,7 @@ final class PackFind {
      * base package (an update or DLC of its own) beside a .nup of its game that has one. A .nup with a base package stands for itself, whatever else is beside it
      */
     private static boolean companion(File f, File[] folder) {
-        boolean nup = f.getName().endsWith(Nup.EXT);
+        boolean nup = Nup.container(f.getName());   // a .nup or an .nx
         if (!nup && !f.getName().endsWith(Nup.EXT_NSP)) return false;
         try {
             Nup me = Nup.peek(f);
@@ -176,7 +176,7 @@ final class PackFind {
             if (mine == null && !nup) return true;   // a DLC NSP: it belongs to a game beside it, or to none (then nothing is lost: it is no game)
             for (File g : folder) {
                 if (g.equals(f) || g.getName().startsWith(".") || !g.isFile()) continue;
-                boolean gnup = g.getName().endsWith(Nup.EXT);
+                boolean gnup = Nup.container(g.getName());
                 if (!gnup && !g.getName().endsWith(Nup.EXT_NSP)) continue;
                 Nup o;
                 try { o = Nup.peek(g); } catch (IOException | RuntimeException e) { continue; }

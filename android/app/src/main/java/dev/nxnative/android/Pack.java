@@ -78,12 +78,38 @@ final class Pack {
      */
     Map<Integer, String> romfsProgramPaths(File game) {
         Map<Integer, String> out = new LinkedHashMap<>();
-        if (program == 0 || Nup.isNup(game)) return out;
+        if (program == 0) return out;
+        if (Nx.isNx(game.getName())) {   // an .nx: each row's package and path (game.nx:update/<v>/romfs) on the game's own file or the one beside it that holds it, when it is there
+            for (Map.Entry<Integer, String> e : romfsProgram.entrySet()) {
+                String s = nxRomfs(game, e.getValue());
+                if (s != null) out.put(e.getKey(), s);
+            }
+            return out;
+        }
+        if (Nup.isNup(game)) return out;
         for (Map.Entry<Integer, String> e : romfsProgram.entrySet()) {
             File d = new File(game, e.getValue());
             if (d.isDirectory()) out.put(e.getKey(), d.getPath());
         }
         return out;
+    }
+
+    /**
+     * A pack.tsv RomFS row of an .nx (&lt;name&gt;.nx:&lt;selector&gt;[/&lt;path&gt;], the selector with or without program&lt;n&gt;/) applied to this game: the
+     * same package and path on the game's own .nx, or on the file beside it that holds that package (Nup.holder); its file name is not used (a renamed .nx still
+     * plays). null when it is no such row or that RomFS folder is not there
+     */
+    static String nxRomfs(File game, String row) {
+        Nup.Ref r;
+        try { r = Nup.parse(row); } catch (IllegalArgumentException e) { return null; }
+        if (r == null || r.selector == null) return null;
+        String s = Nup.spec(Nup.holder(game, r.selector), r.selector, r.sub.isEmpty() ? "romfs" : r.sub);
+        try {
+            Nup.At a = Nup.at(s);
+            return a != null && a.node != null && a.node.dir ? s : null;
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     /** Whether this app made the pack (its made_by row), so its code can be updated without asking when only the tools changed */
@@ -297,6 +323,8 @@ final class Pack {
                 Nup n = Nup.open(game);
                 if (n.base() == null && n.newest() == null && game.getName().endsWith(Nup.EXT_NSP))
                     throw new Nsp.Refused(Nsp.DLC_ONLY, game.getName() + " has neither a base package nor an update");
+                if (n.base() == null && n.newest() == null && n.nx != null)
+                    throw new Nsp.Refused(Nx.DLC_ONLY, game.getName() + " has neither a base snapshot nor an update");
                 return n.programId();
             } catch (Nsp.Refused e) {
                 throw new Nsp.Refused(e.plain, game.getName() + " cannot be used: " + e.getMessage(), e);
@@ -322,6 +350,8 @@ final class Pack {
             File d = DumpLayout.programDir(game, Profile.program(p.titleId));
             File npdm = d == null ? null : new File(d, "exefs/main.npdm");
             if (npdm != null && npdm.isFile() && programId(npdm).equals(p.titleId)) return p.titleId;
+            String s = DumpLayout.programSpec(game, Profile.program(p.titleId));   // an .nx: program n's packages, else its program<n>/ folder
+            if (s != null && programId(DumpLayout.read(s, "exefs/main.npdm"), s + "/exefs/main.npdm").equals(p.titleId)) return p.titleId;
         }
         return id;
     }
@@ -384,6 +414,13 @@ final class Pack {
         if (!Nup.isNup(game)) {
             File f = romfs(game);
             return f == null ? null : f.getPath();
+        }
+        if (program > 0 && Nx.isNx(game.getName())) {   // a program pack of an .nx (a Switch 2 Edition's program 1): its row's RomFS, else program n's own (DumpLayout.programSpec), as a folder's
+            String s = nxRomfs(game, romfsRel);
+            if (s != null) return s;
+            String ps = DumpLayout.programSpec(game, program);
+            Nup.At a = ps == null ? null : Nup.at(ps + "/romfs");
+            return a != null && a.node != null && a.node.dir ? ps + "/romfs" : null;
         }
         String sel = romfsSelector();
         File holder = Nup.holder(game, sel);   // the version may be an NSP of its own beside the game's
@@ -492,7 +529,7 @@ final class Pack {
                     // not a .nup name: only the game's own, which has not got it
                 }
             }
-            if (target != null) out.put(e.getKey() + (target.getName().endsWith(Nup.EXT_NSP) ? Nup.EXT_NSP : Nup.EXT), target.getPath());
+            if (target != null) out.put(e.getKey() + Nup.extOf(target), target.getPath());   // <index>.nup, .nsp or .nx: the host reads the file the link names by its kind
             else if (skipped != null) skipped.add("add-on " + e.getKey() + " (pack.tsv aoc row " + e.getValue() + ") is in neither " + game.getName() + " nor the .nup the row names: the game runs without it");
         }
         if (nup) addedAfter(game, out);
@@ -515,8 +552,8 @@ final class Pack {
                 for (Nup.Pkg p : Nup.open(f).of(Nup.ADDON)) {
                     long idx = p.titleId - app - 0x1000;
                     if (idx <= 0 || idx > 2000 || p.romfsDir == Nup.NONE || aoc.containsKey((int) idx)) continue;
-                    String key = idx + (f.getName().endsWith(Nup.EXT_NSP) ? Nup.EXT_NSP : Nup.EXT);
-                    if (!out.containsKey(idx + Nup.EXT) && !out.containsKey(idx + Nup.EXT_NSP)) out.put(key, f.getPath());
+                    String key = idx + Nup.extOf(f);
+                    if (!out.containsKey(idx + Nup.EXT) && !out.containsKey(idx + Nup.EXT_NSP) && !out.containsKey(idx + Nup.EXT_NX)) out.put(key, f.getPath());
                 }
             } catch (IOException | RuntimeException e) {
                 // unreadable: not this game's add-on
