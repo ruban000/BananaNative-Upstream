@@ -18,8 +18,10 @@ final class Background {
         });
     }
 
-    /** The tiles' icons and details (GameMeta): one at a time */
+    /** The tiles' icons and details as the app's cache keeps them (GameMeta): one at a time, quick (no game file) */
     static final ExecutorService META = pool("nx-game-meta");
+    /** The tiles' icons and details from the game files (GameMeta): one at a time, beside META, so a card's kept details never wait for another card's read */
+    static final ExecutorService META_READ = pool("nx-game-meta-read");
     /** The looks through the games folders and the checks of what they found (GamesFolders): one at a time, so two looks never add a game twice */
     static final ExecutorService LOOK = pool("nx-games-folders");
 }

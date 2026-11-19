@@ -13,10 +13,12 @@ import java.util.Locale;
 
 /**
  * A game card's details kept on disk between runs (GameMeta: the app's cache folder), with no Android classes so the JVM test (GamesFolderJvmTest) checks it.
- * One file per card view, named by the SHA-256 of what it is for ({@link #keptAs}: the game's path, which control data (a Switch 2 Edition's program 1), the
- * phone's language and the app build); inside, the identity of the files it was read from (path or document, size, time) and the details: version,
- * publisher, and the icon's own bytes (the JPEG or PNG exactly as the game file has it; GameMeta scales it in memory to the size it is shown at). A start shows
- * what is kept at once; the files are read again only when their identity is not the kept one.
+ * One file per card view, named by the SHA-256 of what it is for ({@link #keptAs}: the game's path, which control data (a Switch 2 Edition's program 1) and the
+ * phone's language); inside, the identity of the files it was read from (path or document, size, time) and of the app build that read them ({@link #identity}),
+ * and the details: version, publisher, and the icon's own bytes (the JPEG or PNG exactly as the game file has it; GameMeta scales it in memory to the size it
+ * is shown at). A start shows what is kept at once; the files are read again only when their identity is not the kept one. Another app build reads them
+ * again too, but shows what an older build kept until then (with the build in the file's name, every APK update opened on blank tiles until each game's file
+ * had been read again).
  */
 final class MetaKeep {
     private MetaKeep() {}
@@ -41,9 +43,14 @@ final class MetaKeep {
         boolean current(String identity) { return identity != null && identity.equals(key); }
     }
 
-    /** What a kept file is for: the game's path, its control data's name ("" for the game's own), the phone's language and the app build */
-    static String keptAs(String path, String control, String language, String appVersion) {
-        return path + "\n" + (control == null ? "" : control) + "\n" + (language == null ? "" : language) + "\n" + (appVersion == null ? "" : appVersion);
+    /** What a kept file is for: the game's path, its control data's name ("" for the game's own) and the phone's language */
+    static String keptAs(String path, String control, String language) {
+        return path + "\n" + (control == null ? "" : control) + "\n" + (language == null ? "" : language);
+    }
+
+    /** What a kept file was read from: the files' identity (folderKey, a .nup's source key) and the app build that read them; null when the files have none */
+    static String identity(String files, String appVersion) {
+        return files == null ? null : files + "\n" + (appVersion == null ? "" : appVersion);
     }
 
     /** The identity of a folder dump's control data: control.nacp's path, size and time (the icons change with it) */
@@ -63,7 +70,7 @@ final class MetaKeep {
         }
     }
 
-    /** What is kept for keptAs, null when nothing is (or another keptAs: another language or app build) */
+    /** What is kept for keptAs, null when nothing is (or another keptAs: another language) */
     static Kept load(File dir, String keptAs) {
         if (dir == null) return null;
         File f = file(dir, keptAs);

@@ -14,12 +14,13 @@ import java.util.function.Supplier;
 
 /**
  * The icon, version and publisher of a game, for the game cards: what a .nup carries (Nup.gameMeta), or a folder dump's control data (DumpLayout.controlDir,
- * Nacp: control.nacp and icon_&lt;Language&gt;.dat, in the phone's language). Read off the main thread (Background.META, one at a time), handed to the card on
- * the main thread.
+ * Nacp: control.nacp and icon_&lt;Language&gt;.dat, in the phone's language). Read off the main thread (Background.META for what is kept, then
+ * Background.META_READ for the game files, one at a time each), handed to the card on the main thread.
  * <ul>
- * <li>Kept on disk between runs (MetaKeep, in the app's cache folder, keepDir): by the game's path, the phone's language and the app build, with the identity
- *     of the files it was read from (path or document, size, time) and the icon's own bytes. A start shows what is kept at once, then reads the files only when
- *     their identity changed (a .nup's identity is a stat, or one descriptor of a picked file: no container is opened for an unchanged game).</li>
+ * <li>Kept on disk between runs (MetaKeep, in the app's cache folder, keepDir): by the game's path and the phone's language, with the identity of the files it
+ *     was read from (path or document, size, time) and of the app build, and the icon's own bytes. A start shows what is kept at once (an older build's too),
+ *     then reads the files only when that identity changed (a .nup's identity is a stat, or one descriptor of a picked file: no container is opened for an
+ *     unchanged game). A card built again in this run shows what it showed before at once, on the main thread.</li>
  * <li>The icon is decoded at the size it is shown at, at most {@link #iconPx} on a side (the largest Home tile, selected or lifted; inSampleSize, then a last
  *     scale), never larger; the original bytes stay on disk, so its quality is the original's up to that size. Decoded icons are kept in memory, at most
  *     {@link #MEM_BYTES}, least recently used first out.</li>
@@ -39,7 +40,7 @@ final class GameMeta {
 
     /** Where the details are kept between runs (NxApp: the app's cache folder; null: not kept) */
     static volatile File keepDir;
-    /** The app build (NxApp: BuildConfig.NX_COMMIT): another build reads each game's details again once */
+    /** The app build (NxApp: BuildConfig.NX_COMMIT): another build reads each game's details again once, showing what an older one kept until then */
     static volatile String appVersion = "";
 
     private static final Handler main = new Handler(Looper.getMainLooper());
@@ -69,27 +70,47 @@ final class GameMeta {
      * tag names which it will be without opening anything (the card's title ID and switch), for the kept details. done may be called twice: kept, then read
      */
     static void loadControl(File dump, String tag, Supplier<String> control, Consumer<GameMeta> done) {
-        String keptAs = MetaKeep.keptAs(dump.getAbsolutePath(), tag, Nacp.phoneLanguage(), appVersion);
+        String keptAs = MetaKeep.keptAs(dump.getAbsolutePath(), tag, Nacp.phoneLanguage());
+        Shown was = shown.get(keptAs);
+        boolean onMain = Looper.myLooper() == Looper.getMainLooper();
+        if (was != null && onMain) done.accept(was.meta);   // a card built again (Home's row is rebuilt whenever a card's state changes): its icon at once, no blank tile
+        // Two queues, so every card's kept details show before any game file is read: one queue for both made the last tile wait for every other game's
+        // identity check (a stat on the SD card, a picked file's descriptor), Edition.control (a program's NPDM) and any read (a .nup's TOC, an .nx)
         Background.META.execute(() -> {
-            MetaKeep.Kept kept = MetaKeep.load(keepDir, keptAs);
+            MetaKeep.Kept kept = was == null ? MetaKeep.load(keepDir, keptAs) : null;
             if (kept != null && kept.has) post(keptAs, kept, done);
-            String ctl;
-            try { ctl = control.get(); } catch (RuntimeException e) { ctl = null; }
-            boolean nup = ctl == null && (Nup.isNup(dump) || Nup.picked(dump));
-            Nup.Ref spec = ctl == null ? null : parseSpec(ctl);   // a control folder inside an .nx (Edition.control)
-            File folder = nup || spec != null ? null : ctl != null ? new File(ctl) : dump.isDirectory() ? DumpLayout.controlDir(dump) : null;
-            String key = nup ? nupKey(dump) : spec != null ? specKey(ctl, spec) : MetaKeep.folderKey(folder);
-            if (key == null) return;   // cannot be read now (or no details): what is kept stays (the card's check says what is wrong)
-            if (kept != null && kept.current(key)) return;   // unchanged: what is kept is what the files say
-            MetaKeep.Kept k = read(dump, nup, ctl, spec, folder, key);
-            MetaKeep.keep(keepDir, keptAs, k);
-            if (k.has) post(keptAs, k, done);
+            else if (was != null && !onMain) main.post(() -> done.accept(was.meta));
+            String keptKey = was != null ? was.key : kept != null ? kept.key : null;
+            Background.META_READ.execute(() -> {
+                String ctl;
+                try { ctl = control.get(); } catch (RuntimeException e) { ctl = null; }
+                boolean nup = ctl == null && (Nup.isNup(dump) || Nup.picked(dump));
+                Nup.Ref spec = ctl == null ? null : parseSpec(ctl);   // a control folder inside an .nx (Edition.control)
+                File folder = nup || spec != null ? null : ctl != null ? new File(ctl) : dump.isDirectory() ? DumpLayout.controlDir(dump) : null;
+                String key = MetaKeep.identity(nup ? nupKey(dump) : spec != null ? specKey(ctl, spec) : MetaKeep.folderKey(folder), appVersion);
+                if (key == null) return;   // cannot be read now (or no details): what is kept stays (the card's check says what is wrong)
+                if (key.equals(keptKey)) return;   // unchanged (and read by this app build): what is kept is what the files say
+                MetaKeep.Kept k = read(dump, nup, ctl, spec, folder, key);
+                MetaKeep.keep(keepDir, keptAs, k);
+                if (k.has) post(keptAs, k, done);
+                else shown.remove(keptAs);
+            });
         });
     }
 
+    /** What a card showed last and the identity it was read from, by keptAs: a card built again shows it at once (loadControl) */
+    private static final class Shown {
+        final GameMeta meta;
+        final String key;
+        Shown(GameMeta meta, String key) { this.meta = meta; this.key = key; }
+    }
+    private static final java.util.Map<String, Shown> shown = new java.util.concurrent.ConcurrentHashMap<>();
+
     private static void post(String keptAs, MetaKeep.Kept k, Consumer<GameMeta> done) {
         GameMeta m = new GameMeta(k.icon == null ? null : icon(keptAs + "\n" + k.key, k.icon), k.version, k.publisher);
-        if (m.icon != null || m.version != null || m.publisher != null) main.post(() -> done.accept(m));
+        if (m.icon == null && m.version == null && m.publisher == null) return;
+        shown.put(keptAs, new Shown(m, k.key));
+        main.post(() -> done.accept(m));
     }
 
     /** The details as the files have them (the icon's bytes as they are) */

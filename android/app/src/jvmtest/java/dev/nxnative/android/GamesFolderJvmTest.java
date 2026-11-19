@@ -26,7 +26,7 @@ import java.util.TreeSet;
  * <li>what is kept: a second look at unchanged files reads none; a changed time reads that file again; another app build reads all again</li>
  * <li>when: exactly three triggers, the start once per process; a folder added adds every game; a start adds only new or changed files (a removed card stays
  *     removed); Look for new games adds every game without a card</li>
- * <li>the card details kept on disk (MetaKeep): the icon's bytes unchanged, the key (size, time) and keptAs (language, app build) invalidation</li>
+ * <li>the card details kept on disk (MetaKeep): the icon's bytes unchanged, the key (size, time, app build) and keptAs (language) invalidation</li>
  * <li>a games folder read through the provider: stand-in paths whose files open through Nup.opener (.nup, .nsp, .nx), the files beside a game found through
  *     Opener.siblings (Nup.companions), the host's fd: forms for a companion</li>
  * </ul>
@@ -149,17 +149,19 @@ public final class GamesFolderJvmTest {
         for (int i = 0; i < jpg.length; i++) jpg[i] = (byte) (i * 31 + 7);
         jpg[0] = (byte) 0xFF;
         jpg[1] = (byte) 0xD8;
-        String as = MetaKeep.keptAs("/storage/Games/Bananza.nup", "040074A01BF12000", "en-US", "build1");
-        String key = "/storage/Games/Bananza.nup|123456|1000";
+        String as = MetaKeep.keptAs("/storage/Games/Bananza.nup", "040074A01BF12000", "en-US");
+        String key = MetaKeep.identity("/storage/Games/Bananza.nup|123456|1000", "build1");
         check(MetaKeep.load(dir, as) == null, "nothing kept yet");
         MetaKeep.keep(dir, as, new MetaKeep.Kept(key, true, "1.1.0", "Nintendo", jpg));
         MetaKeep.Kept k = MetaKeep.load(dir, as);
         check(k != null && k.has && k.current(key) && "1.1.0".equals(k.version) && "Nintendo".equals(k.publisher), "kept details");
         check(Arrays.equals(k.icon, jpg), "the icon's own bytes, unchanged");
-        check(!k.current("/storage/Games/Bananza.nup|123457|1000") && !k.current("/storage/Games/Bananza.nup|123456|2000"), "another size or time: read again");
-        check(MetaKeep.load(dir, MetaKeep.keptAs("/storage/Games/Bananza.nup", "040074A01BF12000", "de-DE", "build1")) == null, "another language: not this one");
-        check(MetaKeep.load(dir, MetaKeep.keptAs("/storage/Games/Bananza.nup", "040074A01BF12000", "en-US", "build2")) == null, "another app build: not this one");
-        check(MetaKeep.load(dir, MetaKeep.keptAs("/storage/Games/Bananza.nup", "040074A01BF12000:program1", "en-US", "build1")) == null, "another program's details: not this one");
+        check(!k.current(MetaKeep.identity("/storage/Games/Bananza.nup|123457|1000", "build1")) && !k.current(MetaKeep.identity("/storage/Games/Bananza.nup|123456|2000", "build1")), "another size or time: read again");
+        check(!k.current(MetaKeep.identity("/storage/Games/Bananza.nup|123456|1000", "build2")), "another app build: read again");
+        check(MetaKeep.load(dir, MetaKeep.keptAs("/storage/Games/Bananza.nup", "040074A01BF12000", "en-US")) != null, "another app build: what is kept still shows until then");
+        check(MetaKeep.identity(null, "build1") == null, "files without an identity: none");
+        check(MetaKeep.load(dir, MetaKeep.keptAs("/storage/Games/Bananza.nup", "040074A01BF12000", "de-DE")) == null, "another language: not this one");
+        check(MetaKeep.load(dir, MetaKeep.keptAs("/storage/Games/Bananza.nup", "040074A01BF12000:program1", "en-US")) == null, "another program's details: not this one");
         MetaKeep.keep(dir, as, new MetaKeep.Kept(key, false, null, null, null));
         k = MetaKeep.load(dir, as);
         check(k != null && !k.has && k.icon == null && k.current(key), "files without details: kept as none");
