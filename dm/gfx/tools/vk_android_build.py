@@ -611,6 +611,7 @@ def finish(key, w, job, c1):
     try: place(stage, binds, m)
     except ValueError as e: return 'reflection failed', str(e)[:160], None
     if not hmma: spv.cache_raw_loads(m, {e['id'] for e in binds if e['kind'] == abi.KIND_GMEM_MAP})   # the raw load helpers' runs read at once from the pool entry kept last (vk_android_spv.py cache_raw_loads)
+    if stage == 'vs': spv.replay_raw_loads(m, {e['id'] for e in binds if e['kind'] == abi.KIND_GMEM_MAP})   # a straight-line vertex shader's raw loads through kept entries, its body run again on a miss (vk_android_spv.py replay_raw_loads)
     pad = []
     if stage == 'vs':
         want_in = set().union(*[PS_INPUTS.get(p, set()) for p in PAIRS.get(key, ())]) if PAIRS.get(key) else set()

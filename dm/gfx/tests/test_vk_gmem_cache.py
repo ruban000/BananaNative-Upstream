@@ -84,9 +84,10 @@ BIN = {128: lambda a, b: (a + b) & M, 130: lambda a, b: (a - b) & M, 132: lambda
 
 
 def run(m, table, io):
-    """main of the module run once by a small SPIR-V interpreter over the pool table (binding 0) and io (binding 2, a dict of words): (io after, physical stores)"""
+    """main of the module run once by a small SPIR-V interpreter over the pool table (binding 0) and io (binding 2, a dict of words): (io after, physical stores).
+    Output variables are kept as Private ones and come back in io as ('out', variable): their value, or {index tuple: value} when written by element."""
     res = {v['binding']: v['id'] for v in m.resources()}
-    mapvar, logvar, iovar = res[0], res[1], res[2]
+    mapvar, logvar, iovar = res.get(0), res.get(1), res.get(2)
     io, phys_stores = dict(io), {}
     glob = {i: (v[0] if len(v) == 1 else v) for i, (_, v) in m.consts.items()}
     for x in m.ins:
@@ -96,7 +97,7 @@ def run(m, table, io):
         elif op == spv.OP_CONSTANT_COMPOSITE: glob[x[2]] = tuple(glob[c] for c in x[3:])
     mem = {}
     for x in m.ins:
-        if x[0] & 0xffff == spv.OP_VARIABLE and x[3] == spv.SC_PRIVATE:
+        if x[0] & 0xffff == spv.OP_VARIABLE and x[3] in (spv.SC_PRIVATE, spv.SC_OUTPUT):
             glob[x[2]] = ('v', x[2]); mem[('v', x[2])] = glob[x[4]] if len(x) > 4 else 0
         if x[0] & 0xffff == spv.OP_FUNCTION: break
     steps = [0]
@@ -128,16 +129,22 @@ def run(m, table, io):
                 if p[0] == 'io': io[p[1]] = val[x[2]]
                 elif p[0] == 'phys': phys_stores[p[1]] = val[x[2]]
                 elif p[0] == 'log': pass
+                elif p[0] == 'el':
+                    if not isinstance(mem[p[1]], dict): mem[p[1]] = {}
+                    mem[p[1]][p[2]] = val[x[2]]
                 else: mem[p] = val[x[2]]
                 continue
             if op in (8, 317): continue   # OpLine, OpNoLine
             r = x[2]
             if op == spv.OP_LOAD:
                 p = val[x[3]]
-                val[r] = (table[p[1]] if p[0] == 'map' else io.get(p[1], 0) if p[0] == 'io' else word_at(p[1]) if p[0] == 'phys' else 0 if p[0] == 'log' else mem[p])
+                if p[0] == 'phys' and m.op(m.pointee(p[2])[1]) == spv.OP_TYPE_VECTOR: val[r] = tuple(word_at(p[1] + 4 * k) for k in range(m.types[m.pointee(p[2])[1]][3]))
+                elif p[0] == 'el': val[r] = mem[p[1]].get(p[2], 0) if isinstance(mem[p[1]], dict) else 0
+                else: val[r] = (table[p[1]] if p[0] == 'map' else io.get(p[1], 0) if p[0] == 'io' else word_at(p[1]) if p[0] == 'phys' else 0 if p[0] == 'log' else mem[p])
             elif op == spv.OP_ACCESS_CHAIN:
                 b = val.get(x[3])
-                if isinstance(b, tuple) and b[0] == 'phys': val[r] = b   # Word(p).v
+                if isinstance(b, tuple) and b[0] == 'phys': val[r] = ('phys', b[1], x[1])   # Word(p).v
+                elif isinstance(b, tuple) and b[0] == 'v': val[r] = ('el', b, tuple(val[i] for i in x[4:]))   # an element of a Private or Output variable
                 elif x[3] == mapvar: val[r] = ('map', val[x[5]])
                 elif x[3] == iovar: val[r] = ('io', val[x[5]])
                 elif x[3] == logvar: val[r] = ('log', val[x[5]])
@@ -146,7 +153,7 @@ def run(m, table, io):
             elif op in (spv.OP_BITCAST, spv.OP_COPY_OBJECT):
                 v = val[x[3]]
                 val[r] = v[0] | v[1] << 32 if isinstance(v, tuple) and m.op(x[1]) == spv.OP_TYPE_INT else v
-            elif op == spv.OP_CONVERT_U_TO_PTR: val[r] = ('phys', val[x[3]])
+            elif op == spv.OP_CONVERT_U_TO_PTR: val[r] = ('phys', val[x[3]], x[1])
             elif op == spv.OP_COMPOSITE_CONSTRUCT: val[r] = tuple(val[i] for i in x[3:])
             elif op == spv.OP_COMPOSITE_EXTRACT:
                 v = val[x[3]]
@@ -157,12 +164,16 @@ def run(m, table, io):
             elif op == 154: val[r] = any(val[x[3]])   # OpAny
             elif op == 155: val[r] = all(val[x[3]])   # OpAll
             elif op == 168: val[r] = not val[x[3]]   # OpLogicalNot
-            elif op == spv.OP_SELECT: val[r] = val[x[4]] if val[x[3]] else val[x[5]]
+            elif op == spv.OP_SELECT:
+                c = val[x[3]]
+                val[r] = tuple(a if k else b for k, a, b in zip(c, val[x[4]], val[x[5]])) if isinstance(c, tuple) else val[x[4]] if c else val[x[5]]
             elif op in (227, 241):   # the log's atomic load / or (no effect on what is read)
                 val[r] = 0
             elif op in BIN: val[r] = BIN[op](val[x[3]], val[x[4]])
             else: raise AssertionError(f'interpreter: opcode {op}')
     call(m.entry_function(), [])
+    for x in m.ins:
+        if x[0] & 0xffff == spv.OP_VARIABLE and x[3] == spv.SC_OUTPUT: io[('out', x[2])] = mem[('v', x[2])]
     return io, phys_stores
 
 

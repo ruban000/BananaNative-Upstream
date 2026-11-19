@@ -1382,6 +1382,314 @@ def _cached_load_fn(m, h, n, cache, helper, T):
     return fid
 
 
+GMEM_REPLAY_SLOTS = 4   # pool entries a vertex keeps: with 2, a vertex reading 3 pools cycled them, reached the run limit and drew zeros (townspeople flickering)
+GMEM_REPLAY_GAPS = 2    # stretches in no pool a vertex keeps (a run that leaves its pool reads 0 there without a miss)
+GMEM_REPLAY_RUNS = 1 + GMEM_REPLAY_SLOTS + GMEM_REPLAY_GAPS   # runs of main's body at most: each one after the first learns a pool or a stretch
+GMEM_TABLE_LAST = 8191   # the pool table's last entry (8,192 entries: the 13-step search)
+
+
+class _NoReplay(Exception): pass
+
+
+def _replay_kind(m, f, table, v4):
+    """replay_raw_loads' view of a callee of main: ('run', n, cache vars, params) for a function of cache_raw_loads, ('wide', facts) for the translator's 128-bit raw
+    load helper (a uvec4 physical pointer: word 0 returned, words 1-3 stored to a Private array), ('word', facts) for a 32-bit one, else None"""
+    a, e = m.function_range(f); b = m.ins[a:e + 1]
+    if not any(x[0] & 0xffff == OP_ACCESS_CHAIN and x[3] == table for x in b): return None
+    params = [x for x in b[1:3] if x[0] & 0xffff == OP_FUNCTION_PARAMETER]
+    if len(params) != 2: return None
+    cus = [x for x in b if x[0] & 0xffff == OP_CONVERT_U_TO_PTR]
+    rty = b[0][1]
+    if v4 is not None and rty == v4 and len(cus) >= 2:
+        loads = [x for x in b[:40] if x[0] & 0xffff == OP_LOAD and x[3] in m.vars and m.vars[x[3]][1] == SC_PRIVATE]
+        if len(loads) < 6: return None
+        return ('run', len(cus) - 1, [x[3] for x in loads[:6]], [p[1] for p in params])
+    if len(cus) != 1: return None
+    pt = m.pointee(cus[0][1])[1]
+    if m.op(pt) == OP_TYPE_VECTOR:
+        defs = {x[2]: x for x in b if len(x) > 2 and (x[0] & 0xffff) not in NO_RESULT_OPS and x[0] & 0xffff != OP_LABEL}
+        loadx = [x for x in b if x[0] & 0xffff == OP_LOAD and x[3] == cus[0][2]]
+        if len(loadx) != 1: return None
+        load = loadx[0]
+        def lane(v):
+            while v in defs and defs[v][0] & 0xffff in (OP_BITCAST, OP_COPY_OBJECT): v = defs[v][3]
+            x = defs.get(v)
+            return x[4] if x is not None and x[0] & 0xffff == OP_COMPOSITE_EXTRACT and x[3] == load[2] else None
+        idx, priv, pty = {}, None, None
+        for x in b:
+            if x[0] & 0xffff != OP_STORE: continue
+            ch = defs.get(x[1])
+            if ch is None or ch[0] & 0xffff != OP_ACCESS_CHAIN: continue
+            k = lane(x[2])
+            if k: idx[k] = ch[4]; priv, pty = ch[3], ch[1]
+        if sorted(idx) != [1, 2, 3] or m.vars.get(priv, (0, None))[1] != SC_PRIVATE: return None
+        tch = next(x for x in b if x[0] & 0xffff == OP_ACCESS_CHAIN and x[3] == table)
+        return ('wide', {'priv': priv, 'pty': pty, 'idx': idx, 'vptr': cus[0][1], 'vty': pt, 'rty': rty, 'mem': load[4:], 'lo': params[0][1], 'hi': params[1][1],
+                         'tptr': tch[1], 'ity': m.consts[tch[4]][0]})
+    h = _raw_load_helper(m, f, {table})
+    return ('word', h) if h else None
+
+
+def replay_raw_loads(m, tables):
+    """The raw loads of a straight-line vertex shader (after cache_raw_loads: its functions, and the translator's 128-bit raw load helper, which cache_raw_loads
+    does not take) read through K kept pool entries with no search at the call sites, and main's body run again when one missed.
+
+    Every address a call site reads (each word of a cache_raw_loads run, the base of a 128-bit helper call, as the helper checks it) is checked against each of
+    the GMEM_REPLAY_SLOTS kept entries (Private: start, end, delta) with two 64-bit compares, and read at address + delta. An address no kept entry holds reads
+    the table's sink and gives 0; unless it lies in one of the GMEM_REPLAY_GAPS kept stretches in no pool (or below 64 KiB), it is recorded (the first of the
+    run) and sets a flag. main runs its old body (now a function) in a loop: after a run that missed, one lookup of the recorded address (the helper's: the
+    2 MiB chunk's hint, else the 13-step search for the last entry starting at or below it) puts its pool into the next slot, or, in no pool, the stretch from
+    that entry's end to the next entry's start into the next gap, and the body runs again. The first call site's address is looked up once, so a vertex whose
+    loads lie in one pool runs the body once. Each run after the first learns a pool or a stretch, so a vertex reading at most GMEM_REPLAY_SLOTS pools and
+    GMEM_REPLAY_GAPS stretches reads every value as the helper does (same pool, same delta, 0 in no pool) within GMEM_REPLAY_RUNS runs; past that, an address
+    not kept in the last run reads 0 (open: not seen in Ocarina of Time).
+
+    The body runs again, so only a vertex shader whose main is one block, has no opcode a rerun would repeat with an effect (_RUN_BREAKERS: barriers, atomics,
+    image writes, kill, emits), calls nothing but raw load helpers, stores to Function, Private and Output variables only, and reads no Private variable before
+    writing it. Fragment shaders (implicit derivatives in a non-uniform loop), compute, mesh and task shaders (barriers, subgroup operations) and geometry
+    shaders (emits) are left as they are.
+
+    Why: cache_raw_loads leaves each call site with the search the driver inlines; Ocarina of Time's townspeople vertex shader b1f06157308e3b22 keeps 70 of them
+    (61 of the 128-bit helper), and Turnip's ir3 spills around them (docs/reference/shaders.md, Raw global memory loads read through kept entries and replayed).
+    tables: the pool table variables (reflection kind GMEM_MAP). → the number of call sites rewritten (0: the module is as it was)"""
+    if m.model != 'vs' or m.header[1] >= 0x10400 or len(tables) != 1: return 0
+    try: return _replay_raw_loads(m, next(iter(tables)))
+    except _NoReplay: return 0
+
+
+def _replay_raw_loads(m, table):
+    K, NG, RUNS = GMEM_REPLAY_SLOTS, GMEM_REPLAY_GAPS, GMEM_REPLAY_RUNS
+    ent = m.entry_function()
+    a, e = m.function_range(ent)
+    mbody = m.ins[a:e + 1]
+    if sum(1 for x in mbody if x[0] & 0xffff == OP_LABEL) != 1: raise _NoReplay
+    fn_ty, void = mbody[0][4], mbody[0][1]
+    u32f = m.find_type(OP_TYPE_INT, 32, 0)
+    v4f = m.find_type(OP_TYPE_VECTOR, u32f, 4) if u32f is not None else None
+    kinds = {}
+    for f in {x[3] for x in mbody if x[0] & 0xffff == OP_FUNCTION_CALL}:
+        k = _replay_kind(m, f, table, v4f)
+        if k is None: raise _NoReplay
+        kinds[f] = k
+    if not kinds: raise _NoReplay
+    mdefs = {x[2]: x for x in mbody if len(x) > 2 and (x[0] & 0xffff) not in NO_RESULT_OPS and x[0] & 0xffff != OP_LABEL}
+    for x in mbody:
+        op = x[0] & 0xffff
+        if op in _RUN_BREAKERS: raise _NoReplay
+        if op == OP_STORE and _store_class(m, mdefs, x[1]) not in (SC_FUNCTION, SC_PRIVATE, SC_OUTPUT): raise _NoReplay
+    # a rerun must start from the same Private state: main reads no Private variable before it writes it (a 128-bit helper call writes its array)
+    def pbase(p):
+        while p in mdefs and mdefs[p][0] & 0xffff in (OP_ACCESS_CHAIN, OP_IN_BOUNDS_ACCESS_CHAIN): p = mdefs[p][3]
+        return p if m.vars.get(p, (0, None))[1] == SC_PRIVATE else None
+    written = set()
+    for x in mbody:
+        op = x[0] & 0xffff
+        if op == OP_LOAD and pbase(x[3]) is not None and pbase(x[3]) not in written: raise _NoReplay
+        if op == OP_STORE and pbase(x[1]) is not None: written.add(pbase(x[1]))
+        if op == OP_FUNCTION_CALL and kinds[x[3]][0] == 'wide': written.add(kinds[x[3]][1]['priv'])
+    sites = [x for x in mbody if x[0] & 0xffff == OP_FUNCTION_CALL]
+    fa, fe = m.function_range(next(iter(kinds)))
+    tch = next(x for x in m.ins[fa:fe + 1] if x[0] & 0xffff == OP_ACCESS_CHAIN and x[3] == table)   # a word of the table: (table, 0, index)
+    tptr, ity = tch[1], m.consts[tch[4]][0]
+    # declarations (from here on the module changes)
+    bty = m.add_type(OP_TYPE_BOOL)
+    u32 = m.add_type(OP_TYPE_INT, 32, 0)
+    v4 = m.add_type(OP_TYPE_VECTOR, u32, 4)
+    b4 = m.add_type(OP_TYPE_VECTOR, bty, 4)
+    v2 = m.add_type(OP_TYPE_VECTOR, u32, 2)
+    u64 = m.add_type(OP_TYPE_INT, 64, 0)
+    ppriv = m.add_type(OP_TYPE_POINTER, SC_PRIVATE, u32)
+    pphys = m.add_type(OP_TYPE_POINTER, SC_PHYSICAL_STORAGE_BUFFER, u32)
+    U = lambda v: m.add_const(u32, v & 0xffffffff)
+    I = lambda v: m.add_const(ity, v)
+    z4 = m.new_id(); m._insert_decl([3 << 16 | OP_CONSTANT_NULL, v4, z4])
+    def pvar(init):
+        i = m.new_id(); m._insert_decl([5 << 16 | OP_VARIABLE, ppriv, i, SC_PRIVATE, U(init)]); return i
+    slots = [[pvar(0xffffffff), pvar(0xffffffff), pvar(0), pvar(0), pvar(0), pvar(0)] for _ in range(K)]   # start, end, delta (low, high): empty at first
+    gaps = [[pvar(0xffffffff), pvar(0xffffffff), pvar(0), pvar(0)] for _ in range(NG)]   # a stretch in no pool, [from, to) (low, high): empty at first
+    missed, pend_lo, pend_hi, nxt, gnxt, nruns, seeded = (pvar(0) for _ in range(7))
+    elem = m.pointee(tptr)[1]
+
+    def emitter(ins):
+        def op(o, *w): ins.append([(len(w) + 1) << 16 | o, *w])
+        def val(o, ty, *w):
+            r = m.new_id(); ins.append([(len(w) + 3) << 16 | o, ty, r, *w]); return r
+        return op, val
+
+    def lt_fn(val):   # (ahi:alo) < (bhi:blo), or <= with eq
+        def lt(ahi, alo, bhi, blo, eq=False):
+            return val(OP_LOGICAL_OR, bty, val(OP_ULESS_THAN, bty, ahi, bhi),
+                       val(OP_LOGICAL_AND, bty, val(OP_IEQUAL, bty, ahi, bhi), val(OP_ULESS_THAN_EQUAL if eq else OP_ULESS_THAN, bty, alo, blo)))
+        return lt
+
+    def add64(val, alo, ahi, blo, bhi):
+        l = val(OP_IADD, u32, alo, blo)
+        return l, val(OP_IADD, u32, val(OP_IADD, u32, ahi, bhi), val(OP_SELECT, u32, val(OP_ULESS_THAN, bty, l, alo), U(1), U(0)))
+
+    def within(val, lu, hu, s):   # s: (from low, from high, to low, to high), loaded; from <= address < to
+        lt = lt_fn(val)
+        return val(OP_LOGICAL_AND, bty, lt(s[1], s[0], hu, lu, eq=True), lt(hu, lu, s[3], s[2]))
+
+    def check(val, lu, hu):   # the kept slot holding address (hu:lu), as the helper checks an address → (hit, delta low, delta high)
+        hits, dl, dh = [], None, None
+        for s in slots:
+            c = [val(OP_LOAD, u32, v) for v in s]
+            hh = within(val, lu, hu, c)
+            hits.append(hh)
+            dl = c[4] if dl is None else val(OP_SELECT, u32, hh, c[4], dl)
+            dh = c[5] if dh is None else val(OP_SELECT, u32, hh, c[5], dh)
+        hit = hits[0]
+        for hh in hits[1:]: hit = val(OP_LOGICAL_OR, bty, hit, hh)
+        return hit, dl, dh
+
+    def note_miss(op, val, hit, lu, hu):   # an address in no kept slot and no kept stretch, not below 64 KiB: the first of the run recorded, the run marked
+        known = val(OP_LOGICAL_AND, bty, val(OP_IEQUAL, bty, hu, U(0)), val(OP_ULESS_THAN, bty, lu, U(0x10000)))
+        for g in gaps: known = val(OP_LOGICAL_OR, bty, known, within(val, lu, hu, [val(OP_LOAD, u32, v) for v in g]))
+        miss = val(OP_LOGICAL_AND, bty, val(OP_LOGICAL_NOT, bty, hit), val(OP_LOGICAL_NOT, bty, known))
+        mo = val(OP_LOAD, u32, missed)
+        first = val(OP_LOGICAL_AND, bty, miss, val(OP_IEQUAL, bty, mo, U(0)))
+        op(OP_STORE, pend_lo, val(OP_SELECT, u32, first, lu, val(OP_LOAD, u32, pend_lo)))
+        op(OP_STORE, pend_hi, val(OP_SELECT, u32, first, hu, val(OP_LOAD, u32, pend_hi)))
+        op(OP_STORE, missed, val(OP_SELECT, u32, miss, U(1), mo))
+
+    def site(ins, x, kind):   # a 128-bit helper call checks its base (as the helper does); a run of n words of a cache function checks each word (as the n helper calls did)
+        op, val = emitter(ins)
+        lu, hu = val(OP_BITCAST, u32, x[4]), val(OP_BITCAST, u32, x[5])
+        sk = [val(OP_LOAD, elem, val(OP_ACCESS_CHAIN, tptr, table, I(0), I(w))) for w in (6, 7)]   # the table's sink (entry 0, words 6 and 7)
+        if elem != u32: sk = [val(OP_BITCAST, u32, s) for s in sk]
+        def at(hit, al, ah, dl, dh):   # the physical address: in the slot's pool, else the sink
+            pl, ph = add64(val, al, ah, dl, dh)
+            return val(OP_BITCAST, u64, val(OP_COMPOSITE_CONSTRUCT, v2, val(OP_SELECT, u32, hit, pl, sk[0]), val(OP_SELECT, u32, hit, ph, sk[1])))
+        if kind[0] == 'wide':
+            w = kind[1]
+            hit, dl, dh = check(val, lu, hu)
+            v = val(OP_LOAD, w['vty'], val(OP_CONVERT_U_TO_PTR, w['vptr'], at(hit, lu, hu, dl, dh)), 2, 4)   # Aligned 4
+            if w['vty'] != v4: v = val(OP_BITCAST, v4, v)
+            v = val(OP_SELECT, v4, val(OP_COMPOSITE_CONSTRUCT, b4, hit, hit, hit, hit), v, z4)
+            note_miss(op, val, hit, lu, hu)
+        else:
+            ws = []
+            for k in range(kind[1] if kind[0] == 'run' else 1):
+                al, ah = add64(val, lu, hu, U(4 * k), U(0)) if k else (lu, hu)
+                hit, dl, dh = check(val, al, ah)
+                wv = val(OP_LOAD, u32, val(OP_CONVERT_U_TO_PTR, pphys, at(hit, al, ah, dl, dh)), 2, 4)   # Aligned 4
+                ws.append(val(OP_SELECT, u32, hit, wv, U(0)))
+                note_miss(op, val, hit, al, ah)
+            v = val(OP_COMPOSITE_CONSTRUCT, v4, *ws, *[U(0)] * (4 - len(ws)))
+        if kind[0] == 'run':
+            ins.append([4 << 16 | OP_COPY_OBJECT, v4, x[2], v])
+        else:
+            ins.append([4 << 16 | (OP_COPY_OBJECT if x[1] == u32 else OP_BITCAST), x[1], x[2], val(OP_COMPOSITE_EXTRACT, u32, v, 0)])
+            if kind[0] == 'wide':
+                w = kind[1]
+                for k in (1, 2, 3): op(OP_STORE, val(OP_ACCESS_CHAIN, w['pty'], w['priv'], w['idx'][k]), val(OP_COMPOSITE_EXTRACT, u32, v, k))
+
+    def learn(ins, cur, lu, hu):
+        """the table looked up for address (hu:lu), in block cur, as the helper looks up (the 2 MiB chunk's hint, else the 13-step search for the last entry that
+        starts at or below it): its pool into the next slot, or, in no pool, the stretch from that entry's end to the next entry's start into the next gap.
+        → the label of the block it ends in"""
+        op, val = emitter(ins)
+        lt = lt_fn(val)
+        def word(idx, w):
+            v = val(OP_LOAD, elem, val(OP_ACCESS_CHAIN, tptr, table, I(0), val(OP_IADD, ity, val(OP_IMUL, ity, idx, I(8)), I(w))))
+            return v if elem == u32 else val(OP_BITCAST, u32, v)
+        to_i = lambda v: v if ity == u32 else val(OP_BITCAST, ity, v)
+        chunk = val(OP_BITWISE_OR, u32, val(OP_SHL_LOGICAL, u32, hu, U(11)), val(OP_SHR_LOGICAL, u32, lu, U(21)))
+        hw = word(to_i(val(OP_BITWISE_AND, u32, chunk, U(8191))), 6)
+        hidx = val(OP_BITWISE_AND, u32, hw, U(8191))
+        hidx_i = to_i(hidx)
+        hok = val(OP_LOGICAL_AND, bty, val(OP_LOGICAL_AND, bty, val(OP_INOT_EQUAL, bty, hidx, U(0)), val(OP_IEQUAL, bty, val(OP_SHR_LOGICAL, u32, hw, U(13)), chunk)),
+                  val(OP_ULESS_THAN, bty, hu, U(256)))
+        hok = val(OP_LOGICAL_AND, bty, hok, within(val, lu, hu, [word(hidx_i, 0), word(hidx_i, 1), word(hidx_i, 2), word(hidx_i, 3)]))
+        SB, SH, SBB, SC, SM, SMM = (m.new_id() for _ in range(6))
+        x0, s0, x1, s1 = (m.new_id() for _ in range(4))
+        op(OP_SELECTION_MERGE, SMM, 0); op(OP_BRANCH_CONDITIONAL, hok, SMM, SB)
+        op(OP_LABEL, SB); op(OP_BRANCH, SH)
+        op(OP_LABEL, SH)
+        ins.append([7 << 16 | OP_PHI, ity, x0, I(0), SB, x1, SC]); ins.append([7 << 16 | OP_PHI, ity, s0, I(4096), SB, s1, SC])
+        op(OP_LOOP_MERGE, SM, SC, LOOP_DONT_UNROLL); op(OP_BRANCH, SBB)
+        op(OP_LABEL, SBB)
+        nx = val(OP_IADD, ity, x0, s0)
+        ins.append([6 << 16 | OP_SELECT, ity, x1, lt(word(nx, 1), word(nx, 0), hu, lu, eq=True), nx, x0])
+        ins.append([5 << 16 | OP_SHR_LOGICAL, ity, s1, s0, I(1)])
+        more = val(OP_INOT_EQUAL, bty, s1, I(0))
+        op(OP_BRANCH, SC); op(OP_LABEL, SC); op(OP_BRANCH_CONDITIONAL, more, SH, SM)
+        op(OP_LABEL, SM); op(OP_BRANCH, SMM)
+        op(OP_LABEL, SMM)
+        idx = val(OP_PHI, ity, hidx_i, cur, x1, SM)
+        ws = [word(idx, w) for w in range(6)]
+        below = lt(ws[1], ws[0], hu, lu, eq=True)   # the entry starts at or below the address
+        found = val(OP_LOGICAL_AND, bty, below, lt(hu, lu, ws[3], ws[2]))
+        n0 = val(OP_LOAD, u32, nxt)
+        for si, s in enumerate(slots):
+            here = val(OP_LOGICAL_AND, bty, found, val(OP_IEQUAL, bty, n0, U(si)))
+            for v, wv in zip(s, ws): op(OP_STORE, v, val(OP_SELECT, u32, here, wv, val(OP_LOAD, u32, v)))
+        n1 = val(OP_IADD, u32, n0, U(1))
+        op(OP_STORE, nxt, val(OP_SELECT, u32, found, val(OP_SELECT, u32, val(OP_IEQUAL, bty, n1, U(K)), U(0), n1), n0))
+        # in no pool: from the entry's end (0 when it starts above the address: entry 0) to the next entry's start (all ones past the last entry)
+        last = val(OP_IEQUAL, bty, idx, I(GMEM_TABLE_LAST))
+        nidx = val(OP_SELECT, ity, last, idx, val(OP_IADD, ity, idx, I(1)))
+        ns = [val(OP_SELECT, u32, last, U(0xffffffff), word(nidx, w)) for w in (0, 1)]
+        gap = [val(OP_SELECT, u32, below, ws[2], U(0)), val(OP_SELECT, u32, below, ws[3], U(0)),
+               val(OP_SELECT, u32, below, ns[0], ws[0]), val(OP_SELECT, u32, below, ns[1], ws[1])]
+        nf = val(OP_LOGICAL_NOT, bty, found)
+        g0 = val(OP_LOAD, u32, gnxt)
+        for gi, g in enumerate(gaps):
+            here = val(OP_LOGICAL_AND, bty, nf, val(OP_IEQUAL, bty, g0, U(gi)))
+            for v, gv in zip(g, gap): op(OP_STORE, v, val(OP_SELECT, u32, here, gv, val(OP_LOAD, u32, v)))
+        g1 = val(OP_IADD, u32, g0, U(1))
+        op(OP_STORE, gnxt, val(OP_SELECT, u32, nf, val(OP_SELECT, u32, val(OP_IEQUAL, bty, g1, U(NG)), U(0), g1), g0))
+        return SMM
+
+    # B: main's body with every call site rewritten; the first one's address is learnt once (a vertex whose loads lie in one pool runs the body once)
+    B = m.new_id()
+    out = [[5 << 16 | OP_FUNCTION, void, B, 0, fn_ty], mbody[1]]
+    first = True
+    for x in mbody[2:-1]:
+        if x[0] & 0xffff == OP_FUNCTION_CALL and x[3] in kinds:
+            if first:
+                op, val = emitter(out)
+                lu, hu = val(OP_BITCAST, u32, x[4]), val(OP_BITCAST, u32, x[5])
+                SS, SJ = m.new_id(), m.new_id()
+                need = val(OP_IEQUAL, bty, val(OP_LOAD, u32, seeded), U(0))
+                op(OP_SELECTION_MERGE, SJ, 0); op(OP_BRANCH_CONDITIONAL, need, SS, SJ)
+                op(OP_LABEL, SS); op(OP_STORE, seeded, U(1))
+                learn(out, SS, lu, hu)
+                op(OP_BRANCH, SJ); op(OP_LABEL, SJ)
+                first = False
+            site(out, x, kinds[x[3]])
+            continue
+        out.append(x)
+    out.append(mbody[-1])
+    # main: the body until a run with no miss, at most RUNS runs
+    E, H, BD, KK, S, C, M = (m.new_id() for _ in range(7))
+    mn = [mbody[0], [2 << 16 | OP_LABEL, E], [2 << 16 | OP_BRANCH, H],
+          [2 << 16 | OP_LABEL, H], [4 << 16 | OP_LOOP_MERGE, M, C, 0], [2 << 16 | OP_BRANCH, BD], [2 << 16 | OP_LABEL, BD]]
+    op, val = emitter(mn)
+    op(OP_STORE, missed, U(0))
+    val(OP_FUNCTION_CALL, void, B)
+    again = val(OP_INOT_EQUAL, bty, val(OP_LOAD, u32, missed), U(0))
+    op(OP_SELECTION_MERGE, S, 0); op(OP_BRANCH_CONDITIONAL, again, KK, S)
+    op(OP_LABEL, KK)
+    learn(mn, KK, val(OP_LOAD, u32, pend_lo), val(OP_LOAD, u32, pend_hi))
+    op(OP_BRANCH, S)
+    op(OP_LABEL, S); op(OP_BRANCH, C)
+    op(OP_LABEL, C)
+    r1 = val(OP_IADD, u32, val(OP_LOAD, u32, nruns), U(1))
+    op(OP_STORE, nruns, r1)
+    op(OP_BRANCH_CONDITIONAL, val(OP_LOGICAL_AND, bty, again, val(OP_ULESS_THAN, bty, r1, U(RUNS))), H, M)
+    op(OP_LABEL, M); op(OP_RETURN); op(OP_FUNCTION_END)
+    a, e = m.function_range(ent)   # declarations were inserted before the functions since
+    m.ins[a:e + 1] = mn + out
+    for f in list(kinds):   # the helpers and cache functions: no call is left to them
+        fa, fe = m.function_range(f)
+        gone = {y[1] if y[0] & 0xffff == OP_LABEL else y[2] for y in m.ins[fa:fe + 1] if (y[0] & 0xffff) not in NO_RESULT_OPS and len(y) > 2 or y[0] & 0xffff == OP_LABEL}
+        del m.ins[fa:fe + 1]
+        m.ins = [y for y in m.ins if not ((y[0] & 0xffff) in (OP_NAME, OP_DECORATE) and y[1] in gone)]
+    m.index()
+    return len(sites)
+
+
 def lower_image_offsets(m):
     """Lower dynamic Offset operands on OpImageFetch instructions to explicit coordinate addition (OpIAdd),
     satisfying Vulkan 1.3 SPIR-V VUID-RuntimeSpirv-Offset-10213."""
