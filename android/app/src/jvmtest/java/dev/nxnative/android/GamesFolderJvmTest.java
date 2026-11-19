@@ -46,7 +46,8 @@ public final class GamesFolderJvmTest {
         return s;
     }
 
-    static final Set<String> GAMES = new TreeSet<>(List.of("Bananza.nup", "Dumps/Dump0", "NSP Game/update.nsp", "NX/game.nx", "a/b/c/d/deep.nup"));
+    // (an .nx is one file per game: the update-only .nx beside NX/game.nx is a complete game of its own, a standalone update, listed as itself)
+    static final Set<String> GAMES = new TreeSet<>(List.of("Bananza.nup", "Dumps/Dump0", "NSP Game/update.nsp", "NX/game.nx", "NX/zz update.nx", "a/b/c/d/deep.nup"));
 
     public static void main(String[] args) throws Exception {
         File root = new File(args[0]), state = new File(args[1]);
@@ -72,7 +73,7 @@ public final class GamesFolderJvmTest {
         check(names.equals(List.of("update.nsp")), "Add game on the NSP folder: the newest version stands for the game: " + names);
         names.clear();
         for (File f : PackFind.gamesIn(new File(root, "NX"))) names.add(f.getName());
-        check(names.equals(List.of("game.nx")), "Add game on the NX folder: the update-only .nx beside it is its: " + names);
+        check(names.equals(List.of("game.nx", "zz update.nx")), "Add game on the NX folder: each .nx is itself (one file per game): " + names);
         GamesFolder.Result one = GamesFolder.scan(new GamesFolder.PathTree(new File(root, "Dumps/Dump0")), GamesFolder.DEPTH, e -> GamesFolder.Facts.read(e.file));
         check(one.games.size() == 1 && one.games.get(0).rel.isEmpty(), "a games folder that is a dump folder is that game");
         GamesFolder.Result gone = GamesFolder.scan(new GamesFolder.PathTree(new File(root, "missing")), GamesFolder.DEPTH, e -> GamesFolder.Facts.read(e.file));
@@ -201,7 +202,7 @@ public final class GamesFolderJvmTest {
             check(names.equals(List.of("base.nsp", "dlc.nsp")), "the files beside the NSP game, by stand-in paths: " + names);
             names.clear();
             for (Nup c : Nup.companions(nx)) names.add(c.file.getName());
-            check(names.equals(List.of("zz update.nx")), "the update-only .nx beside the .nx: " + names);
+            check(names.isEmpty(), "an .nx is one file per game: no companions, the update-only .nx beside it is not opened as one: " + names);
             File dlc = Nup.holder(nsp, "addon/" + String.format("%016x", Nup.open(new File(dirOf.get("NSP Game"), "dlc.nsp")).packages.get(0).titleId));
             check(dlc.getName().equals("dlc.nsp") && Nup.picked(dlc), "the DLC's holder is its stand-in");
             String link = Nup.spec(dlc, "addon/x", "romfs");

@@ -43,7 +43,10 @@ final class GameCopy {
     }
 
     /** A .nup the app cannot use where it is (a provider that only streams it: PickedNup.Streamed) copied into the app, on the picker's grant */
-    static void copyNup(MainActivity a, Uri u) { start(a, u, false); }
+    static void copyNup(MainActivity a, Uri u) { start(a, u, false, null); }
+
+    /** A dump folder found in a games folder (document doc of the kept tree), copied into the app on that folder's grant (MainActivity.offerCopies) */
+    static void copyDump(MainActivity a, Uri tree, String doc) { start(a, tree, true, doc); }
 
     /** MainActivity.onActivityResult: true when the request was one of these */
     static boolean activityResult(MainActivity a, int request, Intent data) {
@@ -52,13 +55,14 @@ final class GameCopy {
         try {
             a.getContentResolver().takePersistableUriPermission(u, Intent.FLAG_GRANT_READ_URI_PERMISSION);
         } catch (SecurityException e) { /* a provider that grants no lasting access: the copy below still runs on this grant */ }
-        start(a, u, true);
+        start(a, u, true, null);
         return true;
     }
 
     private static final class Item { final Uri uri; final String rel; final long size; Item(Uri u, String r, long s) { uri = u; rel = r; size = s; } }
 
-    private static void start(MainActivity a, Uri u, boolean tree) {
+    /** rootDoc: the tree's folder to copy (a document ID of tree u), null for the tree's own root */
+    private static void start(MainActivity a, Uri u, boolean tree, String rootDoc) {
         if (running) { a.error(Tx.s(R.string.prepare_a_copy_is_already_running)); return; }
         ContentResolver cr = a.getContentResolver();
         File games = CopyPlan.games(AppStorage.root(a));
@@ -74,7 +78,7 @@ final class GameCopy {
                 List<Item> items = new ArrayList<>();
                 String name;
                 if (tree) {
-                    String root = DocumentsContract.getTreeDocumentId(u);
+                    String root = rootDoc != null ? rootDoc : DocumentsContract.getTreeDocumentId(u);
                     name = CopyPlan.safeName(displayName(cr, DocumentsContract.buildDocumentUriUsingTree(u, root)));
                     if (name == null) throw new IOException("the folder has no name the app can use");
                     list(cr, u, root, "", items, cancel);

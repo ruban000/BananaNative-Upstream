@@ -1414,6 +1414,6 @@
     <string name="games_folders_no_game">%1$s에서 게임을 찾지 못했습니다. 게임 폴더로 유지되며, 나중에 넣은 게임은 앱을 시작할 때 추가됩니다.</string>
     <string name="games_folders_cannot_keep">그 폴더는 앱이 재시작 후에도 계속 읽도록 허용하지 않습니다. 휴대폰 저장공간이나 SD 카드의 폴더를 고르세요.</string>
     <string name="games_folders_cannot_read">지금 %1$s을(를) 읽을 수 없습니다. 옮겨졌거나 삭제되었거나 권한이 회수되었을 수 있습니다. 설정 › 게임 폴더에서 제거한 뒤 다시 추가하세요.</string>
-    <string name="games_folders_dump_needs_access">%1$s은(는) 덤프 폴더입니다. 앱은 덤프 폴더를 경로로 읽으므로 모든 파일 접근 권한이 필요합니다 (또는 게임 추가 › 앱으로 복사).</string>
+    <string name="games_folders_dump_needs_access">%1$s은(는) 덤프 폴더입니다. 앱은 덤프 폴더를 경로로 읽으므로 모든 파일 접근 권한이 필요합니다.</string>
     <string name="games_folders_hint">.nup, .nsp, .nx 파일은 게임이며 덤프 폴더도 마찬가지입니다. 게임 옆에 있는 업데이트나 DLC는 그 게임의 것입니다. 앱은 폴더를 추가할 때, 앱을 시작할 때마다, 그리고 새 게임 찾기로 이 폴더들을 살펴보고 아직 카드가 없는 게임을 추가합니다 (시작할 때는 새로 생기거나 바뀐 파일만이므로 지운 카드는 다시 생기지 않습니다). 카드를 지우는 일은 없습니다.</string>
 </resources>

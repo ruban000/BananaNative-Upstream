@@ -314,7 +314,18 @@ final class Nup {
 
     // ---- Opening ----
 
-    private static final Map<String, Nup> cache = new LinkedHashMap<>(16, 0.75f, true);   // least recently used first: an NSP's companions are opened beside it
+    /**
+     * Opened files, least recently used first, bounded by what they keep in memory (CACHE_BYTES, at most CACHE_MAX of them), not by a count: what a .nup keeps
+     * is small (its TOC is read from the file), an .nx's is its Catalog, an NSP's its built TOC. A bound of 8 opened every file of a games folder of more games
+     * again at each check (Home checks each card)
+     */
+    private static final Map<String, Nup> cache = new LinkedHashMap<>(16, 0.75f, true);
+    private static long cacheBytes;
+    static final long CACHE_BYTES = 64L << 20;
+    static final int CACHE_MAX = 256;
+
+    /** About what an opened file keeps in memory while cached (its packages and nodes' bookkeeping, plus an NSP's TOC or an .nx's Catalog) */
+    long kept() { return 4096 + (synth != null ? synth.length : 0) + (nx != null ? nx.kept() : 0); }
 
     /** The .nup checked (superblock, TOC SHA-256); cached by path (or picked document), size and time, so a card's checks do not hash the TOC again */
     static Nup open(File f) throws IOException {
@@ -329,8 +340,10 @@ final class Nup {
             n = read(f, src, true);
         }
         synchronized (cache) {
-            cache.put(key, n);
-            while (cache.size() > 8) cache.remove(cache.keySet().iterator().next());
+            Nup was = cache.put(key, n);
+            if (was != null) cacheBytes -= was.kept();
+            cacheBytes += n.kept();
+            while ((cacheBytes > CACHE_BYTES || cache.size() > CACHE_MAX) && cache.size() > 1) cacheBytes -= cache.remove(cache.keySet().iterator().next()).kept();
         }
         return n;
     }
@@ -418,17 +431,20 @@ final class Nup {
     /**
      * The other NSPs in an NSP game's folder that are of the same game (NSP Box writes each version of a game and each DLC as an NSP of its own), found by what they
      * hold, whatever they are called: a game snapshot with the same program ID, a DLC whose title ID is the game's plus 0x1000 plus an index of 1 to 2000. Sorted by
-     * path. A .nup or .nx beside the game is one when it has no base package (an update or DLC of its own); one with a base is a game of its own. Empty for an
-     * NSP that is a DLC itself, and for one that cannot be read; a sibling that cannot be read is left out
+     * path. A .nup beside the game is one when it has no base package (an update or DLC of its own); one with a base is a game of its own. An .nx is one file per
+     * game (NXConvert puts the updates and DLC in it): it has no companions and is never one, so neither an .nx game nor a game beside .nx files opens them here
+     * (a games folder of large .nx files was opened whole for each check of each game). Empty for an NSP that is a DLC itself, and for one that cannot be read; a
+     * sibling that cannot be read is left out
      */
     static List<Nup> companions(File game) {
         List<Nup> out = new ArrayList<>();
-        if (game == null || extOf(game.getName()) == null) return out;   // a game finds the NUP files and NSPs beside it (an update, DLC)
+        if (game == null || extOf(game.getName()) == null || EXT_NX.equals(extOf(game.getName()))) return out;   // a game finds the NUP files and NSPs beside it (an update, DLC)
         File parent = game.getAbsoluteFile().getParentFile();
         Opener o = opener;
         List<File> sib = o != null && o.owns(game) ? o.siblings(game) : null;   // a games folder's file read through the provider: its folder's files by stand-in paths
-        File[] l = sib != null ? sib.stream().filter(f -> extOf(f.getName()) != null && !f.getName().startsWith(".")).toArray(File[]::new)
-                : parent == null ? null : parent.listFiles(f -> f.isFile() && extOf(f.getName()) != null && !f.getName().startsWith("."));
+        java.util.function.Predicate<File> part = f -> { String e = extOf(f.getName()); return e != null && !EXT_NX.equals(e) && !f.getName().startsWith("."); };
+        File[] l = sib != null ? sib.stream().filter(part).toArray(File[]::new)
+                : parent == null ? null : parent.listFiles(f -> f.isFile() && part.test(f));
         if (l == null) return out;
         long app;
         boolean full;   // the game has a base package: the updates of a .nup beside it are versions of it (else they are games of their own)
@@ -445,8 +461,8 @@ final class Nup {
             if (f.getAbsoluteFile().equals(game.getAbsoluteFile())) continue;
             try {
                 Nup n = peek(f);   // the package records only: a .nup beside the game that is not of it is not hashed
-                boolean nupFile = container(f.getName());   // a .nup or an .nx
-                if (nupFile && n.base() != null) continue;   // a .nup (or .nx) with a base package is a game of its own, not a part of this one
+                boolean nupFile = container(f.getName());   // a .nup (an .nx is never one: left out above)
+                if (nupFile && n.base() != null) continue;   // a .nup with a base package is a game of its own, not a part of this one
                 boolean mine = false;
                 for (Pkg p : n.packages) {
                     long idx = p.titleId - app - 0x1000;

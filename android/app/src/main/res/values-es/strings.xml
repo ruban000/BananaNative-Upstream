@@ -1430,6 +1430,6 @@
     <string name="games_folders_no_game">No se encontró ningún juego en %1$s. Sigue siendo una carpeta de juegos: los juegos que pongas ahí más tarde se añaden al iniciar la app.</string>
     <string name="games_folders_cannot_keep">Esa carpeta no permite que la app la siga leyendo tras reiniciar. Elige una carpeta del almacenamiento del teléfono o de una tarjeta SD.</string>
     <string name="games_folders_cannot_read">%1$s no se puede leer ahora. Puede que se haya movido o borrado, o que se haya retirado el permiso. Quítala en Ajustes › Carpetas de juegos y vuelve a añadirla.</string>
-    <string name="games_folders_dump_needs_access">%1$s es una carpeta de volcado: la app la lee por su ruta, lo que requiere acceso a todos los archivos (o Añadir juego › copiarla a la app).</string>
+    <string name="games_folders_dump_needs_access">%1$s es una carpeta de volcado: la app la lee por su ruta, lo que requiere acceso a todos los archivos.</string>
     <string name="games_folders_hint">Un archivo .nup, .nsp o .nx es un juego, igual que una carpeta de volcado; una actualización o un DLC junto a su juego pertenece a ese juego. La app revisa estas carpetas al añadir una, cada vez que se inicia y con Buscar juegos nuevos, y añade los juegos que aún no tienen tarjeta (al iniciar, solo los archivos nuevos o cambiados, así que una tarjeta que quitaste no vuelve). Nunca quita una tarjeta.</string>
 </resources>

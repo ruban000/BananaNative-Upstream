@@ -1422,6 +1422,6 @@
     <string name="games_folders_no_game">%1$s içinde oyun bulunamadı. Oyun klasörü olarak kalır: oraya sonradan koyduğun oyunlar uygulama başlarken eklenir.</string>
     <string name="games_folders_cannot_keep">Bu klasör, uygulamanın yeniden başlatmadan sonra onu okumaya devam etmesine izin vermiyor. Telefon depolamasında veya SD kartta bir klasör seç.</string>
     <string name="games_folders_cannot_read">%1$s şu anda okunamıyor. Taşınmış ya da silinmiş veya izni geri alınmış olabilir. Ayarlar › Oyun klasörleri\'nden kaldırıp yeniden ekle.</string>
-    <string name="games_folders_dump_needs_access">%1$s bir döküm klasörü: uygulama bunu yolundan okur, bu da tüm dosyalara erişim izni gerektirir (veya Oyun ekle › uygulamaya kopyala).</string>
+    <string name="games_folders_dump_needs_access">%1$s bir döküm klasörü: uygulama bunu yolundan okur, bu da tüm dosyalara erişim izni gerektirir.</string>
     <string name="games_folders_hint">Bir .nup, .nsp veya .nx dosyası bir oyundur, döküm klasörü de öyle; oyununun yanındaki bir güncelleme veya DLC o oyuna aittir. Uygulama bu klasörlere biri eklendiğinde, her başladığında ve Yeni oyunları ara ile bakar ve henüz kartı olmayan oyunları ekler (başlarken yalnızca yeni veya değişen dosyalar, yani kaldırdığın bir kart geri gelmez). Hiçbir kartı kaldırmaz.</string>
 </resources>

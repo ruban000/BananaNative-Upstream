@@ -178,12 +178,14 @@ final class GamesFolder {
 
     /**
      * Whether a file is a part of a game that another file of its folder stands for, so that only that one is a game (it finds the rest beside it:
-     * Nup.companions): a DLC NSP; an NSP of a version that a newer NSP of the game outranks, or of a game with a .nup or .nx beside it that has its base; a .nup or
-     * .nx with no base package (an update or DLC of its own) beside a .nup or .nx of its game that has one. A .nup or .nx with a base package stands for itself,
-     * whatever else is beside it; a file that cannot be read is a game (Add game says why). folder: every game file of the folder by name, with facts of each
+     * Nup.companions): a DLC NSP; an NSP of a version that a newer NSP of the game outranks, or of a game with a .nup beside it that has its base; a .nup with no
+     * base package (an update or DLC of its own) beside a .nup of its game that has one. A .nup with a base package stands for itself, whatever else is beside it;
+     * a file that cannot be read is a game (Add game says why). An .nx is one file per game (Nup.companions): it is never a part of another and takes none, so it
+     * is always listed and left out of the others' rule. folder: every game file of the folder by name, with facts of each
      */
     static boolean companion(String name, Map<String, Facts> folder) {
-        boolean nup = Nup.container(name);   // a .nup or an .nx
+        if (name.endsWith(Nup.EXT_NX)) return false;
+        boolean nup = Nup.container(name);   // a .nup (an .nx is not looked at here)
         if (!nup && !name.endsWith(Nup.EXT_NSP)) return false;
         Facts me = folder.get(name);
         if (me == null || me.error != null) return false;   // unreadable: listed, so that Add game says why
@@ -192,7 +194,7 @@ final class GamesFolder {
         for (Map.Entry<String, Facts> e : folder.entrySet()) {
             String g = e.getKey();
             Facts o = e.getValue();
-            if (g.equals(name) || g.startsWith(".") || o == null || o.error != null || !o.hasNewest) continue;
+            if (g.equals(name) || g.startsWith(".") || g.endsWith(Nup.EXT_NX) || o == null || o.error != null || !o.hasNewest) continue;   // (an .nx takes no parts)
             boolean gnup = Nup.container(g);
             if (!gnup && !g.endsWith(Nup.EXT_NSP)) continue;
             if (!me.hasNewest) {   // a .nup of DLC only: a part of a game beside it that has that DLC's application, else listed (Add game says why it is no game)

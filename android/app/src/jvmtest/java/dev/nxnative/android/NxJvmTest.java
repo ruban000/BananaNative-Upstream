@@ -792,8 +792,9 @@ public final class NxJvmTest {
     }
 
     /**
-     * Files beside each other (NX.md, Nup.companions): a base .nx finds an update-only .nx and a DLC .nx beside it (any names); Add game lists the base only; the
-     * pack's DM_ROMFS and add-on link name the files that hold them; an .nx with a base is a game of its own
+     * Files beside each other (NX.md, Nup.companions): an .nx is one file per game (NXConvert puts the updates and DLC in it), so an .nx game has no companions,
+     * an .nx is never one (not opened for an NSP game beside it either), and Add game lists each .nx as itself. A games folder of large .nx files was opened whole
+     * for each check of each game while they were companions
      */
     static void beside(File t) throws IOException, InterruptedException {
         File dir = new File(t, "beside");
@@ -806,24 +807,17 @@ public final class NxJvmTest {
         File a = pack(dd, new File(dir, "some dlc.nx"), "--app-id", TID);
         Nup un = Nup.open(u);
         check(un.base() == null && un.newest() != null && un.newest().flags == 1, "an update-only .nx: a standalone update (base-less, flag 1)");
-        List<Nup> c = Nup.companions(g);
-        List<String> names = new ArrayList<>();
-        for (Nup x : c) names.add(x.file.getName());
-        check(names.equals(List.of("some dlc.nx", "zz update.nx")), "companions of the base .nx: " + names);
-        check(DumpLayout.versions(g).equals(List.of(0L, 458752L)), "versions across the files: " + DumpLayout.versions(g));
-        check(DumpLayout.path(g, 458752, "romfs").equals(u.getAbsolutePath() + ":update/458752/romfs"), "the update's RomFS in its own file: " + DumpLayout.path(g, 458752, "romfs"));
-        check(Nup.holder(g, "addon/" + AOC).equals(a), "the add-on's holder");
+        check(Nup.companions(g).isEmpty() && Nup.companions(u).isEmpty() && Nup.companions(a).isEmpty(), "an .nx has no companions");
+        check(DumpLayout.versions(g).equals(List.of(0L)), "an .nx game's versions are its own: " + DumpLayout.versions(g));
+        check(DumpLayout.versions(u).equals(List.of(458752L)), "the update-only .nx is a complete game of its own (standalone update): " + DumpLayout.versions(u));
+        check(Nup.holder(g, "addon/" + AOC).equals(g), "an add-on is looked for in the .nx itself only");
         List<File> games = PackFind.gamesIn(dir);
-        check(games.size() == 1 && games.get(0).equals(g), "Add game lists the base .nx only: " + games);
-        Pack p = Pack.read(packDir(t, "pack-beside", g.getName() + ":update/458752/romfs", "1\t" + a.getName() + ":addon/" + AOC + "/romfs"));
-        check(p.romfsPath(g).equals(u.getAbsolutePath() + ":update/458752/romfs"), "DM_ROMFS in the update's file: " + p.romfsPath(g));
-        check(a.getAbsolutePath().equals(p.aocLinks(g).get("1.nx")), "DM_AOC_DIR/1.nx → the DLC's .nx: " + p.aocLinks(g));
-        p = Pack.read(packDir(t, "pack-beside2", g.getName() + ":update/458752/romfs", null));
-        check(a.getAbsolutePath().equals(p.aocLinks(g).get("1.nx")), "the DLC beside linked without a row: " + p.aocLinks(g));
-        // a .nup beside: found as before (a .nup with no base is a part of this game too)
-        File other = pack(db, new File(dir, "another game.nx"));
-        check(Nup.companions(g).size() == 2 && PackFind.gamesIn(dir).size() == 2, "an .nx with a base is a game of its own, never a part of another");
-        other.delete();
+        check(games.size() == 3, "Add game lists each .nx as itself: " + games);
+        // an NSP game beside .nx files does not open them as its companions
+        File nspDir = new File(t, "beside-nsp");
+        nspDir.mkdirs();
+        java.nio.file.Files.copy(g.toPath(), new File(nspDir, "Game Base.nx").toPath());
+        check(Nup.companions(new File(nspDir, "Game Base.nx")).isEmpty(), "still none in another folder");
     }
 
     /** An .nx used where it is (PickedNup): its stand-in path, read through the opener, the host's fd:<n>/<name> forms */

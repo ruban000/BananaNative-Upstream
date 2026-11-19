@@ -265,6 +265,8 @@ final class GamesFolders {
         int games;
         /** Cards that now read their file another way (a stand-in ↔ its real path) */
         int moved;
+        /** Dump folders read through a folder's grant, which the game cannot read by path: {tree, document ID, name}; Add game offers to copy them (GameCopy.copyDump) */
+        final List<String[]> copyable = new ArrayList<>();
     }
 
     /** The path a card's file has under a games folder ("a/b.nup"), null when it is not in it */
@@ -317,7 +319,10 @@ final class GamesFolders {
                 return card != null;
             })) out.add.add(e.file);
             for (GamesFolder.Entry e : GamesFolder.pick(t, tree, r.wrongCase, seen, e -> false)) out.problems.add(Tx.s(R.string.err_nup_rename, e.rel));
-            for (GamesFolder.Entry e : GamesFolder.pick(t, tree, r.needAccess, seen, e -> false)) out.problems.add(Tx.s(R.string.games_folders_dump_needs_access, e.rel.isEmpty() ? name(tree) : e.rel));
+            for (GamesFolder.Entry e : GamesFolder.pick(t, tree, r.needAccess, seen, e -> false)) {
+                out.problems.add(Tx.s(R.string.games_folders_dump_needs_access, e.rel.isEmpty() ? name(tree) : e.rel));
+                if (e.handle instanceof String) out.copyable.add(new String[] {tree, (String) e.handle, e.rel.isEmpty() ? name(tree) : e.rel});   // read through the grant: it can be copied
+            }
         }
         cache.save(factsFile(c));
         seen.save(seenFile(c));

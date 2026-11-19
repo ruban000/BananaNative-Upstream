@@ -69,6 +69,9 @@ final class Nx {
     final long dirCount, fileCount;
     private final byte[] cat;
     private final long catPool, catPoolSize;
+
+    /** What this archive keeps in memory beyond its packages: its Catalog (Nup's cache bound) */
+    long kept() { return cat.length; }
     final List<Nup.Pkg> packages;
     private final Map<Integer, Integer> snapOf = new LinkedHashMap<>();   // package index -> Catalog snapshot index
     /** The package trees of NCA snapshots (NxNca), by the view number in their nodes' virtual IDs */

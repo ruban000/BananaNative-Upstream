@@ -136,7 +136,8 @@ record, an NCA no record names; the refusal says which.
 - **DLC and other versions are found by content, not by name or folder layout**: an NSP of the same game in the game's folder, beside an NSP or a `.nup` game (a DLC whose ID is the game's + 0x1000 +
   an index of 1 to 2000, or a game snapshot of the same program ID) is one of its companions, whatever it is called (`Nup.companions`, `pack_dump.nup_scan`). Add game
   lists the newest game NSP of a folder only, and no NSP of a game that a `.nup` with a base package beside it stands for (the `.nup` finds it). A game with a base package also finds `.nup` files beside it that have none (an update, DLC: a split NUP; the tools write one file, so this is for files split by hand), and Add game does not list those; a `.nup` with a base package is a game of its own and is never taken as a part of another. `pack.tsv` rows name the file that holds each version and add-on (`other.nsp:update/<v>/romfs`); the host's
-  `DM_AOC_DIR/<index>.nsp` links to the DLC's NSP. A picked file without All files access has no folder to look in: it is used alone.
+  `DM_AOC_DIR/<index>.nsp` links to the DLC's NSP. A picked file without All files access has no folder to look in: it is used alone. An `.nx` takes no part in this
+  ([NX.md](NX.md)): it is one file per game, so it has no companions and is never one, and the search does not open the `.nx` files beside a game.
 - Readers: `dm/tools/nsp.py` (`nup_toc`; `nup.py` takes a file starting with `PFS0` as a synthetic NUP: no TOC hash, any alignment), `dm/host/nsp_toc.h` (the host:
   RomFS only), `Nsp.java` (the launcher: ExeFS and RomFS). NSP Box's own NCAs are checked by `nsp.py --verify` / `scripts/nsp_extract.py` (SHA-256 of each NCA against
   its name and record); the in-place readers check structure and bounds, not content hashes (a damaged file is the user's to notice, as a `.nup` read by the host).

@@ -1880,32 +1880,46 @@ public final class MainActivity extends Activity {
         startActivityForResult(i, request);
     }
 
-    /** Add game: the dump is a folder (base/, updates/) or one .nup file (NUP.md); the user says which, then the system picker opens for it */
+    /**
+     * Add game: one file (.nup, .nx, .nsp: NUP.md, NX.md) or a games folder. A folder is always a games folder (GamesFolders): kept, its games added now and new
+     * ones found later; a picked folder that is itself a dump (base/, updates/) is that game (GamesFolder's rule), so there is no second way to add a folder
+     */
     void addGame() {
         if (!Environment.isExternalStorageManager()) { addWithoutAccess(); return; }
         new PadFocus.Builder(this).setTitle(Tx.s(R.string.home_add_game_your_dump_is))
-                .setItems(new String[] {Tx.s(R.string.home_a_folder_with_base_and), Tx.s(R.string.home_a_nup_file_or_an), Tx.s(R.string.home_a_games_folder)}, (d, w) -> {
-                    if (w == 0) pickFolder(PICK_GAME, Tx.s(R.string.home_pick_your_dump_folder_with));
-                    else if (w == 1) pickNup();
-                    else pickGamesFolder();
+                .setItems(new String[] {Tx.s(R.string.home_a_games_folder), Tx.s(R.string.home_a_nup_file_or_an)}, (d, w) -> {
+                    if (w == 0) pickGamesFolder();
+                    else pickNup();
                 })
                 .setNegativeButton(Tx.s(R.string.common_cancel), null).show();
     }
 
     /**
-     * Add game without All files access: a .nup is used where it is (PickedNup: the picker's read permission, kept; nothing copied); a dump folder is copied into the
-     * app's own storage (GameCopy: the game opens its RomFS files by path, and the picker gives no path); or the user turns All files access on to read dumps where
-     * they are
+     * Add game without All files access: a .nup is used where it is (PickedNup: the picker's read permission, kept; nothing copied); a games folder is read through
+     * the picker's grant, and a dump folder found in it (the game opens its RomFS files by path, which the grant does not give) is offered to be copied into the
+     * app's own storage (lookForGames: GameCopy.copyDump); or the user turns All files access on to read dumps where they are
      */
     private void addWithoutAccess() {
         new PadFocus.Builder(this).setTitle(Tx.s(R.string.home_add_game_your_dump_is))
-                .setItems(new String[] {Tx.s(R.string.home_a_nup_or_nsp_file), Tx.s(R.string.home_a_games_folder), Tx.s(R.string.home_a_dump_folder_copied_into),
-                        Tx.s(R.string.home_allow_all_files_access)}, (d, w) -> {
-                    if (w == 0) pickNupHere();
-                    else if (w == 1) pickGamesFolder();
-                    else if (w == 2) { Toast.makeText(this, Tx.s(R.string.home_pick_your_dump_folder_with), Toast.LENGTH_LONG).show(); GameCopy.pickTree(this); }
+                .setItems(new String[] {Tx.s(R.string.home_a_games_folder), Tx.s(R.string.home_a_nup_or_nsp_file), Tx.s(R.string.home_allow_all_files_access)}, (d, w) -> {
+                    if (w == 0) pickGamesFolder();
+                    else if (w == 1) pickNupHere();
                     else openAccessSettings();
                 })
+                .setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+    }
+
+    /**
+     * Dump folders a games folder holds that the app cannot read where they are (no All files access: the game reads its RomFS files by path): copy one into the
+     * app's own storage (GameCopy.copyDump), over the summary of the look. Nothing when there are none
+     */
+    private void offerCopies(List<String[]> dumps) {
+        if (dumps.isEmpty()) return;
+        String[] names = new String[dumps.size()];
+        for (int i = 0; i < names.length; i++) names[i] = dumps.get(i)[2];
+        new PadFocus.Builder(this).setTitle(Tx.s(R.string.home_a_dump_folder_copied_into))
+                .setItems(names, (d, w) -> GameCopy.copyDump(this, Uri.parse(dumps.get(w)[0]), dumps.get(w)[1]))
+                .setNeutralButton(Tx.s(R.string.home_allow_all_files_access), (d, w) -> openAccessSettings())
                 .setNegativeButton(Tx.s(R.string.common_cancel), null).show();
     }
 
@@ -1938,7 +1952,7 @@ public final class MainActivity extends Activity {
             runOnUiThread(() -> {
                 if (isFinishing()) return;
                 if (o.moved > 0) refresh();
-                if (!picks.isEmpty() || !o.problems.isEmpty()) { added(picks, false, o.problems); return; }
+                if (!picks.isEmpty() || !o.problems.isEmpty()) { added(picks, false, o.problems); offerCopies(o.copyable); return; }
                 if (t == GamesFolder.Trigger.LOOK) Toast.makeText(this, Tx.s(R.string.games_folders_nothing_new), Toast.LENGTH_LONG).show();
                 else if (t == GamesFolder.Trigger.ADDED && o.games == 0)
                     new PadFocus.Builder(this).setTitle(Tx.s(R.string.home_no_game_added)).setMessage(Tx.s(R.string.games_folders_no_game, trees == null || trees.isEmpty() ? "" : GamesFolders.name(trees.get(0))))
