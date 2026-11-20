@@ -78,6 +78,7 @@ Keyboard in a window: J K U I are A B X Y, WASD the left stick, Shift + arrows t
 - AV1 movies through SDK 22's decoder.
 - [The Joy-Con mouse pointer](../../../docs/reference/services.md#the-joy-con-mouse-pointer) and The display's largest buffer.
 - The output device notification under its SDK 21 and 22 name: an abort at start without it.
+- [The app closes at launch with an OutOfMemoryError in `Nx.open`](../../../docs/reference/packing.md#the-app-closes-at-launch-with-an-outofmemoryerror-in-nxopen-android-nx-games): its `.nx` holds the largest Manifest here, 30 MB (resolved).
 - [An SDK 21 Switch 2 game with a 4.5 GB alias region](../../../docs/reference/memory.md#an-sdk-21-switch-2-game-with-a-45-gb-alias-region): SDK 22's node area.
 - The title screen's hand-over to the opening demo finalizes a program its queue still has bound: Finalized programs leave every queue's bindings (resolved).
 - [The present's scaling of the window to the screen](../../../docs/reference/frame-rate.md#the-presents-scaling-of-the-window-to-the-screen-one-pass-or-the-displays-own-scaler): FSR 1 at the present on every image, generated frames included; the Screen scaling row (Bicubic, SGSR 1, Device).

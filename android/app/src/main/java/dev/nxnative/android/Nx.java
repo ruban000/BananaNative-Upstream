@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Semaphore;
 
 /**
  * An NX archive (.nx; android/NX.md; github.com/fab918/nxformat docs/SPEC.md, release 1.0.4, header versions (0,2) and (0,3)), read only, never written. A game's
@@ -48,6 +49,16 @@ final class Nx {
     static final long NONE = 0xFFFFFFFFL;
     static final int PAGE = 4096, HEADER = 256, CHECK = 16384;
     static final long MANIFEST_MAX = 256L << 20;   // this reader's own limit (SPEC 13 allows lower limits): the Manifest is read whole once, at open
+    /**
+     * Manifests read and checked at once, in MiB of Manifest: each is held whole while its archive is opened (30 MB for Fire Emblem Fortune's Weave, 25-26 MB
+     * for Mario Kart World and Ocarina of Time), and Home checks every card on a thread of its own while the games folders scan opens every .nx. Unbounded,
+     * a library of large Switch 2 games ran out of the launcher's 512 MB heap at start. A Manifest larger than the budget takes all of it
+     */
+    static final int MANIFEST_BUDGET_MIB = 64;
+    private static final Semaphore MANIFESTS = new Semaphore(MANIFEST_BUDGET_MIB, true);
+
+    /** The budget's permits an archive with this Manifest takes while it is opened */
+    static int manifestPermits(long size) { return (int) Math.max(1, Math.min(MANIFEST_BUDGET_MIB, (size + (1 << 20) - 1) >> 20)); }
     static final long BLOCKS_MAX = 1L << 26;
     static final long ICON_MAX = 8L << 20;
     private static final long NXSR = 0x00010008L;
@@ -282,31 +293,37 @@ final class Nx {
         byte[] cat = new byte[(int) s.catalogSize];
         r.read(s.catalogOff, cat, 0, cat.length);
         need(Arrays.equals(Nup.sha256().digest(cat), s.catalogSha), "the Catalog does not match its SHA-256");
-        byte[] man = new byte[(int) s.manifestSize];
-        r.read(s.manifestOff, man, 0, man.length);
-        need(Arrays.equals(Nup.sha256().digest(man), s.manifestSha), "the Manifest does not match its SHA-256");
-        MessageDigest ih = Nup.sha256();
-        hashRange(r, s.indexOff, s.blockCount * 24, ih);
-        hashRange(r, s.integrityOff, s.integritySize, ih);
-        need(Arrays.equals(ih.digest(), s.indexSha), "the block index does not match its SHA-256");
+        int permits = manifestPermits(s.manifestSize);
+        MANIFESTS.acquireUninterruptibly(permits);   // released when the Manifest is no longer needed: packages() is its last reader
+        try {
+            byte[] man = new byte[(int) s.manifestSize];
+            r.read(s.manifestOff, man, 0, man.length);
+            need(Arrays.equals(Nup.sha256().digest(man), s.manifestSha), "the Manifest does not match its SHA-256");
+            MessageDigest ih = Nup.sha256();
+            hashRange(r, s.indexOff, s.blockCount * 24, ih);
+            hashRange(r, s.integrityOff, s.integritySize, ih);
+            need(Arrays.equals(ih.digest(), s.indexSha), "the block index does not match its SHA-256");
 
-        Cat c = catalog(cat, s);
-        Man m = manifest(man, s.manifestSize);
-        int[] blockSize = blocks(r, s);
-        for (long fi = 0; fi < m.nf; fi++) {   // each file's blocks are its chunks: full ones, then the rest
-            int at = (int) (m.fileTab + 64 * fi);
-            long size = u64(man, at), first = u32(man, at + 8), cnt = u32(man, at + 12);
-            long chunk = 1L << u8(man, at + 16);
-            for (long j = 0; j < cnt; j++) {
-                long id = u32(man, (int) (m.refTab + 4 * (first + j)));
-                need(id < s.blockCount, "a block reference past the block index");
-                need(blockSize[(int) id] == Math.min(chunk, size - j * chunk), "file " + fi + ": block " + id + " is not of its chunk's size");
+            Cat c = catalog(cat, s);
+            Man m = manifest(man, s.manifestSize);
+            int[] blockSize = blocks(r, s);
+            for (long fi = 0; fi < m.nf; fi++) {   // each file's blocks are its chunks: full ones, then the rest
+                int at = (int) (m.fileTab + 64 * fi);
+                long size = u64(man, at), first = u32(man, at + 8), cnt = u32(man, at + 12);
+                long chunk = 1L << u8(man, at + 16);
+                for (long j = 0; j < cnt; j++) {
+                    long id = u32(man, (int) (m.refTab + 4 * (first + j)));
+                    need(id < s.blockCount, "a block reference past the block index");
+                    need(blockSize[(int) id] == Math.min(chunk, size - j * chunk), "file " + fi + ": block " + id + " is not of its chunk's size");
+                }
             }
+            for (int si = 0; si < c.ns; si++) need(c.root[si] < m.nd, "snapshot " + si + "'s root is not a directory of the Manifest");
+            int[] dirSeen = new int[(int) m.nd], fileSeen = new int[(int) m.nf];
+            for (int si = 0; si < c.ns; si++) walk(man, m, c.root[si], si, dirSeen, fileSeen);
+            return packages(r, name, s, cat, c, man, m);
+        } finally {
+            MANIFESTS.release(permits);
         }
-        for (int si = 0; si < c.ns; si++) need(c.root[si] < m.nd, "snapshot " + si + "'s root is not a directory of the Manifest");
-        int[] dirSeen = new int[(int) m.nd], fileSeen = new int[(int) m.nf];
-        for (int si = 0; si < c.ns; si++) walk(man, m, c.root[si], si, dirSeen, fileSeen);
-        return packages(r, name, s, cat, c, man, m);
     }
 
     private static void hashRange(Nup.Source r, long off, long n, MessageDigest h) throws IOException {

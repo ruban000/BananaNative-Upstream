@@ -13,6 +13,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -38,6 +39,8 @@ import java.util.regex.Pattern;
 final class Nup {
     static final int BASE = 0, UPDATE = 1, ADDON = 2;
     static final long NONE = 0xFFFFFFFFL;
+    /** The most Source.read asks of the channel at once (the size of the temporary direct buffer the JDK keeps per thread) */
+    static final int READ_CHUNK = 1 << 20;
     static final String EXT = ".nup";
     /** A plaintext NSP (NSP Box) is read as a NUP file too: {@link Nsp} makes its TOC, its files are extents of it */
     static final String EXT_NSP = ".nsp";
@@ -136,12 +139,20 @@ final class Nup {
 
         Source(FileChannel ch, long size, String key, Closeable owner) { this.ch = ch; this.size = size; this.key = key; this.owner = owner; }
 
-        /** n bytes at pos into b[off..], all of them (EOFException when the file ends first) */
+        /**
+         * n bytes at pos into b[off..], all of them (EOFException when the file ends first). Read READ_CHUNK bytes at a time: a FileChannel read into a heap
+         * buffer goes through a temporary direct buffer as large as the read, which the JDK then keeps cached on the calling thread, and on Android a direct
+         * buffer is Java heap. One read of an .nx's 30 MB Manifest (Fire Emblem Fortune's Weave) held 30 MB more on each thread that did it: Home's card checks
+         * and the games folders scan at start, several at once, ran out of the 512 MB heap
+         */
         void read(long pos, byte[] b, int off, int n) throws IOException {
-            ByteBuffer bb = ByteBuffer.wrap(b, off, n);
-            while (bb.hasRemaining()) {
-                int k = ch.read(bb, pos + (bb.position() - off));
-                if (k < 0) throw new EOFException("the file ends at byte " + (pos + bb.position() - off) + ", before byte " + (pos + n));
+            for (int done = 0; done < n; ) {
+                ByteBuffer bb = ByteBuffer.wrap(b, off + done, Math.min(READ_CHUNK, n - done));
+                while (bb.hasRemaining()) {
+                    int k = ch.read(bb, pos + (bb.position() - off));
+                    if (k < 0) throw new EOFException("the file ends at byte " + (pos + bb.position() - off) + ", before byte " + (pos + n));
+                }
+                done = bb.position() - off;
             }
         }
 
@@ -327,23 +338,42 @@ final class Nup {
     /** About what an opened file keeps in memory while cached (its packages and nodes' bookkeeping, plus an NSP's TOC or an .nx's Catalog) */
     long kept() { return 4096 + (synth != null ? synth.length : 0) + (nx != null ? nx.kept() : 0); }
 
-    /** The .nup checked (superblock, TOC SHA-256); cached by path (or picked document), size and time, so a card's checks do not hash the TOC again */
+    /** The lock of each file being opened now (by cache key): a second thread that opens the same file waits for the first one's result */
+    private static final Map<String, Object> opening = new HashMap<>();
+
+    /**
+     * The .nup checked (superblock, TOC SHA-256); cached by path (or picked document), size and time, so a card's checks do not hash the TOC again. Threads that
+     * open the same file at once read it once: the others wait and take the cached result (at start Home's check of a card and the games folders scan opened
+     * the same .nx together, each reading its whole Manifest)
+     */
     static Nup open(File f) throws IOException {
         Nup n;
         String key;
         try (Source src = source(f)) {
             key = f.getAbsolutePath() + "|" + src.key;
+            Object lock;
             synchronized (cache) {
                 n = cache.get(key);
                 if (n != null) return n;
+                lock = opening.computeIfAbsent(key, k -> new Object());
             }
-            n = read(f, src, true);
-        }
-        synchronized (cache) {
-            Nup was = cache.put(key, n);
-            if (was != null) cacheBytes -= was.kept();
-            cacheBytes += n.kept();
-            while ((cacheBytes > CACHE_BYTES || cache.size() > CACHE_MAX) && cache.size() > 1) cacheBytes -= cache.remove(cache.keySet().iterator().next()).kept();
+            synchronized (lock) {
+                try {
+                    synchronized (cache) {
+                        n = cache.get(key);
+                        if (n != null) return n;   // read by the thread this one waited for
+                    }
+                    n = read(f, src, true);
+                    synchronized (cache) {
+                        Nup was = cache.put(key, n);
+                        if (was != null) cacheBytes -= was.kept();
+                        cacheBytes += n.kept();
+                        while ((cacheBytes > CACHE_BYTES || cache.size() > CACHE_MAX) && cache.size() > 1) cacheBytes -= cache.remove(cache.keySet().iterator().next()).kept();
+                    }
+                } finally {
+                    synchronized (cache) { opening.remove(key, lock); }
+                }
+            }
         }
         return n;
     }

@@ -149,7 +149,48 @@ public final class NxJvmTest {
         picked(auto, d, t);
         programs(new File(t, "programs"));
         nca(d, new File(t, "nca"));
+        memory(auto, new File(t, "memory"));
         System.out.println("ok " + n);
+    }
+
+    // ---- Memory at open: chunked reads, one read of a file opened by several threads at once, the Manifest budget ----
+
+    static void memory(File nx, File t) throws Exception {
+        t.mkdirs();
+        // a read larger than READ_CHUNK, at an odd offset: the bytes as written, in chunks of at most READ_CHUNK (the temporary direct buffer the JDK keeps per thread)
+        byte[] want = new byte[2 * Nup.READ_CHUNK + 12345];
+        new java.util.Random(7).nextBytes(want);
+        File big = new File(t, "big.bin");
+        java.nio.file.Files.write(big.toPath(), want);
+        try (Nup.Source src = Nup.source(big)) {
+            byte[] got = new byte[want.length - 7 + 3];
+            src.read(7, got, 3, want.length - 7);
+            check(Arrays.equals(Arrays.copyOfRange(got, 3, got.length), Arrays.copyOfRange(want, 7, want.length)), "a read across several chunks reads the file's bytes");
+        }
+        // eight threads open one .nx not opened before: one result, the same object for all (the others waited for the first one's read)
+        File copy = new File(t, "fresh.nx");
+        java.nio.file.Files.copy(nx.toPath(), copy.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        int k = 8;
+        Nup[] got = new Nup[k];
+        Throwable[] err = new Throwable[1];
+        java.util.concurrent.CountDownLatch go = new java.util.concurrent.CountDownLatch(1);
+        Thread[] th = new Thread[k];
+        for (int i = 0; i < k; i++) {
+            int j = i;
+            th[i] = new Thread(() -> {
+                try { go.await(); got[j] = Nup.open(copy); } catch (Throwable e) { synchronized (err) { err[0] = e; } }
+            });
+            th[i].start();
+        }
+        go.countDown();
+        for (Thread x : th) x.join();
+        boolean same = err[0] == null && got[0] != null;
+        for (Nup x : got) same &= x == got[0];
+        check(same, "eight threads opening one .nx at once share one result" + (err[0] != null ? ": " + err[0] : ""));
+        check(Nup.open(copy) == got[0], "and it is the cached one afterwards");
+        // the Manifest budget: a small Manifest takes one MiB of it, a large one its size, one larger than the budget all of it
+        check(Nx.manifestPermits(96) == 1 && Nx.manifestPermits(30L << 20) == 30 && Nx.manifestPermits((30L << 20) + 1) == 31
+                && Nx.manifestPermits(300L << 20) == Nx.MANIFEST_BUDGET_MIB, "the Manifest budget's permits");
     }
 
     // ---- A real archive (read only; dm/tools/tests/test_android_nx.py runs it when NX_TEST_DKB_NX names one) ----
