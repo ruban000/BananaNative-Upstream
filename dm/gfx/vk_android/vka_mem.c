@@ -824,6 +824,24 @@ uint64_t vka_addr_run(uint64_t addr, uint64_t len, VkBuffer *buf, VkDeviceSize *
     return n;
 }
 
+uint64_t nvn_sparse_run(uint64_t addr, uint64_t len, uint64_t *physical);
+uint64_t vka_gpu_addr_run(uint64_t addr, uint64_t len, VkBuffer *buf, VkDeviceSize *off) {
+    uint64_t run = vka_addr_run(addr, len, buf, off);
+    if (run || !len) return run;
+    uint64_t physical;
+    uint64_t mapped = nvn_sparse_run(addr, len, &physical);
+    if (!mapped) return 0;
+    mtl_pool_need((const void *)(uintptr_t)physical, mapped, "a buffer in an NVN virtual pool");
+    run = vka_addr_run(physical, mapped, buf, off);
+    static _Atomic int logged;
+    if (!atomic_exchange(&logged, 1)) VLOG("virtual pool buffer %#llx resolves to %#llx (%llu of %llu bytes placed)",
+                                           (unsigned long long)addr, (unsigned long long)physical, (unsigned long long)run, (unsigned long long)mapped);
+    return run;
+}
+int vka_gpu_addr(uint64_t addr, uint64_t len, VkBuffer *buf, VkDeviceSize *off) {
+    return len != 0 && vka_gpu_addr_run(addr, len, buf, off) == len;
+}
+
 // Raw global memory's sink (dmsh_abi.h DMSH_GMEM_MAP_*, entry 0's words 6 and 7; vk_android_spv.py gmem_sink): the device address of a buffer of its own that the library's
 // branchless helpers load from and store to when an address lies in no pool, so such an access touches no guest memory (the translator's helpers skipped it in a branch).
 // The buffer is 16 KiB, the sink the 8 KiB-aligned address in it. Made once; 0 without buffer device addresses or when it could not be made (logged)

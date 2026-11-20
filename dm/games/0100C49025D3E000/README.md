@@ -52,6 +52,8 @@ On the Mac (2026-10-29): the accessibility settings, the EA SPORTS and FC 27 log
 
 General changes first needed here; each applies to every game on the same path:
 
+- **Resolved on Android: a black or incomplete pitch in a match** (1.8d.6523, AYN Thor, Turnip v26.2.0 R5; found and measured in Peanuts Native, not run here): the vertex, index and storage buffers are in a sparse pool → [Sparse pool buffers on the Vulkan replay](../../../docs/reference/nvn-objects.md#sparse-pool-buffers-on-the-vulkan-replay). With the fix the Classic Match drew at 59.8–59.9 fps.
+
 - **Resolved: a second controller ended the game** (1.8d.6523, two DualSense controllers; PR #1129, not run here): the game passes `account::GetUserId` a handle it built itself → [`account::GetUserId` copies the Uid of any handle](../../../docs/reference/services.md#accountgetuserid-copies-the-uid-of-any-handle).
 - **Resolved: a text longer than a branch reaches** (185.6 MB): the rewriter splits the patch area in two → [Two patch areas for a text longer than a branch reaches](../../../docs/reference/rewriter.md#two-patch-areas-for-a-text-longer-than-a-branch-reaches).
 - **Resolved: no shader container found** → [CompiledBytecode resources in Frostbite superbundles](../../../docs/reference/shaders.md#compiledbytecode-resources-in-frostbite-superbundles) (`dm/gfx/tools/frostbite.py`).

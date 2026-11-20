@@ -3343,6 +3343,30 @@ static struct vpool *vpool_at(const void *pool, uint64_t a) {   // caller holds 
 }
 int nvn_sparse_pool(const void *pool) { return pool && ((const pool_t *)pool)->vp; }   // no lock: set at Initialize, cleared at the first mapping (an aliased pool) or Finalize; called per texture lookup
 uint64_t nvn_sparse_gen(void) { return atomic_load(&g_vp_gen); }
+// Resolve one contiguous physical range for a Vulkan buffer binding. A hole or a different
+// physical run ends the binding, since one VkBuffer cannot span both.
+uint64_t nvn_sparse_run(uint64_t a, uint64_t n, uint64_t *physical) {
+    pthread_mutex_lock(&g_vp_mu);
+    struct vpool *v = vpool_at(NULL, a);
+    uint64_t run = 0;
+    if (v) {
+        uint64_t offset = a - (uint64_t)(uintptr_t)v->base;
+        uint64_t limit = v->size - offset;
+        if (n > limit) n = limit;
+        while (run < n) {
+            uint64_t page_off = (offset + run) & 0xfff;
+            const vpte *entry = vpt_get(v, offset + run);
+            if (!entry || !entry->phys) break;
+            uint64_t ptr = (uint64_t)(uintptr_t)entry->phys + page_off;
+            if (!run) *physical = ptr;
+            else if (ptr != *physical + run) break;
+            uint64_t bytes = 0x1000 - page_off;
+            run += bytes < n - run ? bytes : n - run;
+        }
+    }
+    pthread_mutex_unlock(&g_vp_mu);
+    return run;
+}
 uint64_t nvn_sparse_copy(const void *pool, void *dst, uint64_t a, uint64_t n) {
     pthread_mutex_lock(&g_vp_mu); struct vpool *v = vpool_at(pool, a); uint64_t miss = 0;
     if (!v) { pthread_mutex_unlock(&g_vp_mu); memset(dst, 0, n); return n; }
