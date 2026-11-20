@@ -932,6 +932,7 @@ One line per symptom in the [subsystem references](../reference/): what you see 
 - on the aarch64 Linux host under Steam's Game Mode (Gamescope), on Turnip (Adreno 740, Mesa 26.2.7, AYN Odin 2 Pro, 12 GB RAM), the game ends within seconds of its first frames: the kernel log has `a6xx_irq` `gpu fault` and `hangcheck recover` with the task `vk-present`, at the 15th present, once followed by a reboot of the device; or the replay's encoder thread (`vk-enc`) hangs inside the driver and the picture stops. → [Present times through Gamescope's layer fault the GPU (Linux)](../reference/rendering.md#present-times-through-gamescopes-layer-fault-the-gpu-linux)
 - `[RED] BindVertexAttribState n=32` (logged 11,786 times in 50 s) and a black frame on Android. → [NVN2 draws with 32 vertex attributes (Android)](../reference/rendering.md#nvn2-draws-with-32-vertex-attributes-android)
 - `an indirect draw of quads or a line loop is not on Vulkan yet: skipped` in Android logs, leaving geometry drawn with non-indexed `nvnCommandBufferDrawArraysIndirect` (`NVN_DRAW_PRIMITIVE_QUADS`) missing. → [Non-indexed indirect quad draws skipped on the Vulkan replay (Android)](../reference/rendering.md#non-indexed-indirect-quad-draws-skipped-on-the-vulkan-replay-android)
+- (Android, Turnip) pond water appears black while the surrounding terrain, floating plants and reflections still draw. → [Precision of fragment depth used by an equal-depth lighting pass](../reference/rendering.md#precision-of-fragment-depth-used-by-an-equal-depth-lighting-pass)
 
 ## Shaders
 

@@ -46,3 +46,6 @@ uint32_t *vka_spv_pool_fb(const uint32_t *w, size_t nw, uint32_t set, uint32_t t
 // L < 16 moves to nibble L of map, or with nibble 0xf becomes a Private (0, 0, 0, 1). A malloc'd copy (*out_nw words; *moved / *consts the original locations of each kind);
 // NULL with err empty when nothing changes, NULL with the reason in err when it cannot be made
 uint32_t *vka_spv_input_remap(const uint32_t *w, size_t nw, uint64_t map, size_t *out_nw, uint32_t *moved, uint32_t *consts, char *err, size_t errn);
+
+// preserve the rounding of arithmetic feeding a translated FragDepth store. NULL if no decorations are needed.
+uint32_t *vka_spv_precise_depth(const uint32_t *words, size_t count, size_t *out_count);

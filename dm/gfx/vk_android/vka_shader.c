@@ -412,6 +412,11 @@ static void gs_fill(uint64_t key, int stage, uint32_t **w, size_t *nb) {
 }
 // The library's words for a module, made ready for this device: subgroups of one lane where the stage has none (single_lane), a geometry shader's empty runs filled (gs_fill)
 static void prep_words(const dmsh_vk_entry *e, uint64_t key, uint32_t **w, size_t *nb) {
+    if (e->stage == DMSH_VK_STAGE_FS) {   // a pixel shader's arithmetic into FragDepth keeps its rounding (vka_spv_precise_depth); done here, so libraries already on the phone get it too
+        size_t count = 0;
+        uint32_t *precise = vka_spv_precise_depth(*w, *nb / sizeof **w, &count);
+        if (precise) { free(*w); *w = precise; *nb = count * sizeof **w; }
+    }
     if (e->flags & DMSH_VK_F_SUBGROUP) single_lane(key, e->stage, w, nb);
     gs_fill(key, e->stage, w, nb);
 }

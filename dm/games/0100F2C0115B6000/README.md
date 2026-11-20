@@ -81,6 +81,7 @@ Game-specific findings. The general host changes they led to are listed under [F
 
 ## Found on this game
 
+- **Resolved on Android: black pond water on Turnip** (found and checked in Peanuts Native, not run here): on 1.4.3 the Great Sky Island pond regained its blue-green water and reflections with [precise fragment depth for lighting](../../../docs/reference/rendering.md#precision-of-fragment-depth-used-by-an-equal-depth-lighting-pass). The live trace showed the water material drawing and the half-resolution classifiers `5218c5e5e3c80255` and `b117e55c979c3620` writing a D16 target before the equal-depth passes.
 - [Benchmark captures perturb the measured frame pacing](../../../docs/reference/frame-rate.md#benchmark-captures-perturb-the-measured-frame-pacing).
 - [Unmapped guest memory stays resident](../../../docs/reference/memory.md#unmapped-guest-memory-stays-resident).
 - **Resolved in the host (#613): `nn::diag` abort at `sdk+0x13ce58` after about 15 minutes**, the amiibo poll waiting on an event the game never attached: [The amiibo library's state before Initialize](../../../docs/reference/services.md#the-amiibo-librarys-state-before-initialize). Found by disassembly; the abort itself was not reproduced here.
