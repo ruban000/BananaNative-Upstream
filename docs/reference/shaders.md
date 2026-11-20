@@ -425,6 +425,13 @@ Finding, keying and translating shaders (`dm/gfx/tools/shader_split.py`, `dmsh_b
 - **Fix:** shared and local memory arrays get a type of their own (`CodeGen/Spirv/Declarations.cs` `DeclareMemories`, `TypeArray(…, forceIdAllocation: true)`).
 - **Found on:** [Orbitals](../../dm/games/040032B023CA4000/README.md): 24 compute shaders.
 
+### A movie pak is mistaken for an Unreal shader archive
+
+- **Symptom:** shader splitting stops with `there are no decoded shader code archives` even though the game's global shaders and material shaders are inline.
+- **Cause:** `uepak.inline_shaders` classified every readable nonempty pak without inline shaders as a shader archive. Movie and other asset paks therefore triggered a decode step with no shader archives to decode.
+- **Fix:** general, `uepak.py` `inline_shaders` answers None for a pak that names no shader archive, cooked export or global shader cache (a movie or other asset pak), so it counts as neither kind. `shader_split.py` and the survey (`profile_guess.py`) also look for shader libraries in IoStore containers (`io_shader_tocs`), so a library beside such a pak is still found. Test: `test_uepak_iostore.py` (a movie pak, a cooked pak, an archive pak).
+- **Found on:** Demon Slayer: The Hinokami Chronicles 2 (`0100AD80208A8000`) 1.80, in Peanuts Native (no profile here).
+
 ### IoStore patch containers keep their shader groups in the base container
 
 - **Symptom:** `ValueError: …/Glow-Switch_0_P.utoc: shader group 0 has no chunk` from `uepak.py io_archive` while the NSP script decodes the shaders (`decode_ue_shaders`, after `[4/8] UE shader decode`).

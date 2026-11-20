@@ -3794,7 +3794,8 @@ def main():
         # Unreal Engine shader code archives decoded on the Mac (uepak.py): <version dir>/ue_shaders, or DM_UE_SHADERS; needed when the RomFS has Unreal paks
         ued = os.environ.get('DM_UE_SHADERS') or os.path.join(os.path.dirname(os.path.abspath(romfs)), 'ue_shaders')
         names = sorted(f for f in os.listdir(ued) if f.endswith('.ushaderbytecode') and not f.startswith('._')) if os.path.isdir(ued) else []   # AppleDouble metadata, not decoded shader archives
-        if not names and uepak.unreal_paks(romfs, inline=False, mains=[mainnso]): red(f'the RomFS has Unreal paks, but there are no decoded shader code archives in {ued} (the NSP script writes them)')
+        # the archives themselves: a pak of movies or other assets needs none, and IoStore can hold a shader library beside such a pak (uepak.io_shader_tocs)
+        if not names and (uepak.unreal_paks(romfs, inline=False, mains=[mainnso]) or uepak.io_shader_tocs(romfs)): red(f'the RomFS has Unreal shader archives, but there are no decoded shader code archives in {ued} (the NSP script writes them)')
         for nm in names: found += ue_shaders(open(os.path.join(ued, nm), 'rb').read(), f'/ue_shaders/{nm}')
         results.append(('main', last_entries(found), var_pairs(found), {}))
     for romfs in dlc_v:
