@@ -62,6 +62,7 @@ The game builds Mii heads from the console's MiiModel system data, starting at b
 
 ## Found on this game
 
+- [Other versions' pixel shaders return during Android translation](../../../docs/reference/shaders.md#other-versions-pixel-shaders-return-during-android-translation): Prepare stopped at 18 % on a one-version dump.
 - **Display sleep during controller play on the Mac (resolved, player-confirmed):** [Mac display sleep during controller play](../../../docs/reference/services.md#mac-display-sleep-during-controller-play).
 - **Resolved in the sanitizer audit:** [Unaligned command headers during layout probing](../../../docs/reference/audio.md#unaligned-command-headers-during-layout-probing), reproduced with the SDK 4 command-list fixture.
 

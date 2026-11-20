@@ -771,6 +771,12 @@ def pack_shaders(a, g, work, out, vdir, parts=None, aoc=()):
             if keys is not None: keys = [k for k in keys if k not in absent]
         # The selection file is this build's own (a folder of its own, removed after the child): two builds of one game at once (sibling caches) overwrote a shared keys.txt
         with tempfile.TemporaryDirectory(prefix='selection-', dir=swork) as selection_dir:
+            env.pop('DMSH_VK_ABSENT_FILE', None)
+            if absent:
+                excluded = Path(selection_dir) / 'absent.tsv'
+                write_lf(excluded, ''.join(k + '\n' for k in sorted(absent)))
+                env['DMSH_VK_ABSENT_FILE'] = str(excluded)
+                print(f'shaders: excluding {len(absent):,} validated missing shaders from this build', flush=True)
             args = []
             if keys:   # on Windows a file the wrapper reads (vk_android_win.py "@<file>"): thousands of keys pass a command line's 32,767 characters there
                 if WINDOWS:
