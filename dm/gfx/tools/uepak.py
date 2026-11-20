@@ -409,17 +409,28 @@ def archive(b, what='shader code archive') -> dict:
     indices = list(r.array('I', r.take('<I')))
     return dict(maps=maps, shaders=shaders, indices=indices, code=r.o)
 
-def decoded_archive(b, raws):
-    """The archive with every shader replaced by its decoded bytes (raws, in entry order): the same tables, each entry's size = its raw size, the code laid out again
-    (the preload entries keep their old file ranges; only the shader tools read these copies)"""
-    a = archive(b); r = R(b, what='shader code archive'); r.take('<I')
+# A decoded archive can pass 1.5 GB: its tables and shaders are written to the file as they come, never held whole
+def write_decoded_archive(out, b, a, raws):
+    """Keep the archive tables and serialize shader records in entry order with their uncompressed offsets and sizes."""
+    r = R(b, what='shader code archive'); r.take('<I')
     for elem in (20, 20, 16): r.raw(elem * r.take('<I'))
-    head, ents_at = b[:r.o + 4], r.o + 4; n = len(a['shaders']); tail_at = ents_at + 17 * n
-    ents, off = bytearray(), 0
-    for (_, _, raw, fr), d in zip(a['shaders'], raws):
+    ents_at = r.o + 4
+    out.write(b[:ents_at])
+    entries = bytearray(); off = 0
+    for _, _, raw, fr in a['shaders']:
+        entries.extend(struct.pack('<QIIB', off, raw, raw, fr)); off += raw
+    out.write(entries)
+    out.write(b[ents_at + len(entries):a['code']])
+    for (_, _, raw, _), d in zip(a['shaders'], raws):
         if len(d) != raw: raise ValueError(f'decoded shader of {len(d)} bytes, the archive says {raw}')
-        ents += struct.pack('<QIIB', off, raw, raw, fr); off += raw
-    return head + bytes(ents) + b[tail_at:a['code']] + b''.join(raws)
+        out.write(d)
+
+def decoded_archive(b, raws):
+    """The in-memory form used by callers that need the bytes."""
+    import io
+    out = io.BytesIO()
+    write_decoded_archive(out, b, archive(b), raws)
+    return out.getvalue()
 
 LZ4_RATIO = 255   # the most an LZ4 block expands: a match-length byte of 255 adds 255 output bytes for one input byte, every other part of a sequence less
 def lz4_raw(b, k, where):
@@ -427,20 +438,25 @@ def lz4_raw(b, k, where):
     if k > LZ4_RATIO * len(b): raise ValueError(f'{where}: an LZ4 block of {len(b):#x} bytes cannot hold {k:#x}')
     return k
 
-def lz4_shaders(b, a):
-    """Every shader of an archive decoded as an LZ4 block (Unreal Engine 4.26 and later compress shaders with LZ4 unless the project picks another format: DRAGON QUEST VII Reimagined's
-    64,949), or None when one of the compressed ones is no LZ4 block that decodes to its raw size as an LSLG record (Octopath Traveler 0's Oodle: the game's own decoder is needed)"""
+# LZ4 shaders are decoded one at a time (lz4_records); a block that is not LZ4 raises NotLz4, and the archive goes to the Oodle job instead
+class NotLz4(ValueError): pass
+
+def lz4_records(b, a):
     import lz4.block
-    out = []
     for off, size, raw, _ in a['shaders']:
         c = b[a['code'] + off:a['code'] + off + size]
-        if size == raw: out.append(c); continue
-        if raw > LZ4_RATIO * len(c): return None   # more than an LZ4 block of this size can hold
+        if size == raw:
+            yield c
+            continue
+        if raw > LZ4_RATIO * len(c): raise NotLz4()
         try: d = lz4.block.decompress(c, uncompressed_size=raw)
-        except Exception: return None
-        if len(d) != raw or d[:4] != b'LSLG': return None
-        out.append(d)
-    return out
+        except lz4.block.LZ4BlockError as e: raise NotLz4() from e
+        if len(d) != raw or d[:4] != b'LSLG': raise NotLz4()
+        yield d
+
+def lz4_shaders(b, a):
+    try: return list(lz4_records(b, a))
+    except NotLz4: return None
 
 TOC_MAGIC, IO_SHADER_LIBRARY, IO_SHADER_CODE = b'-==--==--==--==-', 8, 9   # EIoChunkType in Unreal Engine 5 (TOC version 4 and later; 4.27 numbers its chunk types otherwise)
 IO_EXPORT_BUNDLE, IO_EXPORT_BUNDLE_427 = 1, 2   # a cooked package's exports: EIoChunkType in Unreal Engine 5 (TOC version 4 and later), in Unreal Engine 4.27 (TOC version 3)
@@ -672,10 +688,16 @@ def job(romfs, main_nso, work, decode=None):
         for path in sorted(x for x in p.files if x.endswith('.ushaderbytecode')):
             b = p.read(path); a = archive(b, f'{pak}: {path}'); name = os.path.basename(path)
             comp = [i for i, (_, size, raw, _) in enumerate(a['shaders']) if size != raw]
-            raws = lz4_shaders(b, a)
-            if comp and raws: b = decoded_archive(b, raws); comp, how = [], 'LZ4'   # decoded here: the Oodle job gets none of them
-            else: how = 'Oodle' if comp else ''
-            open(os.path.join(work, 'archives', name), 'wb').write(b)
+            # the work file is the job's own until finish: a block that is not LZ4 replaces the partly written decode with the archive as it is
+            target = os.path.join(work, 'archives', name)
+            how = 'Oodle' if comp else ''
+            if comp:
+                try:
+                    with open(target, 'wb') as f: write_decoded_archive(f, b, a, lz4_records(b, a))
+                    comp, how = [], 'LZ4'
+                except NotLz4: pass
+            if how != 'LZ4':
+                with open(target, 'wb') as f: f.write(b)
             for i in comp:
                 off, size, raw, _ = a['shaders'][i]; recs.append((name, i, b[a['code'] + off:a['code'] + off + size], raw))
             listing.append(dict(name=name, pak=os.path.relpath(pak, romfs), path=path, shaders=len(a['shaders']), compressed=len(comp), compression=how))
@@ -698,9 +720,18 @@ def finish(work, out):
         dec[(name, i)] = b[o:o + l]; o += l
     os.makedirs(out, exist_ok=True)
     for x in meta['archives']:
-        src = open(os.path.join(work, 'archives', x['name']), 'rb').read(); a = archive(src, x['name'])
-        raws = [dec.get((x['name'], i)) or src[a['code'] + off:a['code'] + off + size] for i, (off, size, _, _) in enumerate(a['shaders'])]
-        tmp = os.path.join(out, x['name'] + '.partial'); open(tmp, 'wb').write(decoded_archive(src, raws)); os.replace(tmp, os.path.join(out, x['name']))
+        # LZ4 and IoStore archives were written decoded by the job: copied as they are
+        source = os.path.join(work, 'archives', x['name'])
+        tmp = os.path.join(out, x['name'] + '.partial')
+        if x.get('compression') in ('LZ4', 'IoStore, decoded'):
+            import shutil
+            shutil.copyfile(source, tmp)
+        else:
+            with open(source, 'rb') as f: src = f.read()
+            a = archive(src, x['name'])
+            raws = (dec.get((x['name'], i)) or src[a['code'] + off:a['code'] + off + size] for i, (off, size, _, _) in enumerate(a['shaders']))
+            with open(tmp, 'wb') as f: write_decoded_archive(f, src, a, raws)
+        os.replace(tmp, os.path.join(out, x['name']))
     return [x['name'] for x in meta['archives']]
 
 def lslg(s):
