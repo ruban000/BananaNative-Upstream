@@ -761,6 +761,7 @@ DM_VK_TEX_STATS_DRAWS	developer	Diagnostics			text			both
 DM_VK_TEX_STATS_LINES	developer	Diagnostics			text			both							
 DM_VK_TEX_STATS_TABLE	developer	Diagnostics			text			both							
 DM_VK_TEX_TRACK	developer	Diagnostics			text			both							
+DM_VK_TILED_WB	developer	Diagnostics			text			both							
 DM_VK_TL_HOST	developer	Graphics			text			both							
 DM_VK_TL_POLL	developer	Diagnostics			text			both							
 DM_VK_TSCAL	developer	Diagnostics			text			both							

@@ -615,7 +615,7 @@ static int rp_begin(const p_set_rt *rt, int has_rt, const p_scissor *sc, int has
         uint32_t lw = im->w >> lv ? im->w >> lv : 1, lh = im->h >> lv ? im->h >> lv : 1;
         R.cnl[i] = nl; R.cext[i] = (VkExtent2D){lw, lh};
         if (lw < w) w = lw; if (lh < h) h = lh; if (nl < layers) layers = nl;
-        vka_img_written(im);
+        vka_img_color_written(im, lv);   // (the level: a block-linear texture's rendered mips are written back into its storage, vka_tex.c)
     }
     R.ncolor = (uint32_t)n;
     VkRenderingAttachmentInfo *dp = NULL, *sp = NULL;
