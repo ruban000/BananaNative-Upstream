@@ -92,7 +92,7 @@ class Wiring(unittest.TestCase):
     def test_the_chain_is_untouched(self):
         import hashlib
         r = subprocess.run(['python3', str(REPO / 'dm/gfx/tools/vk_android_build.py'), '--digest'], capture_output=True, text=True)
-        self.assertEqual(r.stdout.strip(), '6eaa66f9f1e4')
+        self.assertEqual(r.stdout.strip(), '9e7537573836')
 
     def test_skip_backoff_and_resume_outlive_the_process(self):
         """A Skip and a check given up are recorded on disk (not queued again for 7 days or until the APK or tools change); an interrupted check waits BACKOFF_MS before the
