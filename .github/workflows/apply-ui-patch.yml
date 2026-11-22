@@ -46,22 +46,51 @@ jobs:
           starts = list(re.finditer(r"^From [0-9a-f]{40} ", source, re.M))
           if len(starts) != 94:
               raise SystemExit(f"Expected 94 patches, found {len(starts)}")
-          patches = [
-              source[m.start():(starts[i + 1].start() if i + 1 < len(starts) else len(source))]
-              for i, m in enumerate(starts)
-          ]
-          # Patch 1 only changes wording in a legacy hard-coded label. Upstream
-          # uses a localized string resource, so that tiny wording patch cannot
-          # apply verbatim; the substantive UI changes follow in later patches.
-          Path("/tmp/ui-series.mbox").write_text("".join(patches[1:]))
+
+          selected = []
+          allowed_prefixes = (
+              "android/app/src/",
+              "dm/host/android/",
+          )
+          excluded = {
+              "android/app/build.gradle",
+          }
+
+          for i, match in enumerate(starts):
+              patch = source[match.start():(starts[i + 1].start() if i + 1 < len(starts) else len(source))]
+              subject = re.search(r"^Subject: (.*)$", patch, re.M)
+              if i == 0:  # Legacy wording-only patch conflicts with upstream's localized label.
+                  continue
+
+              diff_start = patch.find("\\ndiff --git ")
+              if diff_start < 0:
+                  continue
+              header, diff_text = patch[:diff_start], patch[diff_start:]
+              blocks = re.split(r"(?=^diff --git )", diff_text, flags=re.M)
+              kept = []
+              for block in blocks:
+                  path_match = re.match(r"diff --git a/(.*?) b/", block)
+                  if not path_match:
+                      continue
+                  path = path_match.group(1)
+                  if path in excluded or not path.startswith(allowed_prefixes):
+                      continue
+                  kept.append(block)
+              if kept:
+                  selected.append(header + "\\n" + "".join(kept))
+
+          if not selected:
+              raise SystemExit("No Android UI or touch-input patches were selected")
+          Path("/tmp/ui-series.mbox").write_text("".join(selected))
+          print(f"Selected {len(selected)} UI/touch patches from the 94-patch bundle")
           PY
 
           if ! git am --3way /tmp/ui-series.mbox; then
             git am --abort || true
-            echo "::error::Patch series could not be applied cleanly. No patch commits were pushed."
+            echo "::error::A selected UI/touch patch conflicts with upstream. No patch commits were pushed."
             exit 1
           fi
 
-          git rm -- "$PATCH_FILE"
+          git rm -- "$PATCH_FILE" .github/workflows/apply-ui-patch.yml
           git commit -m "Remove uploaded UI patch bundle"
           git push origin HEAD:apply/application-ui-next
