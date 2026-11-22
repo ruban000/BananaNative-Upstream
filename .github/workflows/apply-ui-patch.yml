@@ -1,0 +1,49 @@
+name: Apply BananaNative UI patch series
+
+on:
+  push:
+    branches:
+      - apply/application-ui-next
+    paths:
+      - android...feature_application-ui-next.txt
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-ui-patch-{{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply-patch-series:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out target branch
+        uses: actions/checkout@v4
+        with:
+          ref: apply/application-ui-next
+          fetch-depth: 0
+
+      - name: Apply the 94-commit patch series
+        shell: bash
+        run: |
+          set -euo pipefail
+          PATCH_FILE="android...feature_application-ui-next.txt"
+
+          if [[ ! -s "$PATCH_FILE" ]]; then
+            echo "::error::Patch file is missing or empty: $PATCH_FILE"
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if ! git am --3way "$PATCH_FILE"; then
+            git am --abort || true
+            echo "::error::Patch series could not be applied cleanly. No patch commits were pushed."
+            exit 1
+          fi
+
+          git rm -- "$PATCH_FILE"
+          git commit -m "Remove uploaded UI patch bundle"
+          git push origin HEAD:apply/application-ui-next
