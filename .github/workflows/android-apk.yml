@@ -29,6 +29,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'apply/application-ui-next') }}
     name: Build arm64 Android APK
     runs-on: ubuntu-24.04
     timeout-minutes: 180
