@@ -6,6 +6,7 @@ on:
       - apply/application-ui-next
     paths:
       - android...feature_application-ui-next.txt
+      - .github/workflows/apply-ui-patch.yml
 
 permissions:
   contents: write
@@ -54,6 +55,7 @@ jobs:
           )
           excluded = {
               "android/app/build.gradle",
+              "android/app/src/main/java/dev/nxnative/android/SidePanel.java",
           }
 
           for i, match in enumerate(starts):
