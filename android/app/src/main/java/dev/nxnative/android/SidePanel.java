@@ -1373,16 +1373,72 @@ final class SidePanel extends FrameLayout {
         frame(now);
     }
 
+    /** A restrained PS5-style focus rim with a soft glass sheen travelling top to bottom. */
+    private final class GlassFocusDrawable extends android.graphics.drawable.Drawable {
+        private final android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final float radius, stroke;
+        private final android.graphics.Matrix matrix = new android.graphics.Matrix();
+        private android.graphics.LinearGradient sheen;
+        private final android.animation.ValueAnimator animator;
+        private float progress;
+
+        GlassFocusDrawable(float radius, float stroke) {
+            this.radius = radius;
+            this.stroke = stroke;
+            animator = android.animation.ValueAnimator.ofFloat(0f, 1f);
+            animator.setDuration(2300);
+            animator.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+            animator.addUpdateListener(a -> {
+                progress = (Float) a.getAnimatedValue();
+                invalidateSelf();
+            });
+            animator.start();
+        }
+
+        @Override protected void onBoundsChange(android.graphics.Rect bounds) {
+            float h = Math.max(1, bounds.height());
+            sheen = new android.graphics.LinearGradient(0, -h, 0, h,
+                    new int[] {0x00FFFFFF, 0x55FFFFFF, 0x00FFFFFF},
+                    new float[] {0f, 0.5f, 1f}, android.graphics.Shader.TileMode.CLAMP);
+        }
+
+        @Override public void draw(android.graphics.Canvas canvas) {
+            android.graphics.Rect b = getBounds();
+            if (b.isEmpty()) return;
+            android.graphics.RectF r = new android.graphics.RectF(b.left + stroke, b.top + stroke,
+                    b.right - stroke, b.bottom - stroke);
+            int save = canvas.save();
+            canvas.clipRoundRect(r, radius, radius);
+            paint.setShader(null);
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setColor(0x0DFFFFFF);
+            canvas.drawRoundRect(r, radius, radius, paint);
+            if (sheen != null) {
+                float y = (progress * 2f - 1f) * b.height();
+                matrix.setTranslate(0, y);
+                sheen.setLocalMatrix(matrix);
+                paint.setShader(sheen);
+                canvas.drawRoundRect(r, radius, radius, paint);
+                paint.setShader(null);
+            }
+            canvas.restoreToCount(save);
+            paint.setStyle(android.graphics.Paint.Style.STROKE);
+            paint.setStrokeWidth(stroke);
+            paint.setColor(0xDDEAF4FF);
+            canvas.drawRoundRect(r, radius, radius, paint);
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+        }
+
+        @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); invalidateSelf(); }
+        @Override public void setColorFilter(android.graphics.ColorFilter filter) { paint.setColorFilter(filter); invalidateSelf(); }
+        @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
+    }
+
     private void frame(View now) {
         if (lit != null && lit != now) lit.setForeground(null);
         float dp = getResources().getDisplayMetrics().density;
-        boolean adj = now == adjusting;
-        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
-        d.setColor(adj ? 0x55FFD54F : 0x26FFD54F);
-        d.setStroke(Math.round((adj ? 4f : 2.5f) * dp), FOCUS);
-        d.setCornerRadius(FRAME_RADIUS_DP * dp);
-        now.setDefaultFocusHighlightEnabled(false);   // Android's own (square) focus highlight would show past the frame's corners
-        now.setForeground(d);
+        now.setDefaultFocusHighlightEnabled(false);   // Android's own square highlight extends past rounded corners
+        now.setForeground(new GlassFocusDrawable(FRAME_RADIUS_DP * dp, 2f * dp));
         lit = now;
     }
 
