@@ -1,4 +1,5 @@
 name: Integrate UI branch into upstream staging
+# Re-run integration when this workflow definition changes.
 
 on:
   push:
