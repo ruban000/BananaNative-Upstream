@@ -56,10 +56,12 @@ void nxin_stick(float x, float y, float deadzone, int32_t *ox, int32_t *oy);   /
 enum { NXT_BUTTON = 0, NXT_STICK = 1, NXT_DPAD = 2 };
 #define NXT_MAX 24
 typedef struct { int kind; uint64_t buttons; int stick; float x, y, r; char label[8]; } nxhost_touch_control;   // stick: 0 left, 1 right (NXT_STICK only)
-typedef struct { int id, ctl, slot; float x, y; } nxin_pointer;   // ctl: control index, or -1 for a touchscreen finger in slot (dm_touch id), -2 for a touch outside both
+typedef struct { int id, ctl, slot; float x, y, origin_x, origin_y; } nxin_pointer;   // ctl: control index, or -1 for a touchscreen finger in slot (dm_touch id), -2 for a touch outside both
 typedef struct {
     nxhost_touch_control c[NXT_MAX]; int n;
     int enabled;                    // 0: the controls are hidden and every touch goes to the game's touchscreen
+    int dual_stick;                 // 1: unclaimed left/right screen touches become invisible, floating-origin sticks
+    float right_sensitivity;        // right-side swipe response, default 24
     float sw, sh;                   // screen size in pixels (aspect for hit tests; any unit)
     float gx, gy, gw, gh;           // the game's picture inside the screen, normalized
     nxin_pointer p[16]; int np;

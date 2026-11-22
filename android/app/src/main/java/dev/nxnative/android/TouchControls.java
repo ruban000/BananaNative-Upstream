@@ -3,6 +3,8 @@ package dev.nxnative.android;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
@@ -17,6 +19,9 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Button;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 
 import java.util.Arrays;
 
@@ -48,6 +53,10 @@ final class TouchControls extends View {
     private int mode = MODE_AUTO;   // the "On-screen controls" setting (setMode)
     private float opacity, scale;
     private boolean haptics;
+    private boolean dualStick;   // one setting: invisible floating-origin left and right sticks
+    private boolean coordinateGrid;   // display-only 20x20 coordinate grid for precise control placement
+    private int rightSwipeSensitivity;   // user-facing right-side swipe sensitivity (1..10)
+    private static int nativeRightSwipeSensitivity(int level) { return 130 + Math.round((Math.max(1, Math.min(10, level)) - 1) * (110.0f / 9.0f)); }
 
     // The layout in pixels, as the host has it
     private int n;
@@ -93,19 +102,38 @@ final class TouchControls extends View {
     private final long[] pressed = new long[MAX], prev = new long[MAX];
     private final float[] sticks = new float[4];
     private int toggleId = -1;
-    private boolean toggleLong;
+    private boolean toggleLong, toggleGesture;
     private final Runnable longPress = () -> { toggleLong = true; performHapticFeedback(HapticFeedbackConstants.LONG_PRESS); settings(); };
 
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG), line = new Paint(Paint.ANTI_ALIAS_FLAG), text = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+    // The artwork replaces only the eight matching button faces; their existing layout and hit targets stay unchanged.
+    private final Bitmap[] buttonIcons = new Bitmap[8];
     private final Path path = new Path();
     private final RectF rect = new RectF();
 
     TouchControls(Context c, boolean input) {
         super(c);
         this.input = input;
+        buttonIcons[0] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_a);
+        buttonIcons[1] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_b);
+        buttonIcons[2] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_x);
+        buttonIcons[3] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_y);
+        buttonIcons[4] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_zr);
+        buttonIcons[5] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_zl);
+        buttonIcons[6] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_r);
+        buttonIcons[7] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_l);
         opacity = prefs().getFloat("opacity", 0.6f);
         scale = prefs().getFloat("scale", 1f);
         haptics = prefs().getBoolean("haptics", true);
+        dualStick = prefs().getBoolean("dual_stick", false);
+        coordinateGrid = prefs().getBoolean("coordinate_grid", false);
+        int savedSensitivity = prefs().getInt("right_swipe_sensitivity", 3);
+        // Migrate the previous native 8..240 preference to the new 1..10 scale.
+        rightSwipeSensitivity = savedSensitivity > 10
+                ? Math.max(1, Math.min(10, Math.round(1 + (savedSensitivity - 130) * 9.0f / 110.0f)))
+                : Math.max(1, savedSensitivity);
+        prefs().edit().putInt("right_swipe_sensitivity", rightSwipeSensitivity).apply();
         shown = prefs().getBoolean("shown", true);
         line.setStyle(Paint.Style.STROKE);
         text.setTextAlign(Paint.Align.CENTER);
@@ -178,9 +206,33 @@ final class TouchControls extends View {
     }
 
     private void apply() {
-        if (input) Native.touchControlsEnable(active() && !editing);   // off: every touch in the picture is the game's touchscreen
+        if (input) {
+            Native.touchControlsDualStick(dualStick);
+            Native.touchControlsRightSwipeSensitivity(nativeRightSwipeSensitivity(rightSwipeSensitivity));
+            Native.touchControlsEnable(active() && !editing);
+        }   // off: every touch in the picture is the game's touchscreen
         Arrays.fill(pressed, 0); Arrays.fill(prev, 0); Arrays.fill(sticks, 0);
         invalidate();
+    }
+
+    private void setRightSwipeSensitivity(int value) {
+        rightSwipeSensitivity = Math.max(1, Math.min(10, value));
+        prefs().edit().putInt("right_swipe_sensitivity", rightSwipeSensitivity).commit();
+        if (input) Native.touchControlsRightSwipeSensitivity(nativeRightSwipeSensitivity(rightSwipeSensitivity));
+    }
+
+    private void setCoordinateGrid(boolean on) {
+        coordinateGrid = on;
+        prefs().edit().putBoolean("coordinate_grid", on).commit();
+        Native.note("coordinate grid " + (on ? "on (A-T, 1-20)" : "off"));
+        invalidate();
+    }
+
+    private void setDualStick(boolean on) {
+        dualStick = on;
+        prefs().edit().putBoolean("dual_stick", on).commit();
+        Native.note("invisible dual joysticks " + (on ? "on" : "off"));
+        apply();
     }
 
     private void toggle() {
@@ -233,7 +285,6 @@ final class TouchControls extends View {
         float shY = y0 + m + 0.7f * rSh;
         add(BUTTON, ZL, 0, SHAPE_SHOULDER, m + rSh, shY, rSh, "ZL");
         add(BUTTON, L, 0, SHAPE_SHOULDER, m + 3 * rSh + 10 * d, shY, rSh, "L");
-        add(BUTTON, ZR, 0, SHAPE_SHOULDER, w - m - rSh, shY, rSh, "ZR");
         add(BUTTON, R, 0, SHAPE_SHOULDER, w - m - 3 * rSh - 10 * d, shY, rSh, "R");
         add(BUTTON, MINUS, 0, SHAPE_ROUND, m + 4 * rSh + 22 * d + rSmall, shY, rSmall, "−");
         add(BUTTON, PLUS, 0, SHAPE_ROUND, w - m - 4 * rSh - 22 * d - rSmall, shY, rSmall, "+");
@@ -254,6 +305,9 @@ final class TouchControls extends View {
         add(STICK, 0, 1, SHAPE_ROUND, rx, ry, rRight, "");
         float diagR = (rRight + rClick + 6 * d) * 0.7071f;
         add(BUTTON, RS, 0, SHAPE_ROUND, rx - diagR, ry - diagR, rClick, "R3");
+        // ZR is an invisible, active shoulder-button hit target at the lower-left edge of the right stick.
+        float diagZR = (rRight + rSh + 6 * d) * 0.7071f;
+        add(BUTTON, ZR, 0, SHAPE_SHOULDER, rx - diagZR, ry + diagZR, rSh, "ZR");
         // Push apart what still overlaps (a large size on a small screen): the later control moves towards the middle
         for (int pass = 0; pass < 4; pass++)
             for (int j = 0; j < n; j++)
@@ -264,10 +318,12 @@ final class TouchControls extends View {
                     cx[j] += cx[j] < w / 2f ? move : -move;
                 }
         groups(w, h, u);
-        java.util.List<String> keys = new java.util.ArrayList<>();
-        for (int i = 0; i < n; i++) keys.add(controlKey(i));
-        for (int i = 0; i < n; i++) hid[i] = hidden.contains(keys.get(i));
-        if (!editing) hideFromLayout();   // the editor keeps them (dimmed) so a tap can show them again; play leaves them out of the picture and of the host's layout
+        // Place the invisible ZR hit target at the centre of grid cell 17R (20x20 grid).
+        for (int i = 0; i < n; i++) if (buttons[i] == ZR) {
+            cx[i] = w * 16.5f / 20f;
+            cy[i] = h * 17.5f / 20f;
+            break;
+        }
         tr = 10 * u; tx = w / 2f; ty = m + tr;   // small and faint (onDraw); its touch area is larger (onToggle)
         // The host's units: centres normalized to the view, radii in units of its height; a stick's grab ring is its own (input_map.c)
         float[] f = new float[n * 6];
@@ -323,6 +379,7 @@ final class TouchControls extends View {
         if (kind[i] == DPAD) return 1;
         if (b == LS) return 0;
         if (b == RS) return 3;
+        if (b == ZR) return 3;
         if ((b & (A | B | X | Y)) != 0) return 2;
         if ((b & (ZL | L | MINUS)) != 0) return 4;
         return 5;
@@ -548,18 +605,27 @@ final class TouchControls extends View {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_POINTER_DOWN: {
                 int i = e.getActionIndex(), id = e.getPointerId(i);
-                if (toggleId < 0 && onToggle(e.getX(i), e.getY(i))) {
-                    toggleId = id; toggleLong = false;
+                if (toggleId < 0 && !toggleGesture && onToggle(e.getX(i), e.getY(i))) {
+                    toggleId = id; toggleLong = false; toggleGesture = true;
                     postDelayed(longPress, 600);
                     if (haptics) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
                     return true;
                 }
-                send(act, id, e.getX(i), e.getY(i));
-                break;
+                // Once this overlay owns the toggle gesture, forward any additional fingers
+                // to the native touch layer. Ordinary gameplay touches fall through to the
+                // dedicated GameSurfaceView below.
+                if (toggleGesture) {
+                    send(act, id, e.getX(i), e.getY(i));
+                    if (act == MotionEvent.ACTION_UP) toggleGesture = false;
+                    return true;
+                }
+                return false;
             }
             case MotionEvent.ACTION_MOVE:
-                for (int i = 0; i < e.getPointerCount(); i++) if (e.getPointerId(i) != toggleId) send(act, e.getPointerId(i), e.getX(i), e.getY(i));
-                break;
+                if (!toggleGesture) return false;
+                for (int i = 0; i < e.getPointerCount(); i++)
+                    if (e.getPointerId(i) != toggleId) send(act, e.getPointerId(i), e.getX(i), e.getY(i));
+                return true;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_POINTER_UP: {
                 int i = e.getActionIndex(), id = e.getPointerId(i);
@@ -567,21 +633,25 @@ final class TouchControls extends View {
                     toggleId = -1;
                     removeCallbacks(longPress);
                     if (!toggleLong && onToggle(e.getX(i), e.getY(i))) toggle();
+                    if (act == MotionEvent.ACTION_UP) toggleGesture = false;
                     return true;
                 }
-                send(act, id, e.getX(i), e.getY(i));
-                break;
+                if (toggleGesture) {
+                    send(act, id, e.getX(i), e.getY(i));
+                    if (act == MotionEvent.ACTION_UP) toggleGesture = false;
+                    return true;
+                }
+                return false;
             }
             case MotionEvent.ACTION_CANCEL:
-                toggleId = -1;
+                if (!toggleGesture) return false;
+                toggleId = -1; toggleGesture = false;
                 removeCallbacks(longPress);
-                send(act, 0, 0, 0);
-                break;
-            default:
+                send(MotionEvent.ACTION_CANCEL, 0, 0, 0);
                 return true;
+            default:
+                return toggleGesture;
         }
-        poll();
-        return true;
     }
 
     /** What the controls hold after a touch: a tick for each new press, a redraw when anything changed */
@@ -599,13 +669,18 @@ final class TouchControls extends View {
         if (changed) invalidate();
     }
 
+    /** Called by GameSurfaceView after native gameplay touches update the host's control state. */
+    void inputChanged() { poll(); }
+
     // ---- Drawing ----
     private float dim = 1f;   // 0.3 while a hidden control is drawn in the editor
     private int alpha(float a) { return Math.max(0, Math.min(255, Math.round(255 * a * opacity * dim))); }
 
     @Override protected void onDraw(Canvas c) {
-        if (!available || clean || !visible() && !editing) return;
+        if (!available && !coordinateGrid) return;
         float dp = getResources().getDisplayMetrics().density;
+        if (coordinateGrid) drawCoordinateGrid(c, dp);
+        if (!available || !visible() && !editing) return;
         line.setStrokeWidth(Math.max(1.5f, 1.6f * dp));
         if (editing) { drawControls(c); drawEditor(c, dp); return; }
         // The show / hide button (when it is on): a small pad outline, mostly transparent over the game, fainter still while the controls are hidden
@@ -624,31 +699,93 @@ final class TouchControls extends View {
         drawControls(c);
     }
 
+    /** A transparent 20x20 reference grid. A-T identify rows from top to bottom; 1-20 identify columns left to right. It never handles touches. */
+    private void drawCoordinateGrid(Canvas c, float dp) {
+        int w = getWidth(), h = getHeight();
+        if (w <= 0 || h <= 0) return;
+        Paint grid = line;
+        grid.setStyle(Paint.Style.STROKE);
+        grid.setStrokeWidth(Math.max(1f, dp));
+        grid.setColor(Color.argb(115, 255, 255, 255));
+        for (int col = 0; col <= 20; col++) {
+            float x = w * col / 20f;
+            c.drawLine(x, 0, x, h, grid);
+        }
+        for (int row = 0; row <= 20; row++) {
+            float y = h * row / 20f;
+            c.drawLine(0, y, w, y, grid);
+        }
+        Paint labels = text;
+        labels.setStyle(Paint.Style.FILL);
+        labels.setTextAlign(Paint.Align.CENTER);
+        labels.setTextSize(13f * dp);
+        labels.setFakeBoldText(true);
+        labels.setColor(Color.WHITE);
+        labels.setShadowLayer(2f * dp, 0, 1f * dp, Color.BLACK);
+        for (int col = 0; col < 20; col++) {
+            String number = String.valueOf(col + 1);
+            c.drawText(number, w * (col + 0.5f) / 20f, 16f * dp, labels);
+        }
+        for (int row = 0; row < 20; row++) {
+            String letter = String.valueOf((char) ('A' + row));
+            c.drawText(letter, 14f * dp, h * (row + 0.5f) / 20f + 5f * dp, labels);
+        }
+        labels.clearShadowLayer();
+    }
+
     private void drawControls(Canvas c) {
         for (int i = 0; i < n; i++) {
-            boolean off = editing && hid[i];   // hidden by the player: faint with a stroke through it, in the editor only
-            boolean held = pressed[i] != 0 && !off;
-            dim = off ? 0.35f : 1f;
+            boolean held = pressed[i] != 0;
+            // Keep ZR in the native touch layout, but never draw its icon, shape, or label.
+            if (buttons[i] == ZR) continue;
             fill.setColor(held ? Color.argb(alpha(0.55f), 255, 255, 255) : Color.argb(alpha(0.35f), 0, 0, 0));
             line.setColor(Color.argb(alpha(0.9f), 255, 255, 255));
+            if (kind[i] == STICK && dualStick && !editing) continue;
             if (kind[i] == STICK) drawStick(c, i);
             else if (kind[i] == DPAD) drawDpad(c, i);
             else {
-                if (shape[i] == SHAPE_SHOULDER) {
-                    rect.set(cx[i] - r[i], cy[i] - r[i] * 0.62f, cx[i] + r[i], cy[i] + r[i] * 0.62f);
-                    c.drawRoundRect(rect, r[i] * 0.5f, r[i] * 0.5f, fill);
-                    c.drawRoundRect(rect, r[i] * 0.5f, r[i] * 0.5f, line);
+                Bitmap icon = buttonIcon(buttons[i]);
+                if (icon != null) {
+                    // Fit the complete transparent PNG inside the original visual footprint.
+                    // Enlarge the artwork within the same button centre; fit the whole image without cropping.
+                    float iconScale = 1.3f;
+                    float boxW = 2f * r[i] * iconScale;
+                    float boxH = (shape[i] == SHAPE_SHOULDER ? 1.24f : 2f) * r[i] * iconScale;
+                    float fit = Math.min(boxW / icon.getWidth(), boxH / icon.getHeight());
+                    float drawW = icon.getWidth() * fit, drawH = icon.getHeight() * fit;
+                    rect.set(cx[i] - drawW / 2f, cy[i] - drawH / 2f, cx[i] + drawW / 2f, cy[i] + drawH / 2f);
+                    iconPaint.setAlpha(held ? 190 : 255);
+                    c.drawBitmap(icon, null, rect, iconPaint);
                 } else {
-                    c.drawCircle(cx[i], cy[i], r[i], fill);
-                    c.drawCircle(cx[i], cy[i], r[i], line);
+                    if (shape[i] == SHAPE_SHOULDER) {
+                        rect.set(cx[i] - r[i], cy[i] - r[i] * 0.62f, cx[i] + r[i], cy[i] + r[i] * 0.62f);
+                        c.drawRoundRect(rect, r[i] * 0.5f, r[i] * 0.5f, fill);
+                        c.drawRoundRect(rect, r[i] * 0.5f, r[i] * 0.5f, line);
+                    } else {
+                        c.drawCircle(cx[i], cy[i], r[i], fill);
+                        c.drawCircle(cx[i], cy[i], r[i], line);
+                    }
+                    text.setColor(held ? Color.argb(alpha(1f), 0, 0, 0) : Color.argb(alpha(1f), 255, 255, 255));
+                    text.setTextSize(r[i] * (label[i].length() > 1 ? 0.72f : 0.95f));
+                    c.drawText(label[i], cx[i], cy[i] - (text.descent() + text.ascent()) / 2, text);
                 }
-                text.setColor(held ? Color.argb(alpha(1f), 0, 0, 0) : Color.argb(alpha(1f), 255, 255, 255));
-                text.setTextSize(r[i] * (label[i].length() > 1 ? 0.72f : 0.95f));
-                c.drawText(label[i], cx[i], cy[i] - (text.descent() + text.ascent()) / 2, text);
             }
             if (off) { line.setColor(Color.argb(Math.round(255 * 0.8f), 255, 120, 120)); c.drawLine(cx[i] - r[i] * 0.7f, cy[i] + r[i] * 0.7f, cx[i] + r[i] * 0.7f, cy[i] - r[i] * 0.7f, line); }
             dim = 1f;
         }
+    }
+
+    /** The PNG assigned to a Switch face or shoulder button, or null for the ordinary labelled controls. */
+    private Bitmap buttonIcon(long button) {
+        if (button == A) return buttonIcons[0];
+        if (button == B) return buttonIcons[1];
+        if (button == X) return buttonIcons[2];
+        if (button == Y) return buttonIcons[3];
+        if (button == ZR) return buttonIcons[4];
+        if (button == ZL) return buttonIcons[5];
+        if (button == R) return buttonIcons[6];
+        if (button == L) return buttonIcons[7];
+        return null;
     }
 
     /** The editor: the picture's outline, each group's frame (the one held filled), the buttons along the top and what to do */
@@ -736,7 +873,12 @@ final class TouchControls extends View {
         box.addView(mg);
         TextView ol = new TextView(ctx), sl = new TextView(ctx);
         SeekBar os = new SeekBar(ctx), ss = new SeekBar(ctx);
-        CheckBox hb = new CheckBox(ctx), lb = new CheckBox(ctx), tb = new CheckBox(ctx);
+        CheckBox hb = new CheckBox(ctx), lb = new CheckBox(ctx), tb = new CheckBox(ctx), db = new CheckBox(ctx), gb = new CheckBox(ctx);
+        TextView sensitivityLabel = new TextView(ctx);
+        SeekBar sensitivityBar = new SeekBar(ctx);
+        sensitivityBar.setMax(9);
+        sensitivityBar.setProgress(rightSwipeSensitivity - 1);
+        sensitivityBar.setKeyProgressIncrement(1);
         os.setMax(90); os.setProgress(Math.round(opacity * 100) - 10);   // 10..100 %
         ss.setMax(90); ss.setProgress(Math.round(scale * 100) - 60);     // 60..150 %
         os.setKeyProgressIncrement(5); ss.setKeyProgressIncrement(5);   // the D-pad's left / right: 5 % a press
@@ -744,7 +886,23 @@ final class TouchControls extends View {
         lb.setText(Tx.s(dev.nxnative.android.R.string.game_show_the_log_over_the)); lb.setChecked(showLog(ctx));
         tb.setText(Tx.s(dev.nxnative.android.R.string.game_show_hide_button_top_centre)); tb.setChecked(button);
         tb.setOnCheckedChangeListener((b, v) -> setToggleButton(v));
-        Runnable labels = () -> { ol.setText(Tx.s(dev.nxnative.android.R.string.game_opacity_pct, os.getProgress() + 10)); sl.setText(Tx.s(dev.nxnative.android.R.string.game_size_percent, ss.getProgress() + 60)); };
+        db.setText("Invisible dual joysticks (left / right screen halves)");
+        db.setChecked(dualStick);
+        db.setOnCheckedChangeListener((b, v) -> setDualStick(v));
+        gb.setText("Coordinate Grid (A-T / 1-20)");
+        gb.setChecked(coordinateGrid);
+        gb.setOnCheckedChangeListener((b, v) -> setCoordinateGrid(v));
+        Runnable sensitivityText = () -> sensitivityLabel.setText("Right swipe sensitivity  " + (sensitivityBar.getProgress() + 1));
+        sensitivityText.run();
+        sensitivityBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int value, boolean user) {
+                sensitivityText.run();
+                if (user) setRightSwipeSensitivity(value + 1);
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {}
+        });
+        Runnable labels = () -> { ol.setText("Opacity " + (os.getProgress() + 10) + " %"); sl.setText("Size " + (ss.getProgress() + 60) + " %"); };
         labels.run();
         SeekBar.OnSeekBarChangeListener live = new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar b, int v, boolean user) {
@@ -762,17 +920,66 @@ final class TouchControls extends View {
         ss.setOnSeekBarChangeListener(live);
         hb.setOnCheckedChangeListener((b, v) -> { haptics = v; save(); });
         lb.setOnCheckedChangeListener((b, v) -> prefs().edit().putBoolean("log", v).commit());
-        android.widget.Button reset = new android.widget.Button(ctx);
-        reset.setText(Tx.s(dev.nxnative.android.R.string.game_reset_the_controls));
+        Button reset = new Button(ctx);
+        reset.setText("↻   Reset the controls");
+        stylePanelAction(reset, ctx, false);
         reset.setOnClickListener(v -> { os.setProgress(50); ss.setProgress(40); hb.setChecked(true); });   // 60 % opacity, 100 % size, the tick on
-        box.addView(ol); box.addView(os); box.addView(sl); box.addView(ss); box.addView(hb); box.addView(lb); box.addView(tb); box.addView(reset);
-        android.widget.Button ed = new android.widget.Button(ctx);   // the layout editor (runs onEditStart); the picture's position is in the panel's Picture rows (positionRows)
-        ed.setText(Tx.s(dev.nxnative.android.R.string.game_edit_the_controls_layout));
+        box.addView(ol); box.addView(os); box.addView(sl); box.addView(ss); box.addView(hb); box.addView(lb); box.addView(tb); box.addView(db); box.addView(gb);
+        box.addView(sensitivityLabel); box.addView(sensitivityBar);
+        addPanelAction(box, reset, ctx);
+        Button ed = new Button(ctx);   // the layout editor (runs onEditStart); the picture's position is in the panel's Picture rows (positionRows)
+        ed.setText("✥   Customize controls layout…");
+        stylePanelAction(ed, ctx, true);
         ed.setOnClickListener(v -> startEditLayout());
-        box.addView(ed);
+        addPanelAction(box, ed, ctx);
+        TextView editHint = new TextView(ctx);
+        editHint.setText("Drag a control group to move it, or pinch to resize it. Your layout is saved for this screen shape.");
+        editHint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        editHint.setTextColor(Color.LTGRAY);
+        box.addView(editHint);
     }
 
     /** Whether GameActivity keeps the newest log lines over the picture once the game draws (off by default; the settings dialog's last box) */
+    /** Glass action buttons used by the in-game side panel. */
+    private static void stylePanelAction(Button button, Context ctx, boolean primary) {
+        float dp = ctx.getResources().getDisplayMetrics().density;
+        GradientDrawable bg = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                primary
+                        ? new int[] {0xCC25366A, 0xCC142C50, 0xCC10243D}
+                        : new int[] {0xAA252A49, 0xCC17263D, 0xCC101D30});
+        bg.setCornerRadius(18 * dp);
+        bg.setStroke(Math.max(1, Math.round(dp)), primary ? 0x997D9EFF : 0x667F9BB8);
+        button.setBackground(bg);
+        button.setTextColor(0xFFF0F5FF);
+        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        button.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        button.setAllCaps(false);
+        button.setGravity(android.view.Gravity.CENTER);
+        button.setMinHeight(Math.round(52 * dp));
+        button.setPadding(Math.round(16 * dp), Math.round(11 * dp), Math.round(16 * dp), Math.round(11 * dp));
+        button.setStateListAnimator(null);
+        button.setElevation(0);
+        button.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                v.animate().cancel();
+                v.animate().scaleX(0.985f).scaleY(0.985f).setDuration(80).start();
+            } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+                v.animate().scaleX(1f).scaleY(1f).setDuration(140).start();
+            }
+            return false;
+        });
+    }
+
+    private static void addPanelAction(LinearLayout box, Button button, Context ctx) {
+        float dp = ctx.getResources().getDisplayMetrics().density;
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = Math.round(9 * dp);
+        lp.bottomMargin = Math.round(3 * dp);
+        box.addView(button, lp);
+    }
+
     static boolean showLog(Context c) { return Prefs.open(c, "touch_controls").getBoolean("log", false); }
     static void showLog(Context c, boolean on) { Prefs.open(c, "touch_controls").edit().putBoolean("log", on).commit(); }
 

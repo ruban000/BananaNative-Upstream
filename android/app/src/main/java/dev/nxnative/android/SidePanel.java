@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -70,8 +71,19 @@ final class SidePanel extends FrameLayout {
     static final String[] TAB_NAMES = {"Performance", "Display", "Controls", "General"};
     private static final int TAB_PERF = 0, TAB_DISPLAY = 1, TAB_CONTROLS = 2, TAB_GENERAL = 3;
     private int tab = TAB_PERF;
-    private static final int FOCUS = 0xFFFFD54F;   // a controller's selection in the menu and the focus frame: a banana yellow, dark text on it
-    private static final int FRAME_RADIUS_DP = 14;   // the focus frame's corners, and the press highlight's of a row (rowRipple): one shape
+    private static final int FOCUS = 0xFFEAF4FF;   // restrained PS5 white focus rim
+    private static final String UI_PREFS = "banana_native_side_panel";
+    private static final String UI_ANIMATIONS = "menu_button_animations";
+    private boolean animationsEnabled() {
+        return act.getSharedPreferences(UI_PREFS, Activity.MODE_PRIVATE).getBoolean(UI_ANIMATIONS, true);
+    }
+    private void animateTap(View view) {
+        if (!animationsEnabled()) return;
+        view.animate().cancel();
+        view.setScaleX(0.96f);
+        view.setScaleY(0.96f);
+        view.animate().scaleX(1f).scaleY(1f).setDuration(150).start();
+    }
 
     // A controller: its confirm and back keys (padButtons), the held direction and its repeat
     private int confirm = KeyEvent.KEYCODE_BUTTON_B, back = KeyEvent.KEYCODE_BUTTON_A;
@@ -90,13 +102,25 @@ final class SidePanel extends FrameLayout {
     // The ids of the choices a rebuild gives the focus back to (restyle)
     private static final int ID_SIZE = 5000, ID_TEXT = 5100, ID_FIT = 5200, ID_MAP = 5300, ID_ONE = 5400, ID_LABEL = 5450, ID_RES = 5500, ID_RES_PRESET = 5590;
 
+    /** A deep navy glass-like surface for the in-game overlay. */
+    private float actDensityPlaceholder() { return getResources().getDisplayMetrics().density; }
+
+    private GradientDrawable makePanelBackground() {
+        GradientDrawable bg = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[] {0xF51A1730, 0xF20B1422, 0xF20D1A2B});
+        bg.setCornerRadius(22 * actDensityPlaceholder());
+        bg.setStroke(1, 0x557F9BB8);
+        return bg;
+    }
+
     SidePanel(Activity a, Rows rows) {
         super(a);
         act = a;
         this.rows = rows;
         float dp = getResources().getDisplayMetrics().density;
         View scrim = new View(a);
-        scrim.setBackgroundColor(0x66000000);
+        scrim.setBackgroundColor(0xAA02050B);
         scrim.setOnClickListener(v -> close());
         addView(scrim, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         drawer = new LinearLayout(a);
@@ -130,17 +154,94 @@ final class SidePanel extends FrameLayout {
         box.setPadding(p, p, p, p);
         scroll = new ScrollView(a);
         scroll.addView(box);
-        sheet.addView(scroll, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
-        sheet.setVisibility(GONE);   // showPage shows it
-        drawer.addView(sheet, new LinearLayout.LayoutParams(PanelLook.widthPx(Prefs.panelSize(a), dp, a.getResources().getDisplayMetrics().widthPixels), LinearLayout.LayoutParams.MATCH_PARENT));
-        drawer.setVisibility(GONE);
-        addView(drawer, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT, Gravity.START));
-        menuSink = new View(a);
-        menuSink.setFocusable(true);
-        menuSink.setFocusableInTouchMode(true);
-        menuSink.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
-        addView(menuSink, new LayoutParams(1, 1));
-        getViewTreeObserver().addOnGlobalFocusChangeListener(this::focusMoved);
+        FrameLayout sh = new FrameLayout(a);
+        sh.setBackground(makePanelBackground());
+        LinearLayout content = new LinearLayout(a);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setBackgroundColor(0x00000000);
+        LinearLayout brand = new LinearLayout(a);
+        brand.setOrientation(LinearLayout.HORIZONTAL);
+        brand.setGravity(Gravity.CENTER_VERTICAL);
+        brand.setPadding(Math.round(18 * dp), Math.round(12 * dp), Math.round(12 * dp), Math.round(10 * dp));
+        TextView brandTitle = new TextView(a);
+        brandTitle.setText("BANANA NATIVE");
+        brandTitle.setTextColor(0xFFF4F5FF);
+        brandTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        brandTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        brandTitle.setLetterSpacing(0.06f);
+        brand.addView(brandTitle, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        TextView live = new TextView(a);
+        live.setText("●  IN GAME");
+        live.setTextColor(0xFFB9C8D9);
+        live.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+        live.setTypeface(Typeface.DEFAULT_BOLD);
+        live.setPadding(Math.round(9 * dp), Math.round(6 * dp), Math.round(9 * dp), Math.round(6 * dp));
+        GradientDrawable liveBg = new GradientDrawable();
+        liveBg.setColor(0x222F4C69);
+        liveBg.setCornerRadius(999 * dp);
+        live.setBackground(liveBg);
+        brand.addView(live, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        TextView closePanel = new TextView(a);
+        closePanel.setText("×");
+        closePanel.setTextColor(0xFFEAF1FA);
+        closePanel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+        closePanel.setGravity(Gravity.CENTER);
+        closePanel.setFocusable(true);
+        closePanel.setContentDescription("Close in-game menu");
+        closePanel.setBackground(makeRailActionBackground(dp));
+        LinearLayout.LayoutParams closeLp = new LinearLayout.LayoutParams(Math.round(38 * dp), Math.round(38 * dp));
+        closeLp.leftMargin = Math.round(9 * dp);
+        brand.addView(closePanel, closeLp);
+        closePanel.setOnClickListener(v -> close());
+        // Exit is a floating action at the lower-right, away from the tab navigation.
+        brand.setBackgroundColor(0xD90F1B2B);
+        content.addView(brand, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, Math.round(66 * dp)));
+        LinearLayout body = new LinearLayout(a);
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        body.setBackgroundColor(0x00000000);
+        tabs = new LinearLayout(a);
+        tabs.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable railBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[] {0xE91A1835, 0xE90D1727, 0xE90B1422});
+        tabs.setBackground(railBg);
+        tabs.setPadding(Math.round(5 * dp), Math.round(10 * dp), Math.round(5 * dp), Math.round(10 * dp));
+        body.addView(tabs, new LinearLayout.LayoutParams(Math.round(100 * dp), LayoutParams.MATCH_PARENT));
+        scroll.setClipToPadding(false);
+        scroll.setFillViewport(false);
+        scroll.setBackgroundColor(0x00000000);
+        scroll.setPadding(Math.round(14 * dp), Math.round(8 * dp), Math.round(14 * dp), Math.round(22 * dp));
+        body.addView(scroll, new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f));
+        content.addView(body, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
+        sh.addView(content, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        TextView exit = new TextView(a);
+        exit.setText("↗");
+        exit.setTextColor(0xFFF4F7FC);
+        exit.setTextSize(TypedValue.COMPLEX_UNIT_SP, 23);
+        exit.setGravity(Gravity.CENTER);
+        exit.setFocusable(true);
+        exit.setContentDescription("Stop game and return to Banana Native");
+        GradientDrawable exitBg = new GradientDrawable();
+        exitBg.setColor(0xE6122032);
+        exitBg.setCornerRadius(999 * dp);
+        exitBg.setStroke(Math.max(1, Math.round(dp)), 0x887FA8D2);
+        exit.setBackground(exitBg);
+        exit.setElevation(12 * dp);
+        exit.setOnClickListener(v -> { animateTap(v); confirmStop(); });
+
+        int panelWidth = PanelLook.widthPx(Prefs.panelSize(a), dp, a.getResources().getDisplayMetrics().widthPixels);
+        int exitSize = Math.round(58 * dp);
+        FrameLayout.LayoutParams exitLp = new FrameLayout.LayoutParams(exitSize, exitSize, Gravity.BOTTOM | Gravity.RIGHT);
+        // Anchor the floating action to the panel's left edge; half the circle sits outside over the game.
+        exitLp.setMargins(0, 0, Math.max(0, panelWidth - exitSize / 2), Math.round(22 * dp));
+        addView(exit, exitLp);
+        // Navigation rail is fixed; only the settings column scrolls. No hide/show animation
+        // means scroll direction changes cannot cause layout jumps or visual jitter.
+        scroll.setOnScrollChangeListener((View v, int sx, int sy, int oldSx, int oldSy) -> {
+            brandTitle.setAlpha(sy > Math.round(72 * dp) ? 0.92f : 1f);
+        });
+        addView(sh, new LayoutParams(panelWidth, LayoutParams.MATCH_PARENT, Gravity.END));
+        sheet = sh;
+
         setVisibility(GONE);
     }
 
@@ -189,87 +290,20 @@ final class SidePanel extends FrameLayout {
         menuScroll.setVisibility(VISIBLE);
         sizes();
         setVisibility(VISIBLE);
-        drawer.setVisibility(VISIBLE);
-        menuScroll.scrollTo(0, 0);
-        drawer.animate().cancel();
-        drawer.setTranslationX(-(menuWidth() + sheetWidth()));   // the widest it gets: open() adds the section right after
-        drawer.animate().translationX(0).setDuration(180).start();
-        menuSink.requestFocus();
-    }
-
-    /** A section to the menu (Back, B): its column goes, the menu has the focus again with that section selected for a controller */
-    private void showMenu() {
-        if (!open) return;
-        open = false;
-        adjusting = null;
-        heldDir = stickHeld = PadPanel.NONE;
-        removeCallbacks(repeat);
-        removeCallbacks(tick);
-        sheet.setVisibility(GONE);
-        menuScroll.setVisibility(VISIBLE);
-        sizes();
-        menuSink.requestFocus();
-        menuSelect(isInTouchMode() ? -1 : menuSection.indexOf(tab));
-    }
-
-    /**
-     * Section k shows to the right of the menu (picked there, a controller's L / R, or open()): the drawer slides in first if it was closed; its rows built, scrolled
-     * to its top; with a controller the focus on its first row. On a stacked screen the section takes the menu's place
-     */
-    private void showPage(int k) {
-        boolean was = menuOpen;
-        if (!menuOpen) slideIn();
-        boolean same = open && k == tab;
-        tab = k;
-        if (!open) {
-            open = true;
-            sheet.setVisibility(VISIBLE);
-            if (was) { sheet.setAlpha(0f); sheet.animate().alpha(1f).setDuration(150).start(); } else sheet.setAlpha(1f);
-        }
-        if (!same) {
-            box.removeAllViews();
-            build();
-            look();
-            scroll.scrollTo(0, 0);
-        }
-        sizes();
-        menuSel = -1;   // a controller works in the section now; the menu marks which one shows
-        paintMenu();
-        if (!isInTouchMode()) post(() -> { if (open) focusFirst(); });
+        sheet.setTranslationX(animationsEnabled() ? sheet.getLayoutParams().width : 0);
+        if (animationsEnabled()) sheet.animate().translationX(0).setDuration(220).start();
+        post(() -> { if (open && !isInTouchMode()) focusFirst(); });
         removeCallbacks(tick);
         refresh();
     }
 
-    /** The menu's column: 300 dp, at most 35 % of the screen but 240 dp when there is room for it (a phone held upright) */
-    private int menuWidth() {
-        float dp = getResources().getDisplayMetrics().density;
-        int sw = getResources().getDisplayMetrics().widthPixels;
-        return Math.min(Math.round(300 * dp), Math.max(Math.round(sw * 0.35f), Math.min(Math.round(240 * dp), Math.round(sw * 0.6f))));
-    }
-    /** Room for the scrim beside the drawer, where a tap closes it */
-    private int scrimPx() { return Math.round(48 * getResources().getDisplayMetrics().density); }
-    /** A screen too narrow for the menu and a section side by side (a section needs 320 dp): the section shows in the menu's place */
-    private boolean stacked() {
-        float dp = getResources().getDisplayMetrics().density;
-        return getResources().getDisplayMetrics().widthPixels < menuWidth() + Math.round(320 * dp) + scrimPx();
-    }
-    /** The section's column: the panel's width (PanelLook: Settings' Size), within what the screen leaves beside the menu */
-    private int sheetWidth() {
-        float dp = getResources().getDisplayMetrics().density;
-        int sw = getResources().getDisplayMetrics().widthPixels;
-        return Math.max(0, Math.min(PanelLook.widthPx(Prefs.panelSize(act), dp, sw), sw - scrimPx() - (stacked() ? 0 : menuWidth())));
-    }
-    private int drawerWidth() {
-        boolean menuShows = !open || !stacked();
-        return (menuShows ? menuWidth() : 0) + (open ? sheetWidth() : 0);
-    }
-    /** The columns' widths now (the panel's size may have changed, or the screen turned), and the menu hidden while a section shows on a stacked screen */
-    private void sizes() {
-        menuScroll.setVisibility(open && stacked() ? GONE : VISIBLE);
-        int mw = menuWidth(), sw = sheetWidth();
-        if (menuScroll.getLayoutParams().width != mw) { menuScroll.getLayoutParams().width = mw; menuScroll.requestLayout(); }
-        if (sheet.getLayoutParams().width != sw) { sheet.getLayoutParams().width = sw; sheet.requestLayout(); }
-        sheet.getChildAt(0).setVisibility(menuScroll.getVisibility());   // the hairline only beside the menu
+    void close() {
+        if (!open) return;
+        open = false;
+        heldDir = stickHeld = PadPanel.NONE;
+        removeCallbacks(repeat);
+        if (animationsEnabled()) sheet.animate().translationX(sheet.getLayoutParams().width).setDuration(180).withEndAction(() -> { if (!open) setVisibility(GONE); }).start();
+        else setVisibility(GONE);
     }
 
     /**
@@ -542,27 +576,7 @@ final class SidePanel extends FrameLayout {
         return !l.isEmpty() ? l.get(0) : null;
     }
 
-    /** The focus frame: a yellow outline on the focused row of the section (not in touch mode, where nothing has the focus) */
-    private void focusMoved(View old, View now) {
-        if (now != adjusting) adjusting = null;
-        if (lit != null) { lit.setForeground(null); lit = null; }
-        if (now == null || !inside(now) || isInTouchMode()) return;
-        frame(now);
-    }
-    /** The frame on v: a slider being adjusted gets a stronger fill and a thicker line */
-    private void frame(View now) {
-        if (lit != null && lit != now) lit.setForeground(null);
-        float dp = getResources().getDisplayMetrics().density;
-        boolean adj = now == adjusting;
-        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
-        d.setColor(adj ? 0x55FFD54F : 0x26FFD54F);
-        d.setStroke(Math.round((adj ? 4f : 2.5f) * dp), FOCUS);
-        d.setCornerRadius(FRAME_RADIUS_DP * dp);
-        now.setDefaultFocusHighlightEnabled(false);   // Android's own (square) focus highlight would show past the frame's corners
-        now.setForeground(d);
-        lit = now;
-    }
-
+    /** The focus frame: a yellow outline on the focused row of the panel (not in touch mode, where nothing has the focus) */
     /**
      * A dialog opened from the panel with a controller's confirm and back keys (on their press), as in the panel: Android's own fallback would take the bottom
      * button as confirm and the right one as back. Its focus starts on the safe choice (negative), so a confirm press does nothing that cannot be undone
@@ -581,7 +595,59 @@ final class SidePanel extends FrameLayout {
         return d;
     }
 
-    /** Another section from a controller's L / R: as picked in the menu */
+    /** The tab bar: one button per tab (the selected one filled), then ✕; large enough to tap (the panel's row height, 48 dp at least), named for TalkBack */
+    private void tabBar() {
+        tabs.removeAllViews();
+        float dp = getResources().getDisplayMetrics().density;
+        int itemHeight = Math.round(72 * dp);
+        String[] glyphs = {"◷", "▣", "⌖", "☰"};
+        for (int i = 0; i < TAB_NAMES.length; i++) {
+            int k = i;
+            boolean on = i == tab;
+            LinearLayout item = new LinearLayout(act);
+            item.setOrientation(LinearLayout.VERTICAL);
+            item.setGravity(Gravity.CENTER);
+            item.setPadding(Math.round(3 * dp), Math.round(7 * dp), Math.round(3 * dp), Math.round(7 * dp));
+            TextView icon = new TextView(act);
+            icon.setText(glyphs[i]);
+            icon.setGravity(Gravity.CENTER);
+            icon.setIncludeFontPadding(false);
+            icon.setTextSize(TypedValue.COMPLEX_UNIT_SP, 19);
+            icon.setTextColor(on ? 0xFFF4F6FF : 0xFF9EADBF);
+            item.addView(icon, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, Math.round(25 * dp)));
+            TextView label = new TextView(act);
+            label.setText(TAB_NAMES[i]);
+            label.setGravity(Gravity.CENTER);
+            label.setIncludeFontPadding(false);
+            label.setMaxLines(2);
+            label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9);
+            label.setTextColor(on ? 0xFFFFFFFF : 0xFF9EADBF);
+            label.setTypeface(on ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+            item.addView(label, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+            GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                    on ? new int[] {0x654C3D91, 0x55305D9B} : new int[] {0x00000000, 0x00000000});
+            bg.setCornerRadius(13 * dp);
+            bg.setStroke(Math.max(1, Math.round(dp)), on ? 0x887E9DFF : 0x00000000);
+            item.setBackground(bg);
+            item.setFocusable(true);
+            item.setClickable(true);
+            item.setOnClickListener(v -> { animateTap(v); showTab(k); });
+            item.setContentDescription(TAB_NAMES[i] + " tab, " + (i + 1) + " of " + TAB_NAMES.length + (on ? ", selected" : ""));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, itemHeight);
+            lp.bottomMargin = Math.round(6 * dp);
+            tabs.addView(item, lp);
+        }
+    }
+
+    private GradientDrawable makeRailActionBackground(float dp) {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0x221B2B42);
+        bg.setCornerRadius(13 * dp);
+        bg.setStroke(Math.max(1, Math.round(dp)), 0x447F9BB8);
+        return bg;
+    }
+
+    /** Another tab: its rows built, scrolled to its top; with a controller the focus on its first row */
     private void showTab(int k) {
         if (!open || k == tab) return;
         showPage(k);
@@ -590,23 +656,33 @@ final class SidePanel extends FrameLayout {
     /** The panel's size and text size (Prefs.panelSize / panelText): the section's width, and every row's least height and text size, over what build() made */
     private void look() {
         float dp = getResources().getDisplayMetrics().density;
-        sizes();
-        look(box, PanelLook.textScale(Prefs.panelText(act)), PanelLook.rowPx(Prefs.panelSize(act), dp));
+        int size = Prefs.panelSize(act), w = PanelLook.widthPx(size, dp, getResources().getDisplayMetrics().widthPixels);
+        if (sheet.getLayoutParams().width != w) { sheet.getLayoutParams().width = w; sheet.requestLayout(); }
+        look(box, PanelLook.textScale(Prefs.panelText(act)), PanelLook.rowPx(size, dp));
+        attachPanelFocus(box);
     }
+    private void attachPanelFocus(View v) {
+        if (v.isFocusable() && v != this && v.getParent() != tabs) Ui.settingFocus(act, v, 12);
+        if (v instanceof ViewGroup) for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) attachPanelFocus(((ViewGroup) v).getChildAt(i));
+    }
+
     private static void look(View v, float text, int row) {
         if (v instanceof TextView) {
             TextView t = (TextView) v;
             if (text != 1f) t.setTextSize(TypedValue.COMPLEX_UNIT_PX, t.getTextSize() * text);
             if (v instanceof Button || v instanceof CompoundButton) t.setMinHeight(row);
-            if (v instanceof CompoundButton && !(v.getBackground() instanceof RowRipple)) {
-                // a check box or radio button: its press highlight in the focus frame's shape over the whole choice (its own was a small circle
-                // around the box), and room after its text so that the frame does not touch it
-                v.setBackground(rowRipple(v.getResources()));
-                v.setDefaultFocusHighlightEnabled(false);
-                int ph = Math.round(12 * v.getResources().getDisplayMetrics().density);
-                v.setPaddingRelative(v.getPaddingStart(), v.getPaddingTop(), ph, v.getPaddingBottom());
+            if (v instanceof Button || v instanceof CompoundButton) t.setTextColor(0xFFF1F5FA);
+            if (v instanceof CompoundButton) {
+                int[][] states = new int[][] { new int[] { android.R.attr.state_checked }, new int[] {} };
+                int[] colors = new int[] { 0xFFDCEBFF, 0xFF9AA9BC };
+                ((CompoundButton) v).setButtonTintList(new android.content.res.ColorStateList(states, colors));
             }
-        } else if (v instanceof SeekBar) v.setMinimumHeight(row);
+        } else if (v instanceof SeekBar) {
+            v.setMinimumHeight(row);
+            ((SeekBar) v).setProgressTintList(android.content.res.ColorStateList.valueOf(0xFFDCEBFF));
+            ((SeekBar) v).setThumbTintList(android.content.res.ColorStateList.valueOf(0xFFF4F7FC));
+            ((SeekBar) v).setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0x557C8FA8));
+        }
         if (v instanceof ViewGroup) for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) look(((ViewGroup) v).getChildAt(i), text, row);
     }
 
@@ -632,8 +708,9 @@ final class SidePanel extends FrameLayout {
         TextView h = new TextView(act);
         h.setText(t);
         h.setTypeface(Typeface.DEFAULT_BOLD);
-        h.setTextSize(15);
-        h.setPadding(0, Math.round(18 * getResources().getDisplayMetrics().density), 0, 0);
+        h.setTextColor(0xFFEAF1FA);
+        h.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        h.setPadding(0, Math.round(11 * getResources().getDisplayMetrics().density), 0, Math.round(2 * getResources().getDisplayMetrics().density));
         box.addView(h);
         return h;
     }
@@ -641,8 +718,8 @@ final class SidePanel extends FrameLayout {
     private TextView note(String t) {
         TextView n = new TextView(act);
         n.setText(t);
-        n.setTextSize(12);
-        n.setTextColor(Color.LTGRAY);
+        n.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f);
+        n.setTextColor(0xFFA4B1C2);
         box.addView(n);
         return n;
     }
@@ -817,76 +894,85 @@ final class SidePanel extends FrameLayout {
         nextStartRows();
     }
 
-    /**
-     * Cheats: the cheats this run started with (GameActivity.cheats: the profile's file and the player's imported ones, merged), one switch each, live in the host
-     * (Native.cheatSet, hle_cheats.c nxhost_cheat_set) and kept per game (Prefs.cheatOn). Only when the game started with Game settings › Cheats on: otherwise the
-     * list is empty and the section is not shown (Cheats.panel). Grouped by the file's sections
-     */
-    private void cheatRows() {
-        if (!(act instanceof GameActivity)) return;
-        java.util.List<Cheats.Entry> list = ((GameActivity) act).cheats();
-        if (list.isEmpty()) return;
-        head(act.getString(R.string.cheats_title));
-        note(act.getString(R.string.cheats_caution));
-        java.util.Set<String> on = Prefs.cheatsOn(act, game());
-        String sec = null;
-        for (Cheats.Entry e : list) {
-            if (!e.section.equals(sec)) {
-                sec = e.section;
-                if (!sec.isEmpty()) { TextView s = note(sec); s.setTypeface(Typeface.DEFAULT_BOLD); }
+    /** GameHub-style action surface: rounded, full-width controls with a clear action color. */
+    private void actionButton(Button button, int fill, int stroke, int foreground) {
+        float dp = getResources().getDisplayMetrics().density;
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(fill);
+        bg.setCornerRadius(14 * dp);
+        bg.setStroke(Math.round(dp), stroke);
+        button.setBackground(bg);
+        button.setTextColor(foreground);
+        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        button.setTypeface(Typeface.DEFAULT_BOLD);
+        button.setAllCaps(false);
+        button.setGravity(Gravity.CENTER);
+        button.setMinHeight(Math.round(52 * dp));
+        button.setPadding(Math.round(14 * dp), Math.round(10 * dp), Math.round(14 * dp), Math.round(10 * dp));
+        button.setStateListAnimator(null);
+        button.setElevation(0);
+        button.setOnTouchListener((v, event) -> {
+            if (!animationsEnabled()) return false;
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                v.animate().cancel();
+                v.animate().scaleX(0.975f).scaleY(0.975f).setDuration(75).start();
+            } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+                v.animate().scaleX(1f).scaleY(1f).setDuration(130).start();
             }
-            android.widget.CheckBox b = new android.widget.CheckBox(act);
-            b.setText(e.name);
-            b.setChecked(on.contains(e.key));
-            b.setOnCheckedChangeListener((v, x) -> {
-                Prefs.cheatOn(act, game(), e.key, x);
-                int r = Native.cheatSet(e.key, x);
-                if (r != 1) Native.note("[RED] [nxlaunch] cheat \"" + e.key + "\" " + (x ? "on" : "off") + ": the host did not take it (" + r + (r == 0 ? ": no plain cheat, see the cheats lines above" : r == -1 ? ": no such cheat" : ": not in this host") + ")");
-            });
-            box.addView(b);
-        }
-    }
-
-    /**
-     * Shaders, for a game the shader layer covers (a Switch 2 title: GameActivity.layerShown): one status line, the label's own state in words (LayerStatus.panelLine; "All shaders ready" when the
-     * game has a prepared library and nothing waits), kept up to date while the tab shows (refresh), and the switch Shaders while playing (the same setting as Game settings). The host reads
-     * the switch once, when the game starts, so the switch says so and does not pretend to be live
-     */
-    private void shaderRows() {
-        if (!(act instanceof GameActivity) || !((GameActivity) act).layerShown()) return;
-        head(Tx.s(R.string.game_shaders));
-        layerNow = note(((GameActivity) act).layerLine());
-        note(Tx.s(R.string.game_shaders_the_game_lacks_are_3));
-        Button lab = row(ID_LABEL, Tx.s(R.string.game_building_shaders_label), Overlay.labelChoices()[Prefs.layerLabel(act)]);   // Off / the count / the words: takes effect at the label's next update
-        lab.setOnClickListener(v -> padDialog(new AlertDialog.Builder(act).setTitle(Tx.s(R.string.game_building_shaders_label))
-                .setSingleChoiceItems(Overlay.labelChoices(), Prefs.layerLabel(act), (d, w) -> { Prefs.layerLabel(act, w); d.dismiss(); restyle(ID_LABEL); })
-                .setNegativeButton(Tx.s(R.string.common_cancel), null).show()));
-    }
-
-    /** General: the panel's own look, cheats, shaders, Hide everything and Pause when the game comes back */
-    private void general() {
-        note(Tx.s(R.string.game_the_game_runs_on_behind));
-        panelRows();
-        cheatRows();
-        shaderRows();
-
-        // One tap for a clean picture: host-drawn stats and tag, the log, the touch controls and the panel strip together, saved as one flag.
-        // Back / Home still opens this panel, where the same button brings everything back; the overlay and log settings themselves are untouched.
-        final boolean allHidden = Prefs.clean(act);
-        Button clean = new Button(act);
-        clean.setText(Tx.s(allHidden ? R.string.game_show_everything : R.string.game_hide_everything_clean_picture));
-        clean.setOnClickListener(v -> {
-            if (act instanceof GameActivity) ((GameActivity) act).clean(!allHidden);
-            close();
+            return false;
         });
-        box.addView(clean);
+    }
 
-        // Pause and Stop are the menu's (buildMenu); Pause's own setting stays here
+    /** A single safe exit path for the header power icon and General › Stop. */
+    private void confirmStop() {
+        padDialog(new AlertDialog.Builder(act).setTitle("Stop the game?")
+                .setMessage("The game will close and return to Banana Native. Unsaved progress may be lost.")
+                .setPositiveButton("Stop game", (d, w) -> {
+                    Native.note("stopped by the user");
+                    if (act instanceof GameActivity) ((GameActivity) act).stopFromPanel();
+                    else act.finish();
+                })
+                .setNegativeButton("Keep playing", null).show());
+    }
+
+    /** General: panel appearance, animation preference, Pause, Stop and Back to the game */
+    private void general() {
+        note("The game runs on behind this panel; every change applies now and is kept, except those marked for the next start.");
+        panelRows();
+        head("Interface");
+        android.widget.CheckBox animations = new android.widget.CheckBox(act);
+        animations.setText("Menu & button animations");
+        animations.setChecked(animationsEnabled());
+        animations.setContentDescription("Toggle menu slide and button press animations");
+        animations.setOnCheckedChangeListener((b, on) ->
+                act.getSharedPreferences(UI_PREFS, Activity.MODE_PRIVATE).edit().putBoolean(UI_ANIMATIONS, on).apply());
+        box.addView(animations);
+        note("Adds smooth panel transitions and a subtle press effect to menu buttons.");
+
+        Button pause = new Button(act);   // the game suspended (clock, graphics, threads, audio) until a tap on the screen, or A / Start: GameActivity.pause
+        pause.setText("Ⅱ   Pause the game");
+        actionButton(pause, 0xFF17263A, 0x667C9BB9, 0xFFF2F6FC);
+        pause.setOnClickListener(v -> { close(); if (act instanceof GameActivity) ((GameActivity) act).pause(); });
+        LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        pl.topMargin = Math.round(24 * getResources().getDisplayMetrics().density);
+        box.addView(pause, pl);
         android.widget.CheckBox ret = new android.widget.CheckBox(act);
         ret.setText(Tx.s(R.string.game_pause_when_the_game_comes));
         ret.setChecked(Prefs.pauseOnReturn(act, game()));
         ret.setOnCheckedChangeListener((b, on) -> Prefs.pauseOnReturn(act, game(), on));
         box.addView(ret);
+        Button stop = new Button(act);
+        stop.setText("■   Stop the game");
+        actionButton(stop, 0xFF241923, 0x668E6674, 0xFFFFEDF1);
+        stop.setOnClickListener(v -> confirmStop());
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = Math.round(24 * getResources().getDisplayMetrics().density);
+        box.addView(stop, lp);
+        Button done = new Button(act);
+        done.setText("↩   Back to the game");
+        actionButton(done, 0xFF121E2D, 0x557C9BB9, 0xFFE7EFFB);
+        done.setOnClickListener(v -> close());
+        box.addView(done, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
     }
 
     /**

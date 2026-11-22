@@ -274,7 +274,7 @@ final class GameSettings {
         final List<String> titles = new ArrayList<>();
         String info;
 
-        Section(MainActivity a, String key, String emoji, String label) { this.key = key; this.emoji = emoji; this.label = label; rows = Ui.listCard(a); }
+        Section(MainActivity a, String key, String emoji, String label) { this.key = key; this.emoji = emoji; this.label = label; rows = Ui.settingsList(a); }
 
         boolean empty() { return rows.getChildCount() == 0; }
 
@@ -540,11 +540,12 @@ final class GameSettings {
         advanced.add(new Ui.Setting(a, "📝", Tx.s(R.string.game_extra_environment), v -> env(a, g, again))
                 .value(envLines == 0 ? Tx.s(R.string.game_none) : Tx.n(R.plurals.game_n_lines, envLines, envLines, env.replace('\n', ' '))).chevron(a));
 
-        Section[] all = perf ? new Section[] {picture, speed, advanced} : new Section[] {options, controls};   // Performance: what changes speed and picture; Game: the game's own options, language and controls
-        View reset = recLine != null ? null : Ui.button(a, Tx.s(R.string.game_reset_to_defaults), Ui.Kind.SOFT, v -> new PadFocus.Builder(a).setTitle(Tx.s(R.string.game_title_for, Tx.s(R.string.game_reset_to_defaults), g.name))
-                .setMessage(Tx.s(R.string.game_the_game_will_follow_global))
-                .setPositiveButton(Tx.s(R.string.game_reset), (x, w) -> { Prefs.resetGame(a, id); again.run(); }).setNegativeButton(Tx.s(R.string.common_cancel), null).show());
-        column(a, content, all, reset);
+        Section[] all = perf ? new Section[] {picture, speed, advanced} : new Section[] {options, controls};   // Game: game options and controls
+        View reset = recLine != null ? null : Ui.button(a, "Reset to defaults", Ui.Kind.SOFT, v -> new AlertDialog.Builder(a).setTitle("Reset to defaults · " + g.name)
+                .setMessage("The game will follow global settings. Extra environment lines are kept.")
+                .setPositiveButton("Reset", (x, w) -> { Prefs.resetGame(a, id); again.run(); }).setNegativeButton("Cancel", null).show());
+        if (wide) rail(a, content, all, reset, again);
+        else column(a, content, all, reset);
         refresh[0].run();   // the tags, the Recommended: lines and the choice's changed line
     }
 
@@ -587,83 +588,37 @@ final class GameSettings {
         if (reset != null) Ui.add(content, reset, 20, Ui.wrap());
     }
 
-    /**
-     * The top bar of a game's page, wide or narrow: Back, the game's picture and its name (with its version and publisher once read) in 48 dp; on a narrow window
-     * Play ends the bar (a wide window has it in the left column)
-     */
-    private static void topBar(MainActivity a, LinearLayout outer, Game g, boolean play, Runnable close) {
-        LinearLayout bar = Ui.row(a);
-        bar.addView(Ui.back(a, v -> close.run()), new LinearLayout.LayoutParams(Ui.dp(a, 44), Ui.dp(a, 44)));
-        TextView tile = Ui.tile(a, g.name, 40);
-        tile.setTextSize(18);
-        ((LinearLayout.LayoutParams) tile.getLayoutParams()).setMarginStart(Ui.dp(a, 12));
-        bar.addView(tile);
-        LinearLayout names = new LinearLayout(a);
-        names.setOrientation(LinearLayout.VERTICAL);
-        names.setPadding(Ui.dp(a, 10), 0, 0, 0);
-        TextView name = Ui.text(a, g.name, play ? 16 : 17, R.color.bn_text, 800);
-        name.setMaxLines(play ? 2 : 1);   // Play ends a narrow bar: the name may take two lines
-        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        name.setAccessibilityHeading(true);
-        names.addView(name);
-        TextView meta = Ui.small(a, "");
-        meta.setTextSize(11);
-        meta.setSingleLine(true);
-        meta.setVisibility(View.GONE);
-        names.addView(meta);
-        bar.addView(names, Ui.weight());
-        if (play) {   // Play: a round banana button, so the name keeps the room
-            ImageView b = new ImageView(a);
-            b.setImageDrawable(Ui.icon(a, R.drawable.ic_play, R.color.bn_on_banana));
-            b.setPadding(Ui.dp(a, 10), Ui.dp(a, 10), Ui.dp(a, 6), Ui.dp(a, 10));   // the triangle looks centred a little right of its box
-            b.setBackground(Ui.round(Ui.col(a, R.color.bn_banana), Ui.dp(a, 999), 0, 0));
-            b.setContentDescription(Tx.s(R.string.common_play));
-            b.setTooltipText(Tx.s(R.string.common_play));
-            b.setClickable(true);
-            b.setFocusable(true);
-            b.setOnClickListener(v -> a.launch(g));
-            LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(Ui.dp(a, 44), Ui.dp(a, 44));
-            pl.setMarginStart(Ui.dp(a, 8));
-            bar.addView(b, pl);
+    /** A wide window: a rail of the sections at the left, the one picked at the right (its label, its card, its line), like a settings app */
+    private static void rail(MainActivity a, LinearLayout content, Section[] all, View reset, Runnable again) {
+        Section cur = null;
+        for (Section s : all) if (!s.empty() && s.key.equals(shown)) cur = s;
+        if (cur == null) for (Section s : all) if (!s.empty()) { cur = s; break; }
+        if (cur == null) return;
+        LinearLayout body = Ui.add(content, Ui.row(a), 16);
+        body.setGravity(Gravity.TOP);
+        // Both sides of the wide layout must allow the same 16dp focus-frame overflow as the phone Settings list.
+        body.setClipChildren(false);
+        body.setClipToPadding(false);
+        LinearLayout nav = new LinearLayout(a);
+        nav.setOrientation(LinearLayout.VERTICAL);
+        nav.setClipChildren(false);
+        nav.setClipToPadding(false);
+        for (Section s : all) {
+            if (s.empty()) continue;
+            Ui.add(nav, Ui.navItem(a, s.emoji, s.label, s == cur, v -> { shown = s.key; again.run(); }), 2);
         }
-        outer.addView(bar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(a, 48)));
-        boolean ownCover = Covers.show(tile, g);   // the player's own cover wins over the game's icon
-        GameMeta.loadControl(new File(g.gameDir), Edition.control(a, g), m -> {
-            if (m.icon != null && !ownCover) Ui.tileIcon(tile, m.icon);
-            String l = m.line();
-            if (l != null) { meta.setText(l); meta.setVisibility(View.VISIBLE); }
-        });
-    }
-
-    /**
-     * A wide window: a left column with Back and Play, the game's picture, name and version, and the tabs as a list; the right pane (MainActivity.newPane, which
-     * scrolls on its own) is returned for the tab's page
-     */
-    private static LinearLayout split(MainActivity a, LinearLayout outer, Game g, boolean play, String[] keys, String[] labels, int sel, Runnable close) {
-        topBar(a, outer, g, false, close);   // Back, the game's picture and its name; under it the left column and the page
-        LinearLayout body = new LinearLayout(a);
-        body.setOrientation(LinearLayout.HORIZONTAL);
-        Ui.add(outer, body, 8, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        LinearLayout left = new LinearLayout(a);
-        left.setOrientation(LinearLayout.VERTICAL);
-        android.widget.ScrollView ls = new android.widget.ScrollView(a);
-        ls.setVerticalScrollBarEnabled(false);
-        ls.addView(left);
-        body.addView(ls, new LinearLayout.LayoutParams(Ui.dp(a, 180), ViewGroup.LayoutParams.MATCH_PARENT));
-        if (play) {
-            android.widget.Button b = Ui.button(a, Tx.s(R.string.common_play), Ui.Kind.PRIMARY, v -> a.launch(g));
-            b.setCompoundDrawablesRelativeWithIntrinsicBounds(Ui.icon(a, R.drawable.ic_play, R.color.bn_on_banana), null, null, null);
-            b.setCompoundDrawablePadding(Ui.dp(a, 4));
-            left.addView(b, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(a, 44)));
-        }
-        for (int k = 0; k < keys.length; k++) {
-            int i2 = k;
-            String e = keys[k].equals(PERFORMANCE) ? "\u26A1" : keys[k].equals(GAME) ? "\uD83C\uDFAE" : keys[k].equals(SAVES) ? "\uD83D\uDCBE" : "\uD83D\uDCE6";
-            TextView n = Ui.navItem(a, e, labels[k], k == sel, v -> { tab = keys[i2]; a.gameSettingsTop(); });
-            n.setMinHeight(Ui.dp(a, 38));
-            Ui.add(left, n, k == 0 ? 10 : 0);
-        }
-        return a.newPane(body);
+        body.addView(nav, new LinearLayout.LayoutParams(Ui.dp(a, 210), ViewGroup.LayoutParams.WRAP_CONTENT));
+        LinearLayout right = new LinearLayout(a);
+        right.setOrientation(LinearLayout.VERTICAL);
+        right.setClipChildren(false);
+        right.setClipToPadding(false);
+        LinearLayout.LayoutParams rp = Ui.weight();
+        rp.setMarginStart(Ui.dp(a, 20));
+        body.addView(right, rp);
+        right.addView(Ui.section(a, cur.label));
+        Ui.add(right, cur.rows, 6);
+        if (cur.info != null) info(a, right, cur.info);
+        if (reset != null) Ui.add(right, reset, 20, Ui.wrap());
     }
 
     /** The small line under a section's card */
@@ -801,25 +756,13 @@ final class GameSettings {
         String[] labels = {Tx.s(R.string.game_game_default_name, gpuTsName(p == null ? "submission" : p.gpuTs)), Tx.s(R.string.game_per_segment), Tx.s(R.string.game_per_submission)};
         String m = Prefs.gpuTs(a, g.titleId);
         int checked = m == null ? 0 : 1 + Math.max(0, Arrays.asList(GPU_TS).indexOf(m));
-        LinearLayout box = new LinearLayout(a);
-        box.setOrientation(LinearLayout.VERTICAL);
-        AlertDialog[] d = new AlertDialog[1];
-        box.addView(Ui.small(a, Tx.s(R.string.game_gpu_timing_explain)));
-        android.widget.RadioGroup rg = new android.widget.RadioGroup(a);
-        for (int k = 0; k < labels.length; k++) {
-            android.widget.RadioButton rb = new android.widget.RadioButton(a);
-            rb.setText(labels[k]);
-            rb.setId(k + 1);
-            rg.addView(rb);
-        }
-        rg.check(checked + 1);
-        rg.setOnCheckedChangeListener((x, w) -> {
-            Prefs.gpuTs(a, g.titleId, w <= 1 ? null : GPU_TS[w - 2]);
-            d[0].dismiss();
-            done.run();
-        });
-        Ui.add(box, rg, 8);
-        d[0] = Ui.sheet(a, Tx.s(R.string.game_title_for, Tx.s(R.string.game_gpu_timing), g.name), box).setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+        Ui.choiceSheet(a, "GPU timing · " + g.name,
+                "Per segment: the game's timestamps see the real GPU time, so its dynamic resolution can adapt. Per submission: one time for the whole "
+                        + "submission (the older behaviour). A DM_NVN_GPU_TS line in env.txt wins.",
+                labels, checked, w -> {
+                    Prefs.gpuTs(a, g.titleId, w == 0 ? null : GPU_TS[w - 1]);
+                    done.run();
+                });
     }
 
     /** The pack's scene_res rows (Pack.scenes), empty without a pack or from one that cannot be read */
@@ -848,34 +791,24 @@ final class GameSettings {
         if (ps.isEmpty()) return;
         java.util.Map<String, String> rows = packScenes(g);
         File pd = g.packDir != null ? new File(g.packDir) : null;
-        String recPreset = Prefs.rec(a, g.titleId, Recommend.RES_PRESET);   // this phone's recommended preset (Prefs.recommended), named in its line
-        LinearLayout box = new LinearLayout(a);
-        box.setOrientation(LinearLayout.VERTICAL);
-        AlertDialog[] d = new AlertDialog[1];
+        String recPreset = Prefs.rec(a, g.titleId, Recommend.RES_PRESET);
         boolean simple = Prefs.simpleRes(a, g.titleId);
-        box.addView(Ui.small(a, ResPresets.NOTE + " " + Tx.s(R.string.game_window_note_tail)));
-        android.widget.RadioGroup rg = new android.widget.RadioGroup(a);
-        for (int k = 0; k <= (simple ? ps.size() - 1 : ps.size()); k++) {   // the tester rows add Advanced after the presets
-            android.widget.RadioButton rb = new android.widget.RadioButton(a);
-            if (k < ps.size()) {
-                ResPresets.Preset p = ps.get(k);
-                boolean missing = p.overlay() && SceneRes.overlay(rows, pd, p.id) == null;
-                rb.setText(ResPresets.itemText(p, k == 0, p.id.equals(recPreset)) + (missing ? Tx.s(R.string.game_needs_prepare_again) : ""));
-            } else rb.setText(Tx.s(R.string.game_advanced_for_testers_nwindow_and));
-            rb.setId(k + 1);
-            rg.addView(rb);
+        String[] labels = new String[ps.size() + (simple ? 0 : 1)];
+        for (int k = 0; k < ps.size(); k++) {
+            ResPresets.Preset p = ps.get(k);
+            boolean missing = p.overlay() && SceneRes.overlay(rows, pd, p.id) == null;
+            labels[k] = ResPresets.itemText(p, k == 0, p.id.equals(recPreset)) + (missing ? " · needs Prepare again" : "");
         }
+        if (!simple) labels[ps.size()] = "Advanced (for testers)\nwindow and 3D scene set apart";
         String rc = Prefs.resolutionChoice(a, g.titleId);
         ResPresets.Preset cur = ResPresets.of(ps, rc);
-        if (cur != null) rg.check(ps.indexOf(cur) + 1);
-        else if (!simple) rg.check(ps.size() + 1);   // Advanced; a player's saved custom setup shows none checked
-        rg.setOnCheckedChangeListener((x, w) -> {
-            Prefs.resPreset(a, g.titleId, w <= ps.size() ? ps.get(w - 1).id : ResPresets.ADVANCED);
-            d[0].dismiss();
-            done.run();
-        });
-        Ui.add(box, rg, 8);
-        d[0] = Ui.sheet(a, Tx.s(R.string.game_title_for, Tx.s(R.string.common_resolution), g.name), box).setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+        int checked = cur != null ? ps.indexOf(cur) : simple ? -1 : ps.size();
+        Ui.choiceSheet(a, "Resolution · " + g.name,
+                ResPresets.NOTE + " Menus and text follow the window. Sizes marked about are estimates. The 3D pictures are made from your game files when the game is prepared.",
+                labels, checked, w -> {
+                    Prefs.resPreset(a, g.titleId, w < ps.size() ? ps.get(w).id : ResPresets.ADVANCED);
+                    done.run();
+                });
     }
 
     /** Game settings' value of Advanced › 3D scene: the choice's label, and when the pack has no overlay for it (made before the option, or the pack step refused the palette), what to do */
@@ -899,29 +832,18 @@ final class GameSettings {
         labels[0] = Tx.s(R.string.game_game_default_its_own_dynamic);
         for (int k = 0; k < ps.size(); k++) labels[k + 1] = ps.get(k).label;
         SceneRes.Preset cur = SceneRes.of(ps, Prefs.sceneRes(a, g.titleId));
-        LinearLayout box = new LinearLayout(a);
-        box.setOrientation(LinearLayout.VERTICAL);
-        AlertDialog[] d = new AlertDialog[1];
         boolean args = ps.stream().allMatch(SceneRes.Preset::arg);
-        box.addView(Ui.small(a, args
-                ? Tx.s(R.string.game_scene_args_explain)
-                : Tx.s(R.string.game_scene_overlay_explain)));
-        android.widget.RadioGroup rg = new android.widget.RadioGroup(a);
-        for (int k = 0; k < labels.length; k++) {
-            android.widget.RadioButton rb = new android.widget.RadioButton(a);
-            rb.setText(labels[k]);
-            rb.setId(k + 1);
-            rg.addView(rb);
-        }
-        rg.check(cur == null ? 1 : ps.indexOf(cur) + 2);
-        rg.setOnCheckedChangeListener((x, w) -> {
-            Prefs.sceneRes(a, g.titleId, w <= 1 ? null : ps.get(w - 2).name);
+        String note = args
+                ? "The 3D scene as a share of the picture, set through the game's own settings: higher is sharper and slower, menus and text stay sharp. "
+                  + "Sizes are the most the game draws; under load its dynamic resolution lowers them. Applies at the next start. A DM_GAME_ARGS_ADD line in env.txt wins."
+                : "The 3D scene as a scale of the window's upscaler output, before the upscaler takes it to the window: lower is faster and softer. Menus and text stay sharp. "
+                  + "Made from your game files when the game is prepared; applies at the next start. A DM_ROMFS_OVERLAY line in env.txt wins.";
+        int checked = cur == null ? 0 : ps.indexOf(cur) + 1;
+        Ui.choiceSheet(a, "3D scene · " + g.name, note, labels, checked, w -> {
+            Prefs.sceneRes(a, g.titleId, w == 0 ? null : ps.get(w - 1).name);
             keepAdvanced(a, g);
-            d[0].dismiss();
             done.run();
         });
-        Ui.add(box, rg, 8);
-        d[0] = Ui.sheet(a, Tx.s(R.string.game_title_for, Tx.s(R.string.game_3d_scene), g.name), box).setNegativeButton(Tx.s(R.string.common_cancel), null).show();
     }
 
     static String phoneTag() { return java.util.Locale.getDefault().toLanguageTag(); }
@@ -933,11 +855,10 @@ final class GameSettings {
         System.arraycopy(GameLanguage.NAMES, 0, labels, 1, GameLanguage.NAMES.length);
         String m = Prefs.gameLang(a, g.titleId);
         int checked = m == null ? 0 : 1 + Math.max(0, Arrays.asList(GameLanguage.CODES).indexOf(m));
-        new PadFocus.Builder(a).setTitle(Tx.s(R.string.game_title_for, Tx.s(R.string.game_game_language), g.name)).setSingleChoiceItems(labels, checked, (x, w) -> {
+        Ui.choiceSheet(a, "Game language · " + g.name, labels, checked, w -> {
             Prefs.gameLang(a, g.titleId, w == 0 ? null : GameLanguage.CODES[w - 1]);
-            x.dismiss();
             done.run();
-        }).setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+        });
     }
 
     /** A choice made under Advanced (a game with presets) stores Advanced, so the choices are not taken for a preset they happen to match (ResPresets.current) */
@@ -952,34 +873,31 @@ final class GameSettings {
         Profile mp = Profile.of(g.titleId);
         String[] modes = mp != null ? mp.modes() : null;
         if (modes != null) {   // a game with one docked and one handheld row (Profile.modes): those two choices only, as Display shows its two
-            new PadFocus.Builder(a).setTitle(windowTitle(g) + " · " + g.name).setSingleChoiceItems(new String[] {mp.modeLabel(0), mp.modeLabel(1)},
-                    mp.modeOf(Prefs.gameWindow(a, g.titleId)), (x, w) -> {
+            Ui.choiceSheet(a, windowTitle(g) + " · " + g.name,
+                    new String[] {mp.modeLabel(0), mp.modeLabel(1)}, mp.modeOf(Prefs.gameWindow(a, g.titleId)), w -> {
                 Prefs.gameWindow(a, g.titleId, modes[w]);
                 keepAdvanced(a, g);
-                x.dismiss();
                 done.run();
-            }).setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+            });
             return;
         }
         String[] labels = new String[Prefs.WINDOWS.length + 1];
         labels[0] = Tx.s(R.string.game_default_value, Prefs.windowName(Prefs.defaultWindow(a, g.titleId), false));
         { Profile lp = Profile.of(g.titleId); for (int li = 0; li < Prefs.WINDOWS.length; li++) labels[li + 1] = lp != null ? lp.windowLabel(Prefs.WINDOWS[li], Prefs.WINDOW_NAMES[li]) : Prefs.WINDOW_NAMES[li]; }   // a choice the game draws at another size says so (Profile.windowLabel)
         int checked = Prefs.ownWindow(a, g.titleId) ? 1 + Math.max(0, Arrays.asList(Prefs.WINDOWS).indexOf(Prefs.gameWindow(a, g.titleId))) : 0;
-        new PadFocus.Builder(a).setTitle(windowTitle(g) + " · " + g.name).setSingleChoiceItems(labels, checked, (x, w) -> {
+        Ui.choiceSheet(a, windowTitle(g) + " · " + g.name, labels, checked, w -> {
             Prefs.gameWindow(a, g.titleId, w == 0 ? null : Prefs.WINDOWS[w - 1]);
             keepAdvanced(a, g);
-            x.dismiss();
             done.run();
-        }).setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+        });
     }
 
     /** Display: Fit keeps the game's 16:9 picture with bars on a screen of another shape; Stretch fills the screen (DM_VK_STRETCH), the touch mapping with it */
     private static void display(MainActivity a, Game g, Runnable done) {
-        new PadFocus.Builder(a).setTitle(Tx.s(R.string.game_title_for, Tx.s(R.string.common_display), g.name)).setSingleChoiceItems(Tx.arr(R.array.arr_display), Prefs.stretch(a, g.titleId) ? 1 : 0, (x, w) -> {
+        Ui.choiceSheet(a, "Display · " + g.name, Prefs.DISPLAY_NAMES, Prefs.stretch(a, g.titleId) ? 1 : 0, w -> {
             Prefs.stretch(a, g.titleId, w == 1);
-            x.dismiss();
             done.run();
-        }).setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+        });
     }
 
     private static void xbox(MainActivity a, Game g, Runnable done) {   // Default first: the game follows Settings again
@@ -987,11 +905,10 @@ final class GameSettings {
         labels[0] = Tx.s(R.string.game_default_settings_value, Prefs.xboxLabel(Prefs.xboxButtons(a)));
         System.arraycopy(Tx.arr(R.array.arr_xbox), 0, labels, 1, Tx.arr(R.array.arr_xbox).length);
         int checked = Prefs.ownXboxButtons(a, g.titleId) ? Prefs.xboxButtons(a, g.titleId) + 1 : 0;
-        new PadFocus.Builder(a).setTitle(Tx.s(R.string.game_title_for, Tx.s(R.string.settings_xbox_button_label_swap), g.name)).setSingleChoiceItems(labels, checked, (x, w) -> {
+        Ui.choiceSheet(a, "Xbox button label swap · " + g.name, labels, checked, w -> {
             Prefs.xboxButtons(a, g.titleId, w == 0 ? null : w - 1);
-            x.dismiss();
             done.run();
-        }).setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+        });
     }
 
     private static void cap(MainActivity a, Game g, Runnable done) {
@@ -1002,10 +919,10 @@ final class GameSettings {
             labels[0] = rc != null ? Tx.s(R.string.game_recommended_value, Prefs.paceLabel(rc)) : pl > 0 ? Tx.s(R.string.game_default_this_games, Prefs.paceLabel(Prefs.paceOf(pl))) : Tx.s(R.string.game_default_settings_value, Prefs.paceLabel(Prefs.paceOf(Prefs.fpsCap(a))));
             int checked = 0, cur = Prefs.paceCap(a, g.titleId);
             for (int k = 0; k < Prefs.PACE_CAPS.length; k++) { labels[k + 1] = Prefs.paceLabel(Prefs.PACE_CAPS[k]); if (Prefs.ownFpsCap(a, g.titleId) && Prefs.PACE_CAPS[k] == cur) checked = k + 1; }
-            new PadFocus.Builder(a).setTitle(Tx.s(R.string.game_title_for, Tx.s(R.string.common_frame_rate_cap), g.name)).setSingleChoiceItems(labels, checked, (x, w) -> {
+            Ui.choiceSheet(a, "Frame rate cap · " + g.name, labels, checked, w -> {
                 Prefs.fpsCap(a, g.titleId, w == 0 ? null : Prefs.PACE_CAPS[w - 1]);
-                x.dismiss(); done.run();
-            }).setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+                done.run();
+            });
             return;
         }
         int n = Prefs.FPS_CAPS.length;
@@ -1021,11 +938,10 @@ final class GameSettings {
             labels[k + 2] = MainActivity.capLabel(Prefs.FPS_CAPS[k]);
             if (own && Prefs.FPS_CAPS[k] == cur) checked = k + 2;
         }
-        new PadFocus.Builder(a).setTitle(Tx.s(R.string.game_title_for, Tx.s(R.string.common_frame_rate_cap), g.name)).setSingleChoiceItems(labels, checked, (x, w) -> {
+        Ui.choiceSheet(a, "Frame rate cap · " + g.name, labels, checked, w -> {
             Prefs.fpsCap(a, g.titleId, w == 0 ? null : w == 1 ? -1 : Prefs.FPS_CAPS[w - 2]);
-            x.dismiss();
             done.run();
-        }).setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+        });
     }
 
     private static void driver(MainActivity a, Game g, Runnable done) {
@@ -1041,12 +957,10 @@ final class GameSettings {
             labels.add(inst.get(k).label());
             if (c != null && inst.get(k).dir.getName().equals(c)) checked = k + 2;
         }
-        new PadFocus.Builder(a).setTitle(Tx.s(R.string.game_title_for, Tx.s(R.string.common_gpu_driver), g.name)).setSingleChoiceItems(labels.toArray(new String[0]), checked, (x, w) -> {
+        Ui.choiceSheet(a, "GPU driver · " + g.name, labels.toArray(new String[0]), checked, w -> {
             GpuDriver.choice(a, g.titleId, w == 0 ? null : w == 1 ? GpuDriver.SYSTEM : inst.get(w - 2).dir.getName());
-            x.dismiss();
-            if (slowOnTurnip(a, g.titleId)) Toast.makeText(a, TURNIP_SLOW_NOTE(), Toast.LENGTH_LONG).show();
             done.run();
-        }).setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+        });
     }
 
     private static void env(MainActivity a, Game g, Runnable done) {
@@ -1076,8 +990,7 @@ final class GameSettings {
         String[] labels = new String[items.length + 1];
         labels[0] = first;
         System.arraycopy(items, 0, labels, 1, items.length);
-        new PadFocus.Builder(a).setTitle(title).setSingleChoiceItems(labels, own ? cur + 1 : 0, (x, w) -> { set.accept(w == 0 ? null : w - 1); x.dismiss(); done.run(); })
-                .setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+        Ui.choiceSheet(a, title, labels, own ? cur + 1 : 0, w -> { set.accept(w == 0 ? null : w - 1); done.run(); });
     }
 
     private static void upscaler(MainActivity a, Game g, Runnable done) {   // the Upscaler (GameUpscaler: DM_VK_NDSR and the present's scaling); the in-game panel changes it live
@@ -1153,10 +1066,9 @@ final class GameSettings {
                     : Tx.s(R.string.game_aspect_3d_follows));
         String cur = Prefs.aspect(a, g.titleId);
         int checked = cur == null ? 0 : Math.max(0, as.indexOf(cur) + 1);
-        new PadFocus.Builder(a).setTitle(Tx.s(R.string.game_title_for, Tx.s(R.string.game_aspect_ratio), g.name)).setSingleChoiceItems(labels, checked, (x, w) -> {
+        Ui.choiceSheet(a, "Aspect ratio · " + g.name, labels, checked, w -> {
             Prefs.aspect(a, g.titleId, w == 0 ? null : as.get(w - 1));
-            x.dismiss();
             done.run();
-        }).setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+        });
     }
 }

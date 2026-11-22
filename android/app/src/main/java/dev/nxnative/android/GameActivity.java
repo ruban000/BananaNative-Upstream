@@ -121,14 +121,15 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
         }
         FrameLayout root = new FrameLayout(this);
         rootView = root;
-        SurfaceView surface = new SurfaceView(this);
+        GameSurfaceView surface = new GameSurfaceView(this);
         surface.getHolder().addCallback(this);
         root.addView(surface);
         // The log's last lines (tail()): bottom left, one block only as high as its text, so it stays clear of the build tag in the corner above
         overlay = overlayText(Gravity.BOTTOM | Gravity.START, 1f);
         root.addView(overlay, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START));
-        // The on-screen controls take every touch and pass it to the host, which tells controls from touchscreen fingers
+        // The controls are a visual overlay; ordinary gameplay touches fall through to GameSurfaceView, which forwards them to the host.
         controls = new TouchControls(this, Native.hasInput());
+        surface.setInputChangedListener(controls::inputChanged);
         root.addView(controls, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         // The build tag: an overlay item, on by default (fpsTick follows the switches); bold, flush in the top-left corner
         tag = overlayText(Gravity.TOP | Gravity.START, 1f);
@@ -1069,8 +1070,11 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
                 .setPositiveButton(android.R.string.ok, (d, w) -> end()).setCancelable(false).show();
     }
 
-    void end() {
-        ExitWatch.stopped();   // first, as before: the launcher never takes this end for an unexpected one
+    /** The in-game panel's explicit power/stop action. */
+    void stopFromPanel() { end(); }
+
+    private void end() {
+        ExitWatch.stopped();
         backToFrontend();
         finishAndRemoveTask();   // the game's own task (taskAffinity <application ID>.game) leaves Recents with it
         endProcess();   // now, not at onDestroy: Android may hold a finishing screen's destroy until the next one is idle

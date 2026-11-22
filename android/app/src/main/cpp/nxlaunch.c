@@ -41,6 +41,8 @@ void nxhost_env_changed(void);
 #pragma weak nxhost_input_touch
 #pragma weak nxhost_touch_layout
 #pragma weak nxhost_touch_controls_enable
+#pragma weak nxhost_touch_dual_stick
+#pragma weak nxhost_touch_right_sensitivity
 #pragma weak nxhost_touch_controls_set
 #pragma weak nxhost_touch_controls_state
 #pragma weak nxhost_motion_start
@@ -386,6 +388,12 @@ JNIEXPORT void JNICALL Java_dev_nxnative_android_Native_picturePlace(JNIEnv *env
 }
 JNIEXPORT void JNICALL Java_dev_nxnative_android_Native_touchControlsEnable(JNIEnv *env, jclass cls, jboolean on) {
     (void)env; (void)cls; if (nxhost_touch_controls_enable) nxhost_touch_controls_enable(on);
+}
+JNIEXPORT void JNICALL Java_dev_nxnative_android_Native_touchControlsDualStick(JNIEnv *env, jclass cls, jboolean on) {
+    (void)env; (void)cls; if (nxhost_touch_dual_stick) nxhost_touch_dual_stick(on);
+}
+JNIEXPORT void JNICALL Java_dev_nxnative_android_Native_touchControlsRightSwipeSensitivity(JNIEnv *env, jclass cls, jint sensitivity) {
+    (void)env; (void)cls; if (nxhost_touch_right_sensitivity) nxhost_touch_right_sensitivity((float)sensitivity);
 }
 // The launcher's layout (TouchControlsView): six floats per control, kind, buttons, stick, x, y, r (input_android.h). The number the host kept; -1 = this host draws none
 JNIEXPORT jint JNICALL Java_dev_nxnative_android_Native_touchControlsSet(JNIEnv *env, jclass cls, jfloatArray a) {

@@ -137,7 +137,7 @@ void nxin_touch_default_layout(nxin_touch *t) {
 }
 static void release(nxin_touch *t, int ctl);
 int nxin_touch_set_layout(nxin_touch *t, const nxhost_touch_control *c, int n, int *kept) {
-    int r = 0; for (int i = 0; i < t->np; i++) r |= t->p[i].ctl >= 0 ? 1 : t->p[i].ctl == -1 ? 2 : 0, release(t, t->p[i].ctl);
+    int r = 0; for (int i = 0; i < t->np; i++) r |= (t->p[i].ctl >= 0 || t->p[i].ctl == -3 || t->p[i].ctl == -4) ? 1 : t->p[i].ctl == -1 ? 2 : 0, release(t, t->p[i].ctl);
     t->np = 0;
     if (!c || n <= 0) nxin_touch_default_layout(t);
     else {
@@ -150,7 +150,7 @@ int nxin_touch_set_layout(nxin_touch *t, const nxhost_touch_control *c, int n, i
 }
 void nxin_touch_init(nxin_touch *t) {
     memset(t, 0, sizeof *t);
-    t->enabled = 1; t->sw = 16; t->sh = 9; t->gw = t->gh = 1;
+    t->enabled = 1; t->sw = 16; t->sh = 9; t->gw = t->gh = 1; t->right_sensitivity = 24.0f;
     nxin_touch_default_layout(t);
 }
 // Distance from a control's centre in units of the screen height
@@ -162,7 +162,9 @@ static float dist(const nxin_touch *t, const nxhost_touch_control *c, float x, f
 static int hit(const nxin_touch *t, float x, float y) {
     int best = -1; float bd = 0;
     for (int i = 0; i < t->n; i++) {
-        const nxhost_touch_control *c = &t->c[i]; float dx, dy, d = dist(t, c, x, y, &dx, &dy);
+        const nxhost_touch_control *c = &t->c[i];
+        if (t->dual_stick && c->kind == NXT_STICK) continue;
+        float dx, dy, d = dist(t, c, x, y, &dx, &dy);
         float grab = c->kind == NXT_STICK ? STICK_GRAB : c->kind == NXT_DPAD ? DPAD_GRAB : 1;
         if (d <= c->r * grab && (best < 0 || d / c->r < bd)) { best = i; bd = d / c->r; }
     }
@@ -175,7 +177,29 @@ static uint64_t dpad_dir(float dx, float dy, float r) {   // 8 directions, a cen
     if (dy > fabsf(dx) * k) b |= DM_BTN_DOWN; if (-dy > fabsf(dx) * k) b |= DM_BTN_UP;
     return b;
 }
-static void drive(nxin_touch *t, nxin_pointer *p) {   // a pointer on a control: what it presses or how far it tilts
+static void drive(nxin_touch *t, nxin_pointer *p) {   // a pointer on a control or an invisible floating-origin stick
+    if (p->ctl == -3 || p->ctl == -4) {
+        float aspect = t->sh > 0 ? t->sw / t->sh : 1;
+        float dx = (p->x - p->origin_x) * aspect, dy = p->y - p->origin_y;
+        if (p->ctl == -4) {
+            // Right half is a relative swipe-look surface: each finger movement
+            // nudges the Switch right stick, rather than measuring from a fixed
+            // joystick origin. Keep the previous point so the user can lift and
+            // re-touch anywhere without needing to drag from a fixed centre.
+            t->sx[1] = clamp1(dx * t->right_sensitivity * 1.8f);
+            t->sy[1] = clamp1(-dy * t->right_sensitivity * 1.8f);
+            p->origin_x = p->x;
+            p->origin_y = p->y;
+        } else {
+            // Left half remains a floating-origin movement stick.
+            const float radius = 0.18f * STICK_FULL;
+            float sx = dx / radius, sy = -dy / radius, m = sqrtf(sx * sx + sy * sy);
+            if (m > 1) { sx /= m; sy /= m; }
+            if (m < STICK_DEAD) sx = sy = 0;
+            t->sx[0] = sx; t->sy[0] = sy;
+        }
+        return;
+    }
     nxhost_touch_control *c = &t->c[p->ctl]; float dx, dy; dist(t, c, p->x, p->y, &dx, &dy);
     if (c->kind == NXT_BUTTON) t->pressed[p->ctl] = c->buttons;
     else if (c->kind == NXT_DPAD) t->pressed[p->ctl] = dpad_dir(dx, dy, c->r);
@@ -187,6 +211,11 @@ static void drive(nxin_touch *t, nxin_pointer *p) {   // a pointer on a control:
     }
 }
 static void release(nxin_touch *t, int ctl) {
+    if (ctl == -3 || ctl == -4) {
+        int s = ctl == -3 ? 0 : 1;
+        t->sx[s] = t->sy[s] = 0;
+        return;
+    }
     if (ctl < 0) return;
     t->pressed[ctl] = 0;
     if (t->c[ctl].kind == NXT_STICK) t->sx[t->c[ctl].stick] = t->sy[t->c[ctl].stick] = 0;
@@ -195,7 +224,7 @@ static int in_game(const nxin_touch *t, float x, float y) { return x >= t->gx &&
 int nxin_touch_event(nxin_touch *t, int action, int id, float x, float y) {
     int k = -1; for (int i = 0; i < t->np; i++) if (t->p[i].id == id) k = i;
     if (action == AM_CANCEL) {   // the whole gesture is gone
-        int r = 0; for (int i = 0; i < t->np; i++) r |= t->p[i].ctl >= 0 ? 1 : t->p[i].ctl == -1 ? 2 : 0, release(t, t->p[i].ctl);
+        int r = 0; for (int i = 0; i < t->np; i++) r |= (t->p[i].ctl >= 0 || t->p[i].ctl == -3 || t->p[i].ctl == -4) ? 1 : t->p[i].ctl == -1 ? 2 : 0, release(t, t->p[i].ctl);
         t->np = 0; return r;
     }
     if (action == AM_DOWN || action == AM_POINTER_DOWN) {
@@ -203,6 +232,13 @@ int nxin_touch_event(nxin_touch *t, int action, int id, float x, float y) {
         nxin_pointer *p = &t->p[t->np++]; p->id = id; p->x = x; p->y = y; p->slot = -1;
         p->ctl = t->enabled ? hit(t, x, y) : -1;
         if (p->ctl >= 0) { for (int i = 0; i < t->np - 1; i++) if (t->p[i].ctl == p->ctl) { p->ctl = -2; return 0; } drive(t, p); return 1; }   // a control has one pointer
+        if (t->enabled && t->dual_stick && x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+            p->ctl = x < 0.5f ? -3 : -4;
+            for (int i = 0; i < t->np - 1; i++) if (t->p[i].ctl == p->ctl) { p->ctl = -2; return 0; }
+            p->origin_x = x; p->origin_y = y;
+            drive(t, p);
+            return 1;
+        }
         if (!in_game(t, x, y)) { p->ctl = -2; return 0; }
         p->ctl = -1;
         uint32_t used = 0; for (int i = 0; i < t->np - 1; i++) if (t->p[i].ctl == -1) used |= 1u << t->p[i].slot;
@@ -211,8 +247,8 @@ int nxin_touch_event(nxin_touch *t, int action, int id, float x, float y) {
     }
     if (k < 0) return 0;
     nxin_pointer *p = &t->p[k]; p->x = x; p->y = y;
-    int r = p->ctl >= 0 ? 1 : p->ctl == -1 ? 2 : 0;
-    if (action == AM_MOVE) { if (p->ctl >= 0) drive(t, p); return r; }
+    int r = (p->ctl >= 0 || p->ctl == -3 || p->ctl == -4) ? 1 : p->ctl == -1 ? 2 : 0;
+    if (action == AM_MOVE) { if (p->ctl >= 0 || p->ctl == -3 || p->ctl == -4) drive(t, p); return r; }
     if (action == AM_UP || action == AM_POINTER_UP) { release(t, p->ctl); t->p[k] = t->p[--t->np]; return r; }
     return 0;
 }

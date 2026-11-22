@@ -34,6 +34,8 @@ NXHOST_API void nxhost_input_touch(int action, int id, float x, float y);
 // The view's size in pixels and where the game's picture lies in it (normalized; 0, 0, 1, 1 when the picture fills the view)
 NXHOST_API void nxhost_touch_layout(float view_w, float view_h, float pic_x, float pic_y, float pic_w, float pic_h);
 NXHOST_API void nxhost_touch_controls_enable(bool on);   // on by default; off sends every touch to the game (a gamepad is in use, say)
+NXHOST_API void nxhost_touch_dual_stick(bool on);           // route unclaimed touches in the left/right screen halves to invisible floating-origin sticks
+NXHOST_API void nxhost_touch_right_sensitivity(float sensitivity); // right-side swipe response
 // The on-screen controls to draw: their count, and each one's kind / buttons / centre / radius / label (input_map.h). pressed: what each holds now, stick: deflection (-1..1, y up)
 NXHOST_API int nxhost_touch_controls(nxhost_touch_control *out, int max);
 NXHOST_API void nxhost_touch_controls_state(uint64_t *pressed, int max, float stick[4]);

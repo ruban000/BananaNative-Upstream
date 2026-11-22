@@ -10,8 +10,8 @@ final class PanelLook {
 
     static final String[] NAMES = {"Small", "Normal", "Large"};
     static final int NORMAL = 1;
-    private static final int[] WIDTH_DP = {340, 420, 520}, ROW_DP = {40, 48, 60};
-    private static final float[] WIDTH_SHARE = {0.45f, 0.55f, 0.7f}, TEXT = {0.85f, 1f, 1.2f};
+    private static final int[] WIDTH_DP = {340, 420, 520}, ROW_DP = {36, 42, 48};
+    private static final float[] WIDTH_SHARE = {0.45f, 0.55f, 0.7f}, TEXT = {0.78f, 0.88f, 1.0f};
 
     /** A stored choice as an index of NAMES: anything else reads as Normal */
     static int of(int v) { return v >= 0 && v < NAMES.length ? v : NORMAL; }

@@ -1,22 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The icon's background (deep green) behind the banana -->
-    <color name="ic_launcher_background">#FF1E5B3A</color>
-
-    <!-- The launcher's palette (Ui.java, themes.xml): ripe banana on a light grey home, peel brown and the icon's leaf green. values-night has the dark set -->
-    <color name="bn_bg">#FFECECEE</color>            <!-- the screen: light grey, as the Switch 2 home -->
-    <color name="bn_card">#FFFFFFFF</color>          <!-- cards and dialogs -->
-    <color name="bn_card_stroke">#FFDADADF</color>
-    <color name="bn_tint">#FFE3E3E8</color>          <!-- tonal buttons, icon tiles, chips -->
-    <color name="bn_banana">#FFFFD43B</color>        <!-- primary buttons -->
-    <color name="bn_banana_deep">#FFF2B705</color>
-    <color name="bn_on_banana">#FF3B2611</color>     <!-- text on banana yellow (both modes) -->
-    <color name="bn_text">#FF1C1C1E</color>
-    <color name="bn_text_2">#FF66666E</color>
-    <color name="bn_accent">#FF9A6400</color>        <!-- check boxes, switches, dialog buttons: a deep gold that reads on light grey -->
-    <color name="bn_leaf">#FF1E5B3A</color>
+    <color name="ic_launcher_background">#FF0B101B</color>
+    <color name="bn_bg">#FF0B101B</color>
+    <color name="bn_card">#FF111B2A</color>
+    <color name="bn_card_stroke">#333F536B</color>
+    <color name="bn_tint">#FF1A293C</color>
+    <color name="bn_banana">#FFFFFFFF</color>
+    <color name="bn_banana_deep">#FFDCE5F0</color>
+    <color name="bn_on_banana">#FF0B101B</color>
+    <color name="bn_text">#FFFFFFFF</color>
+    <color name="bn_text_2">#FF9AA8BA</color>
+    <color name="bn_accent">#FFFFFFFF</color>
+    <color name="bn_leaf">#FF0B101B</color>
     <color name="bn_on_leaf">#FFFFFFFF</color>
-    <color name="bn_danger">#FFB83A12</color>
-    <color name="bn_danger_tint">#FFFDE3D8</color>
-    <color name="bn_warn_tint">#FFFFE7B0</color>
+    <color name="bn_danger">#FFFF8796</color>
+    <color name="bn_danger_tint">#FF3A202B</color>
+    <color name="bn_warn_tint">#FF382D1D</color>
 </resources>

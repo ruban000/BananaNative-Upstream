@@ -59,6 +59,10 @@ final class Native {
 
     static native void touchControlsEnable(boolean on);
 
+    /** Route unclaimed touches in each screen half to an invisible floating-origin stick. */
+    static native void touchControlsDualStick(boolean on);
+    static native void touchControlsRightSwipeSensitivity(int sensitivity);
+
     /** The on-screen controls' layout, six floats per control: kind (0 button, 1 stick, 2 D-pad), buttons (DM_BTN_* bits), stick (0 left, 1 right), x, y (normalized
      *  to the view), r (in units of the view's height). The number the host kept; -1 when this host has no such entry point (no controls are drawn). */
     static native int touchControlsSet(float[] controls);
