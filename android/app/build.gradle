@@ -240,7 +240,7 @@ android {
     ndkVersion '28.2.13676358'
 
     defaultConfig {
-        applicationId nxLive ? 'dev.bananative.android' : nxPlay ? 'dev.nxnative.android.play' : nxApp ? "dev.nxnative.android.$nxApp" : 'dev.nxnative.android'
+        applicationId nxLive ? 'dev.bananative.android' : nxPlay ? providers.gradleProperty('nxPlayId').getOrElse('dev.nxnative.android.play.ui') : nxApp ? "dev.nxnative.android.$nxApp" : 'dev.nxnative.android'
         resValue 'string', 'app_name', nxPlay || nxLive ? 'Banana Native' : nxApp ? nxLabel : 'Banana Native test'
         minSdk nxMinSdk
         targetSdk 35
