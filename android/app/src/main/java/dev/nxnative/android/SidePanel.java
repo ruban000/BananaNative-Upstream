@@ -148,6 +148,9 @@ final class SidePanel extends FrameLayout {
         drawer.addView(menuScroll, new LinearLayout.LayoutParams(menuWidth(), LinearLayout.LayoutParams.MATCH_PARENT));
         sheet = new LinearLayout(a);   // the section's column: a hairline against the menu, then its rows
         sheet.setOrientation(LinearLayout.HORIZONTAL);
+        // This view is sized before it is attached during the first Back-to-menu transition.
+        // Give it valid parameters up front so sizes()/slideIn() never dereference null.
+        sheet.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT));
         View rule = new View(a);
         rule.setBackgroundColor(0x1FFFFFFF);
         sheet.addView(rule, new LinearLayout.LayoutParams(Math.max(1, Math.round(dp)), LinearLayout.LayoutParams.MATCH_PARENT));
