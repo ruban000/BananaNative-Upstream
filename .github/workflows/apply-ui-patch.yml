@@ -1,0 +1,80 @@
+name: Merge application UI onto upstream Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - apply/application-ui-next
+    paths:
+      - .github/workflows/apply-ui-patch.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: merge-application-ui-next
+  cancel-in-progress: false
+
+jobs:
+  merge-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: apply/application-ui-next
+          fetch-depth: 0
+
+      - name: Merge UI branch while retaining upstream changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET_BEFORE="$(git rev-parse HEAD)"
+          SOURCE_REF="ui-source/feature/application-ui-next"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git remote add ui-source https://github.com/ruban000/BananaNative-UI.git
+          git fetch --no-tags ui-source feature/application-ui-next
+
+          # Merge the source branch against the real shared history. For genuinely
+          # overlapping hunks, prefer the UI branch; non-overlapping upstream edits
+          # are retained by Git's three-way merge.
+          if ! git merge --no-commit --no-ff -X theirs "$SOURCE_REF"; then
+            if [[ -n "$(git diff --name-only --diff-filter=U)" ]]; then
+              echo "::error::Unresolved conflicts remain after the three-way UI merge."
+              git merge --abort || true
+              exit 1
+            fi
+          fi
+
+          # Keep only the Android app source and Android input changes from the
+          # UI branch. Restore workflows, build configuration, and other paths
+          # to the upstream staging-branch versions.
+          while IFS= read -r path; do
+            [[ -z "$path" ]] && continue
+            case "$path" in
+              android/app/src/*|dm/host/android/*) ;;
+              *) git restore --source="$TARGET_BEFORE" --staged --worktree -- "$path" 2>/dev/null || true ;;
+            esac
+          done < <(git diff --name-only "$TARGET_BEFORE" "$SOURCE_REF")
+
+          if [[ -n "$(git diff --name-only --diff-filter=U)" ]]; then
+            echo "::error::Unmerged paths remain; refusing to push."
+            git merge --abort || true
+            exit 1
+          fi
+
+          rm -f -- "android...feature_application-ui-next.txt"
+          rm -f -- ".github/workflows/apply-ui-patch.yml"
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "::error::The merge produced no UI changes."
+            git merge --abort || true
+            exit 1
+          fi
+
+          git commit -m "Merge application-ui-next UI changes onto upstream Android"
+          git push origin HEAD:apply/application-ui-next
