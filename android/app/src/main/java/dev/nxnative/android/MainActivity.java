@@ -129,6 +129,8 @@ public final class MainActivity extends Activity {
         Updater.onStart(this);   // the release app: a newer release on GitHub opens the update popup (once per process start: not on a resume or a rotation)
     }
 
+    private String poppedLine(long n) { return "Bananas Popped: " + java.text.NumberFormat.getIntegerInstance().format(n); }
+
     /** Hide the status bar, but keep Android navigation visible so its auto-rotate suggestion remains available. */
     @SuppressWarnings("deprecation")
     private void applyImmersiveMode() {
