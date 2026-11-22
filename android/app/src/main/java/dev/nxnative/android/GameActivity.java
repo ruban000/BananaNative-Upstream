@@ -1119,6 +1119,10 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
     private Runnable lsfgFollow;   // stops Lsfg.follow (frame generation's choices following the screen while the game runs)
 
     @Override protected void onDestroy() {
+        if (Build.VERSION.SDK_INT >= 33 && backCallback != null) {
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
+            backCallback = null;
+        }
         if (lsfgFollow != null) { lsfgFollow.run(); lsfgFollow = null; }
         if (layer != null) { layer.stop(); layer = null; }
         TextInput.gone(this);
@@ -1602,14 +1606,6 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
 
     @SuppressWarnings("deprecation")
     @Override public void onBackPressed() { handleBack(); }
-
-    @Override protected void onDestroy() {
-        if (Build.VERSION.SDK_INT >= 33 && backCallback != null) {
-            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
-            backCallback = null;
-        }
-        super.onDestroy();
-    }
 
     // For CtrlScreen: the view tree it goes into (under the in-game panel), and whether a gamepad is connected (then the on-screen controls are hidden and cannot join)
     FrameLayout rootView() { return rootView; }
