@@ -736,6 +736,7 @@ final class TouchControls extends View {
     private void drawControls(Canvas c) {
         for (int i = 0; i < n; i++) {
             boolean held = pressed[i] != 0;
+            boolean off = editing && hid[i];
             // Keep ZR in the native touch layout, but never draw its icon, shape, or label.
             if (buttons[i] == ZR) continue;
             fill.setColor(held ? Color.argb(alpha(0.55f), 255, 255, 255) : Color.argb(alpha(0.35f), 0, 0, 0));
