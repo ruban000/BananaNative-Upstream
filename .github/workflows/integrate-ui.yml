@@ -46,3 +46,129 @@ jobs:
 
       - name: Push integration to staging only
         run: git push origin HEAD:refs/heads/apply/application-ui-next
+
+  build:
+    needs: integrate
+    name: Build arm64 Android APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Check out integrated staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: apply/application-ui-next
+          submodules: recursive
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install pinned Android NDK and CMake
+        shell: bash
+        run: |
+          sdkmanager "ndk;28.2.13676358" "cmake;3.22.1"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/28.2.13676358" >> "$GITHUB_ENV"
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build zsh perl
+
+      - name: Cache native packer stage
+        id: native-stage
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/nxnative-pack/stage
+          key: ${{ runner.os }}-native-pack-ndk28.2.13676358-py3.14.6-${{ hashFiles('android/ondevice/**', 'dm/third_party/zstd-zbic/**', 'dm/gfx/tools/dmsh_xlate_android/**', 'dm/gfx/tools/build_spirv_tools.sh', 'dm/gfx/tools/xlate_tree.py') }}
+
+      - name: Build the on-device packer stage
+        if: steps.native-stage.outputs.cache-hit != 'true'
+        shell: zsh {0}
+        run: |
+          zsh android/ondevice/build.sh "$RUNNER_TEMP/nxnative-pack"
+
+      - name: Verify native packer stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          STAGE="$RUNNER_TEMP/nxnative-pack/stage"
+          test -s "$STAGE/lib/libpython3.14.so"
+          test -s "$STAGE/lib/libnxpack.so"
+          test -s "$STAGE/lib/libzbicdec.so"
+          test -s "$STAGE/lib/libdmsh_xlate.so"
+          test -s "$STAGE/lib/libSPIRV-Tools-shared.so"
+          test -d "$STAGE/python/lib/python3.14"
+          echo "Native packer stage is ready (cache hit: ${{ steps.native-stage.outputs.cache-hit == 'true' }})."
+
+      - name: Configure Android SDK path
+        run: |
+          printf 'sdk.dir=%s\\n' "$ANDROID_SDK_ROOT" > android/app/local.properties
+
+      - name: Configure APK signing (persistent key if supplied)
+        shell: bash
+        env:
+          NX_KEYSTORE_BASE64: ${{ secrets.NX_KEYSTORE_BASE64 }}
+          NX_KEY_ALIAS: ${{ secrets.NX_KEY_ALIAS }}
+          NX_KEY_PASSWORD: ${{ secrets.NX_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$NX_KEYSTORE_BASE64" && -z "$NX_KEY_ALIAS" && -z "$NX_KEY_PASSWORD" ]]; then
+            echo "::notice::No persistent signing key configured; using the temporary Android debug key. Future APKs may require reinstalling."
+            exit 0
+          fi
+          if [[ -z "$NX_KEYSTORE_BASE64" || -z "$NX_KEY_ALIAS" || -z "$NX_KEY_PASSWORD" ]]; then
+            echo "::error::If using a persistent key, provide all three NX_KEYSTORE_BASE64, NX_KEY_ALIAS and NX_KEY_PASSWORD secrets."
+            exit 1
+          fi
+          KEYSTORE="$RUNNER_TEMP/banana-native-ui.jks"
+          printf '%s' "$NX_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          test -s "$KEYSTORE"
+          {
+            echo "NX_SIGN_STORE=$KEYSTORE"
+            echo "NX_SIGN_ALIAS=$NX_KEY_ALIAS"
+            echo "NX_SIGN_PASS=$NX_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Cache .NET packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.fsproj', '**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Build APK
+        working-directory: android/app
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon --build-cache --parallel -PnxPlay=true -PnxPlayId=dev.nxnative.android.play.ui -PnxLabel='Banana Native ui' -PnxPackStage="$RUNNER_TEMP/nxnative-pack/stage" apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Banana-Native-Android-arm64
+          path: android/app/out/*.apk
+          if-no-files-found: error
+          retention-days: 14
