@@ -99,6 +99,11 @@ public final class MainActivity extends Activity {
     }
 
     private int layoutNow = HomeLayout.ROW;
+    private final Runnable workRun = this::workTick;
+    private final android.os.Handler workUi = new android.os.Handler(android.os.Looper.getMainLooper());
+    private String keepSelected;
+    private List<String> moveOrig;
+    private String moveId;
 
     @Override protected void onCreate(Bundle saved) {
         super.onCreate(saved);
@@ -2646,4 +2651,181 @@ public final class MainActivity extends Activity {
     private void pick(String title, String[] items, int cur, java.util.function.IntConsumer set) {
         Ui.choiceSheet(this, title, items, cur, w -> { set.accept(w); refreshSettings(); });
     }
+
+    // Restored upstream helpers needed by the PS5 UI integration.
+    void hintUpdate() {
+        if (hint == null) return;
+        boolean pad = HintBar.hasPad(this);
+        if (moveId != null) {
+            if (pad) hint.set(new String[] {"\u2194", Tx.s(R.string.hint_move)}, new String[] {"A", Tx.s(R.string.hint_place)}, new String[] {"B", Tx.s(R.string.hint_cancel)});
+            else hint.set(new String[] {null, Tx.s(R.string.hint_tap_move)});
+        } else if (onHome()) {
+            View f = getCurrentFocus();
+            boolean onTile = f != null && f.getTag() instanceof TileInfo;
+            if (games.isEmpty()) { if (pad) hint.set(new String[] {"A", Tx.s(R.string.home_add_game)}); else hint.set(); }
+            else if (pad && onTile) hint.set(new String[] {"A", Tx.s(R.string.hint_open)}, new String[] {"X", Tx.s(R.string.hint_options_hold)});
+            else hint.set();
+        } else if (pad) hint.set(new String[] {"A", Tx.s(R.string.hint_select)}, new String[] {"B", Tx.s(R.string.hint_back)});
+        else hint.set();
+    }
+
+    private boolean moveKey(KeyEvent e) {
+        int k = e.getKeyCode();
+        boolean down = e.getAction() == KeyEvent.ACTION_DOWN;
+        if (PadFocus.isBack(k) || k == KeyEvent.KEYCODE_BACK) { if (!down) endMove(false); return true; }
+        if (k == KeyEvent.KEYCODE_BUTTON_A || k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER) { if (down && e.getRepeatCount() == 0) endMove(true); return true; }
+        boolean rtl = layoutNow == HomeLayout.ROW && getResources().getConfiguration().getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
+        int cols = layoutNow == HomeLayout.GRID ? HomeLayout.columns(gameBox) : 1;
+        int d = 0;
+        if (k == KeyEvent.KEYCODE_DPAD_LEFT) d = rtl ? 1 : -1;
+        else if (k == KeyEvent.KEYCODE_DPAD_RIGHT) d = rtl ? -1 : 1;
+        else if (k == KeyEvent.KEYCODE_DPAD_UP) d = layoutNow == HomeLayout.GRID ? -cols : layoutNow == HomeLayout.LIST ? -1 : 0;
+        else if (k == KeyEvent.KEYCODE_DPAD_DOWN) d = layoutNow == HomeLayout.GRID ? cols : layoutNow == HomeLayout.LIST ? 1 : 0;
+        else return false;
+        if (down && d != 0) stepMove(d);
+        return true;
+    }
+
+    private void endMove(boolean keep) {
+        if (moveId == null) return;
+        if (!keep) Prefs.gameOrder(this, GameOrder.write(moveOrig));
+        keepSelected = moveId;
+        moveId = null;
+        moveOrig = null;
+        refresh();
+        hintUpdate();
+    }
+
+    private void bananaTaps(FrameLayout frame) {
+        android.widget.ScrollView scroll = pageScroll();
+        if (scroll == null) return;
+        scroll.setOnTouchListener(popListener(scroll));
+    }
+
+    private static void noFocusTint(View v) {
+        v.setDefaultFocusHighlightEnabled(false);
+        if (v instanceof android.widget.ScrollView || v instanceof android.widget.HorizontalScrollView) v.setFocusable(false);
+        if (v instanceof ViewGroup) for (int i = 0; i < ((ViewGroup) v).getChildCount(); i++) noFocusTint(((ViewGroup) v).getChildAt(i));
+    }
+
+    private void workTick() {
+        workUi.removeCallbacks(workRun);
+        if (!resumed || workTiles.isEmpty()) return;
+        boolean demo = BuildConfig.DEBUG && Prefs.demoGames(this);   // the sample tiles: a made-up progress
+        float p = demo ? (System.currentTimeMillis() / 150 % 100) / 100f : Ondevice.progress();
+        String line = demo ? Tx.s(R.string.common_preparing) : Ondevice.progressLine();
+        int state = demo ? Ondevice.TILE_RUNNING : Ondevice.tileState();
+        int detail = line.indexOf(": ");   // the tile names the stage only; its detail (the files, the counts) is in the job's sheet and the log
+        if (detail > 0) line = line.substring(0, detail);
+        for (TileInfo ti : workTiles) {   // the job's state on the ring: running (the arc), waiting (it goes round), paused (the arc stays, II), failed (full, red, !), done
+            ti.ring.set(state == Ondevice.TILE_QUEUED ? -1f : state == Ondevice.TILE_FAILED || state == Ondevice.TILE_DONE ? 1f : p);
+            ti.ring.look(state == Ondevice.TILE_FAILED ? Ui.col(this, R.color.bn_danger) : state == Ondevice.TILE_PAUSED ? 0xFFFFFFFF : ti.ring.baseColor(),
+                    state == Ondevice.TILE_FAILED ? "!" : state == Ondevice.TILE_PAUSED ? "II" : null);
+            ti.workLine = line;
+            HomeLayout.caption(ti);
+            ti.ot.setText(line + "\n" + Tx.s(R.string.home_tile_details));   // a hint that the tile opens the job's sheet
+            ti.ring.setContentDescription(null);
+        }
+        workUi.postDelayed(workRun, 700);
+    }
+
+    private ViewGroup homeBox() {
+        layoutNow = HomeLayout.mode(this);
+        return layoutNow == HomeLayout.ROW ? tileRow() : HomeLayout.container(this, gameBox, layoutNow);
+    }
+
+    private FrameLayout artTile(String name, TextView st, LinearLayout meta, View.OnClickListener open) {
+        FrameLayout c = new FrameLayout(this);
+        TextView tile = Ui.tile(this, name, 64);
+        tile.setTextSize(48);
+        c.addView(tile, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        LinearLayout ov = new LinearLayout(this);   // the state over the picture (overlay)
+        ov.setOrientation(LinearLayout.VERTICAL);
+        ov.setGravity(Gravity.CENTER);
+        ov.setVisibility(View.GONE);
+        ProgressRing ring = new ProgressRing(this, Ui.col(this, R.color.bn_banana), true);   // while the game is being prepared: its progress on the dimmed picture, as an install on an icon
+        ring.setVisibility(View.GONE);
+        ov.addView(ring, new LinearLayout.LayoutParams(dp(64), dp(64)));
+        TextView ot = Ui.text(this, "", 12, R.color.bn_on_leaf, 700);
+        ot.setTextColor(android.graphics.Color.WHITE);
+        ot.setGravity(Gravity.CENTER);
+        ot.setPadding(dp(10), 0, dp(10), 0);
+        ov.addView(ot);
+        android.widget.ProgressBar pb = new android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        pb.setIndeterminate(true);
+        pb.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Ui.col(this, R.color.bn_banana)));
+        LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(4));
+        pl.setMargins(dp(14), dp(8), dp(14), 0);
+        ov.addView(pb, pl);
+        c.addView(ov, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        ProgressRing badge = new ProgressRing(this, Ui.col(this, R.color.bn_banana), false);   // a game that stays playable while something is checked or updated: a small ring in the corner
+        badge.setBackground(Ui.round(0x99000000, dp(999), 0, 0));
+        badge.setPadding(dp(4), dp(4), dp(4), dp(4));
+        badge.setVisibility(View.GONE);
+        FrameLayout.LayoutParams bl = new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.TOP | Gravity.END);
+        bl.setMargins(dp(10), dp(10), dp(10), dp(10));
+        c.addView(badge, bl);
+        meta.setVisibility(View.GONE);
+        meta.addView(st);
+        c.addView(meta);
+        TileInfo info = new TileInfo(name, st, open);
+        info.ov = ov; info.ot = ot; info.pb = pb; info.badge = badge; info.ring = ring;
+        ov.setTag(null);
+        c.setTag(info);
+        c.setForeground(ring(22, true));
+        c.setFocusable(true);
+        c.setClickable(true);
+        c.setContentDescription(name);
+        c.setOnClickListener(v -> { if (moveId == null && ov.getVisibility() == View.VISIBLE && st.hasOnClickListeners()) st.performClick(); else open.onClick(v); });   // a tile with something to do (Prepare, Fix the save folder) does it; a long press opens the page
+        c.setOnLongClickListener(v -> { open.onClick(v); return true; });   // a game's tile: gameCard makes this the reorder menu
+        c.setOnTouchListener((v, e) -> { if (e.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) selectTile(c, false); return false; });   // a touch selects it (it grows) before the tap
+        st.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence a, int b, int d, int e) { }
+            @Override public void onTextChanged(CharSequence a, int b, int d, int e) { }
+            @Override public void afterTextChanged(android.text.Editable e) { c.post(() -> overlay(ov, ot, pb, badge, st)); }
+        });
+        overlay(ov, ot, pb, badge, st);
+        return c;
+    }
+
+    private void addTile(ViewGroup row, View v) {
+        if (layoutNow != HomeLayout.ROW) { HomeLayout.add(this, row, layoutNow, (FrameLayout) v); return; }
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(150), dp(150));
+        if (row.getChildCount() > 0) lp.setMarginStart(dp(16));
+        row.addView(v, lp);
+    }
+
+    private void workTile(View c) {
+        TileInfo ti = (TileInfo) c.getTag();
+        ti.work = true;
+        ti.ov.setTag(Boolean.TRUE);
+        View.OnClickListener sheet = v -> Ondevice.sheet(this);
+        c.setOnClickListener(sheet);
+        c.setOnLongClickListener(v -> { sheet.onClick(v); return true; });
+        ti.ov.setBackground(Ui.round(0xB3000000, dp(22), 0, 0));
+        ti.ov.setVisibility(View.VISIBLE);
+        ti.ring.setVisibility(View.VISIBLE);
+        ti.pb.setVisibility(View.GONE);
+        ti.badge.setVisibility(View.GONE);
+        ti.ot.setMaxLines(3);
+        ti.ot.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        ti.ot.setPadding(dp(12), dp(8), dp(12), 0);
+        workTiles.add(ti);
+        workTick();
+    }
+
+    private void startSelection(ViewGroup row) {
+        if (gameBox != null) noFocusTint(gameBox);   // the tiles were made after the page was
+        for (int k = 0; k < row.getChildCount(); k++)
+            if (row.getChildAt(k).getTag() instanceof TileInfo) {
+                View t = row.getChildAt(k);
+                selectTile(t, false);
+                if (getCurrentFocus() == null) t.requestFocus();
+                return;
+            }
+    }
+
+    void updateShaders(Game g) { page(false); Ondevice.prepareShaders(this, new File(g.gameDir), true); }
+
+    void prepareShaders(Game g) { page(false); Ondevice.prepareShaders(this, new File(g.gameDir), false); }
 }
