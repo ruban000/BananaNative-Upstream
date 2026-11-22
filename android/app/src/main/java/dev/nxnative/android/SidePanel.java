@@ -71,7 +71,9 @@ final class SidePanel extends FrameLayout {
     static final String[] TAB_NAMES = {"Performance", "Display", "Controls", "General"};
     private static final int TAB_PERF = 0, TAB_DISPLAY = 1, TAB_CONTROLS = 2, TAB_GENERAL = 3;
     private int tab = TAB_PERF;
-    private static final int FOCUS = 0xFFEAF4FF;   // restrained PS5 white focus rim
+    private LinearLayout tabs;
+    private static final int FOCUS = 0xFFEAF4FF;
+    private static final int FRAME_RADIUS_DP = 14;   // restrained PS5 white focus rim
     private static final String UI_PREFS = "banana_native_side_panel";
     private static final String UI_ANIMATIONS = "menu_button_animations";
     private boolean animationsEnabled() {
@@ -1291,5 +1293,91 @@ final class SidePanel extends FrameLayout {
         if (lsfgNow != null) { String st = Native.frameGenStatus(); int sp = st.indexOf(' '); lsfgNow.setText(Tx.s(R.string.game_now_status, sp > 0 ? st.substring(sp + 1) : st)); }
         removeCallbacks(tick);   // a change calls refresh too: one loop, not one more per change
         postDelayed(tick, 500);
+    }
+
+    // Restored upstream helpers needed by the PS5 UI integration.
+    private void showMenu() {
+        if (!open) return;
+        open = false;
+        adjusting = null;
+        heldDir = stickHeld = PadPanel.NONE;
+        removeCallbacks(repeat);
+        removeCallbacks(tick);
+        sheet.setVisibility(GONE);
+        menuScroll.setVisibility(VISIBLE);
+        sizes();
+        menuSink.requestFocus();
+        menuSelect(isInTouchMode() ? -1 : menuSection.indexOf(tab));
+    }
+
+    private void showPage(int k) {
+        boolean was = menuOpen;
+        if (!menuOpen) slideIn();
+        boolean same = open && k == tab;
+        tab = k;
+        if (!open) {
+            open = true;
+            sheet.setVisibility(VISIBLE);
+            if (was) { sheet.setAlpha(0f); sheet.animate().alpha(1f).setDuration(150).start(); } else sheet.setAlpha(1f);
+        }
+        if (!same) {
+            box.removeAllViews();
+            build();
+            look();
+            scroll.scrollTo(0, 0);
+        }
+        sizes();
+        menuSel = -1;   // a controller works in the section now; the menu marks which one shows
+        paintMenu();
+        if (!isInTouchMode()) post(() -> { if (open) focusFirst(); });
+        removeCallbacks(tick);
+        refresh();
+    }
+
+    private int menuWidth() {
+        float dp = getResources().getDisplayMetrics().density;
+        int sw = getResources().getDisplayMetrics().widthPixels;
+        return Math.min(Math.round(300 * dp), Math.max(Math.round(sw * 0.35f), Math.min(Math.round(240 * dp), Math.round(sw * 0.6f))));
+    }
+
+    private int scrimPx() { return Math.round(48 * getResources().getDisplayMetrics().density); }
+
+    private int sheetWidth() {
+        float dp = getResources().getDisplayMetrics().density;
+        int sw = getResources().getDisplayMetrics().widthPixels;
+        return Math.max(0, Math.min(PanelLook.widthPx(Prefs.panelSize(act), dp, sw), sw - scrimPx() - (stacked() ? 0 : menuWidth())));
+    }
+
+    private int drawerWidth() {
+        boolean menuShows = !open || !stacked();
+        return (menuShows ? menuWidth() : 0) + (open ? sheetWidth() : 0);
+    }
+
+    private void sizes() {
+        menuScroll.setVisibility(open && stacked() ? GONE : VISIBLE);
+        int mw = menuWidth(), sw = sheetWidth();
+        if (menuScroll.getLayoutParams().width != mw) { menuScroll.getLayoutParams().width = mw; menuScroll.requestLayout(); }
+        if (sheet.getLayoutParams().width != sw) { sheet.getLayoutParams().width = sw; sheet.requestLayout(); }
+        sheet.getChildAt(0).setVisibility(menuScroll.getVisibility());   // the hairline only beside the menu
+    }
+
+    private void focusMoved(View old, View now) {
+        if (now != adjusting) adjusting = null;
+        if (lit != null) { lit.setForeground(null); lit = null; }
+        if (now == null || !inside(now) || isInTouchMode()) return;
+        frame(now);
+    }
+
+    private void frame(View now) {
+        if (lit != null && lit != now) lit.setForeground(null);
+        float dp = getResources().getDisplayMetrics().density;
+        boolean adj = now == adjusting;
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+        d.setColor(adj ? 0x55FFD54F : 0x26FFD54F);
+        d.setStroke(Math.round((adj ? 4f : 2.5f) * dp), FOCUS);
+        d.setCornerRadius(FRAME_RADIUS_DP * dp);
+        now.setDefaultFocusHighlightEnabled(false);   // Android's own (square) focus highlight would show past the frame's corners
+        now.setForeground(d);
+        lit = now;
     }
 }
