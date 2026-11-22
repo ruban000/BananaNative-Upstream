@@ -341,5 +341,49 @@ class Main(Base):
         self.assertEqual((ex / 'romfs_nro/nro/m.nro').read_bytes(), b'nro')
 
 
+class Container(Base):
+    """A .nx file of the dump (dm/tools/nx_pack.py) stands for the folder: its packages are read in place, and what the script writes goes beside the file"""
+    def setUp(self):
+        super().setUp()
+        import subprocess
+        (self.dump / f'updates/{VER}/romfs/nro').mkdir(); (self.dump / f'updates/{VER}/romfs/nro/m.nro').write_bytes(b'nro')
+        self.box = self.dump.parent / 'box'; self.box.mkdir(); self.nx = self.box / 'game.nx'
+        r = subprocess.run([sys.executable, str(REPO / 'dm/tools/nx_pack.py'), str(self.dump), str(self.nx), '--codec', 'raw'], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_builds_beside_the_file(self):
+        seen, said = {}, []
+        def stop(env, *a): seen.update(env); raise Stop()
+        with mock.patch.object(nsp, 'find_repo', return_value=REPO), mock.patch.object(nsp, 'configure_dotnet'), mock.patch.object(nsp, 'WORK_DIR', ''), \
+             mock.patch.object(nsp, 'check_prereqs', side_effect=stop), mock.patch.object(nsp, 'say', side_effect=said.append), \
+             mock.patch.object(nsp, 'ask', side_effect=AssertionError('asked for something')):
+            with self.assertRaises(Stop): nsp.main(nsp.parse_args([str(self.nx)]))
+        self.assertEqual(Path(seen['DM_ROOT']), self.box / f'{TID:016X}_build')
+        self.assertTrue(any(s.startswith(f'game.nx: {TID:016X}, 1 update(s)') for s in said), said)
+
+    def test_build_id_lookup_reads_a_module_of_the_file(self):   # same_build, the first step for a game no profile has
+        _, fam = nsp.scan_dump(self.nx)
+        main = pack_dump.version_part(self.nx, dict(fam['updates']), VER, 'exefs') / 'main'
+        self.assertEqual(nsp.build_id(main), (self.dump / f'updates/{VER}/exefs/main').read_bytes()[0x40:0x50].hex())
+        with mock.patch.object(nsp, 'PROG', mock.Mock()): self.assertIsNone(nsp.same_build(self.nx, TID, fam))
+
+    def test_survey_reads_the_file_and_writes_beside_it(self):
+        _, fam = nsp.scan_dump(self.nx)
+        import nacp, profile_guess
+        with mock.patch.object(nsp, 'pg', profile_guess, create=True), mock.patch.object(nsp, 'nacp', nacp, create=True), mock.patch.object(nsp, 'say'), \
+             mock.patch.object(nsp, 'PROG', mock.Mock()), mock.patch.object(nsp, 'check_aarch64'), mock.patch.object(profile_guess, 'facts_of', side_effect=Stop()):
+            with self.assertRaises(Stop): nsp.survey(self.nx, TID, fam, REPO, sys.executable, {})
+        ex = self.box / f'{TID:016X}_survey/extract'
+        self.assertEqual((ex / 'ExeFS/main').read_bytes(), b'new code')
+        rows = sorted(l.split('\t')[:2] for l in (ex / 'romfs_manifest.tsv').read_text().splitlines() if not l.startswith('#'))
+        self.assertEqual(rows, [['/dir/new', '4'], ['/nro/m.nro', '3']])
+        self.assertEqual((ex / 'romfs_nro/nro/m.nro').read_bytes(), b'nro')
+
+    def test_another_file_is_refused(self):
+        f = self.box / 'notes.txt'; f.write_text('x')
+        with mock.patch.object(nsp, 'find_repo', return_value=REPO), mock.patch.object(nsp, 'configure_dotnet'), self.assertRaisesRegex(nsp.BuildError, 'not a dump folder'):
+            nsp.main(nsp.parse_args([str(f)]))
+
+
 if __name__ == '__main__':
     unittest.main()

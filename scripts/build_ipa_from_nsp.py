@@ -17,6 +17,7 @@
 #   or in a terminal: python3 scripts/build_ipa_from_nsp.py <dump folder> [options] (values given on the command line override "Settings", -h lists every option;
 #   without keyboard input a missing value is not asked for but reported as an error; exit code 0 on success, 1 on error, 130 when interrupted). Command-line options entered in Spyder's run configuration work the same way.
 # Uses only two things: this repository and a dump folder of one game, made from your own console: base/exefs + base/romfs, optional updates/<version>/exefs + romfs and dlc/<DLC title ID>/<n>/romfs
+#   or a .nup or .nx file of one, read in place (android/NUP.md, android/NX.md); the build folder, the survey and the finished app then go beside the file
 #   (scripts/pack_dump.py lists the layout; DLC, when present, is packed too and unlocks the add-on content already in the game). A dump has no control data: the name comes from the profile (or --app-name), and the app has no icon.
 #   The newest version in the folder is packed. A version the profile registers (with every version in its shader_versions in the folder) is built from the profile as it is; any other
 #   version (the base game alone, another update) from a profile derived from it in <build folder>/profile: the same settings, and the version's own shaders (derive_profile).
@@ -369,7 +370,7 @@ def run(cmd, log, env=None, cwd=None, on_line=None, ok=()):
 
 
 def build_id(nso):
-    with open(nso, 'rb') as f:
+    with rfs.open(nso, 'rb') as f:   # a module of a .nup / .nx package too
         f.seek(0x40); return f.read(16).hex()
 
 
@@ -482,7 +483,7 @@ def survey_nros(folder):
 def survey(dump, app, fam, repo, py, env):
     """What a game with no profile is: its newest version's code modules and RomFS headers (<dump folder>/<title ID>_survey/extract: ExeFS/, romfs_manifest.tsv and the RomFS's
     NRO modules in romfs_nro/, the layout profile_guess.py --check reads) → survey.md beside it, and the facts the provisional profile is guessed from"""
-    work = dump / f'{app:016X}_survey'; logs, ex = work / 'logs', work / 'extract'
+    work = home_of(dump) / f'{app:016X}_survey'; logs, ex = work / 'logs', work / 'extract'
     say(f'no game profile for {app:016X}: surveying first')
     PROG.plan(3)   # the manifest, the code modules (reading them, then the rewrite-site census), the imports
     vers = dict(fam['updates']); ver = max(vers, default=0)
@@ -609,11 +610,11 @@ def work_dir(args):   # the build folder --work-dir / WORK_DIR names, used as gi
     return Path(os.path.expanduser(w)).resolve() if w else None
 
 
-def profile_folder(args, nsp_dir, app):
+def profile_folder(args, home, app):
     """Where the provisional (or derived) profile goes: --profile-out / PROFILE_OUT, else <build folder>/profile, the build folder being --work-dir / WORK_DIR or <dump folder>/<title ID>_build.
     A build folder of its own that has no profile yet gets a copy of the one in the default place (kept there), so a game surveyed before --work-dir is not surveyed again."""
     if args.profile_out or PROFILE_OUT: return Path(os.path.expanduser(args.profile_out or PROFILE_OUT)).resolve()
-    old = nsp_dir / f'{app:016X}_build' / 'profile'
+    old = home / f'{app:016X}_build' / 'profile'
     work = work_dir(args)
     if not work: return old
     new = work / 'profile'
@@ -869,11 +870,15 @@ def dump_folder(folder):   # a folder of the game's files in pack_dump.py's layo
     return pack_dump.is_dump(folder)
 
 
-def scan_dump(dump, want=None):   # what a dump folder holds: (title ID, {'base': base/, 'updates': [(version, updates/<version>/)], 'dlc': [(DLC title ID, None, its RomFS folder)], 'dump': True})
+def home_of(dump):   # where a game's build and survey folders go by default: the dump folder, or the folder a .nup / .nx file is in (as pack_dump.py's build folder)
+    return dump.parent if pack_dump.nup.is_nup(dump) else dump
+
+
+def scan_dump(dump, want=None):   # what a dump folder (or a .nup / .nx file, its packages read in place) holds: (title ID, {'base': base/, 'updates': [(version, updates/<version>/)], 'dlc': [(DLC title ID, None, its RomFS folder)], 'dump': True})
     try: app, vers, dlc = pack_dump.scan(dump)
     except pack_dump.Error as e: raise BuildError(str(e)) from e
     if want is not None and want != app: raise BuildError(f'no game {want:016X} (--title-id / TITLE_ID) in {dump}, which holds {app:016X}')
-    return app, {'base': pack_dump.base_dir(dump), 'updates': sorted(vers.items()), 'dlc': [(tid, None, roms) for tid, roms in dlc.items()], 'dump': True}
+    return app, {'base': pack_dump.version_dir(dump, vers, 0), 'updates': sorted(vers.items()), 'dlc': [(tid, None, roms) for tid, roms in dlc.items()], 'dump': True}
 
 
 def extract_dump(ex, name, src, app):   # one version of a dump folder (src: base/ or updates/<version>/) → extract/<version>/ExeFS + RomFS.img; the code modules and the image are kept while unchanged
@@ -2067,7 +2072,7 @@ def parse_args(argv):
     ap = argparse.ArgumentParser(prog='build_ipa_from_nsp.py',
         description='Build an unsigned IPA or prepare an Xcode project from a game\'s dump folder (made from your own console); a game with no profile is surveyed and gets a provisional profile.',
         epilog='example: python3 scripts/build_ipa_from_nsp.py ~/dumps/"Super Mario Bros Wonder"')
-    ap.add_argument('nsp_dir', nargs='?', help='the game\'s dump folder: base/exefs, base/romfs, optional updates/<version>/ and dlc/ (scripts/pack_dump.py lists the layout) (default: the NSP_DIR setting, else asked)')
+    ap.add_argument('nsp_dir', nargs='?', help='the game\'s dump folder: base/exefs, base/romfs, optional updates/<version>/ and dlc/ (scripts/pack_dump.py lists the layout), or a .nup or .nx file of one (default: the NSP_DIR setting, else asked)')
     ap.add_argument('--title-id', help='the title ID the dump folder must hold, 16 hex digits (default: the TITLE_ID setting)')
     ap.add_argument('-p', '--package', help='version packed into the IPA, e.g. v327680 / v0 (default: the newest in the folder)')
     ap.add_argument('-o', '--out', help='output IPA, or app with --platform mac-app (default: <the profile\'s ipa>, or <game name>.app, in the dump folder)')
@@ -2185,7 +2190,8 @@ def main(args=None):
     if romfs_mode == 'separate' and mac: raise BuildError(f'--romfs separate keeps the game files off the iPhone app: it cannot be combined with --platform {platform}, which runs from the extracted files')
     if romfs_mode == 'separate' and not keep: raise BuildError('--romfs separate requires --keep-extracted: the image must remain available for the one-time transfer to the phone')
     nsp_dir = Path(os.path.expanduser(args.nsp_dir or NSP_DIR or ask('dump folder: ', 'the dump folder'))).resolve()
-    if not nsp_dir.is_dir(): raise BuildError(f'not a folder: {nsp_dir}')
+    if not nsp_dir.is_dir() and not pack_dump.nup.is_nup(nsp_dir): raise BuildError(f'not a dump folder, a .nup file or a .nx file: {nsp_dir}')
+    home = home_of(nsp_dir)   # the default place of the build folder, the survey and the provisional profile
     sys.path.insert(0, str(repo / 'dm/games')); import game as gamemod   # game profiles
     global pg; import profile_guess as pg   # dm/games: a provisional profile's keys from the game files and from the heap check
     sys.path.insert(0, str(repo / 'dm/tools')); global nacp; import nacp   # the game name and languages in control data, when an extraction has it (a dump folder has none)
@@ -2200,7 +2206,7 @@ def main(args=None):
     want = args.title_id or TITLE_ID
     if want and not re.fullmatch(r'[0-9A-Fa-f]{16}', want): raise BuildError(f'--title-id / TITLE_ID takes a title ID, 16 hex digits: {want}')
     app, fam = scan_dump(nsp_dir, int(want, 16) if want else None)
-    say(f'a dump folder: {app:016X}, {len(fam["updates"])} update(s), {len(fam["dlc"])} DLC')
+    say(f'{"a dump folder" if nsp_dir.is_dir() else nsp_dir.name}: {app:016X}, {len(fam["updates"])} update(s), {len(fam["dlc"])} DLC')
     force =args.provisional or PROVISIONAL   # a provisional profile even when dm/games has one (testing the guesses)
     g, provisional, shadowed = None if force else gamemod.by_title(app), False, False
     alias = None if force or g else same_build(nsp_dir, app, fam)   # a known build under another title ID: packed from a profile derived from that build's
@@ -2210,14 +2216,14 @@ def main(args=None):
         missing = [m for m in ('lz4.block', 'capstone') if not _importable(m)]
         if missing: raise BuildError(f'the current Python ({sys.executable}) is missing modules: {", ".join(missing)}')
         check_capstone()
-        pdir = profile_folder(args, nsp_dir, app)
+        pdir = profile_folder(args, home, app)
         if not (args.survey_only or SURVEY_ONLY): rmtree(derived_key(pdir / f'{app:016X}'))
         if (pdir / f'{app:016X}' / 'game.tsv').exists() and not (args.survey_only or SURVEY_ONLY):
             say(f'no game profile for {app:016X}: reusing the provisional profile from the last run (delete it to survey again)')
         else:
             facts = survey(nsp_dir, app, fam, repo, py, env)
             if args.survey_only or SURVEY_ONLY: return
-            facts['survey'] = str(nsp_dir / f'{app:016X}_survey' / 'survey.md')
+            facts['survey'] = str(home / f'{app:016X}_survey' / 'survey.md')
             write_profile(pdir / f'{app:016X}', app, facts)
         # the profile folder joins the search path of game.py, which the shader tools, make and build_ipa.sh all use (DM_GAMES_DIR)
         os.environ['DM_GAMES_DIR'] = env['DM_GAMES_DIR'] = os.pathsep.join([str(pdir)] + [d for d in os.environ.get('DM_GAMES_DIR', '').split(os.pathsep) if d and d != str(pdir)])
@@ -2242,12 +2248,12 @@ def main(args=None):
         if alias and not derived: derived = f'title {app:016X} is not game profile {g.id}\'s title {g.title_id:016X}'
         if derived: say(f'{derived}: packing {pkg_ver} from a profile derived from it')
     versions = [pkg_ver] if derived else need + ([pkg_ver] if pkg_ver not in need else [])
-    work = work_dir(args) or nsp_dir / f'{g.id}_build'
+    work = work_dir(args) or home / f'{g.id}_build'
     out_ipa = Path(os.path.expanduser(args.out or OUT_IPA)).resolve() if (args.out or OUT_IPA) else work.parent / g.get('ipa')   # by default next to the build folder (the dump folder, beside <id>_build/, unless --work-dir moved it)
     if shadowed and not (args.out or OUT_IPA): out_ipa = out_ipa.with_name(out_ipa.stem + '-provisional.ipa')   # never over the IPA of the game's real profile
     if mac_pack and (args.out or OUT_IPA) and out_ipa.suffix != '.app': raise BuildError(f'the Mac app (-o / OUT_IPA) must end in .app: {out_ipa}')
     project = work / 'xcode/DmIOS.xcodeproj'
-    workspace = Path(os.path.expanduser(args.xcode_workspace or XCODE_WORKSPACE)).resolve() if (args.xcode_workspace or XCODE_WORKSPACE) else nsp_dir.parent / 'NxNative.xcworkspace'
+    workspace = Path(os.path.expanduser(args.xcode_workspace or XCODE_WORKSPACE)).resolve() if (args.xcode_workspace or XCODE_WORKSPACE) else (home.parent if nsp_dir.is_dir() else home) / 'NxNative.xcworkspace'
     if prepare_xcode and workspace.suffix != '.xcworkspace': raise BuildError('--xcode-workspace must end in .xcworkspace')
     saved_signing = {}
     if prepare_xcode:
@@ -2286,7 +2292,7 @@ def main(args=None):
         versions, dirs = [pkg_ver], {pkg_ver: dirs[pkg_ver]}
     reg = g   # the profile as registered (a derived build reports what it lacks against it)
     if derived:   # the derived profile goes where a provisional one would, and every tool (game.py, make, build_ipa.sh) takes it first (DM_GAMES_FIRST)
-        pdir = profile_folder(args, nsp_dir, app)
+        pdir = profile_folder(args, home, app)
         disp = derive_profile(g, pdir / g.id, pkg_ver, dirs[pkg_ver], g.words('modules'), app)
         os.environ['DM_GAMES_DIR'] = env['DM_GAMES_DIR'] = os.pathsep.join([str(pdir)] + [d for d in os.environ.get('DM_GAMES_DIR', '').split(os.pathsep) if d and d != str(pdir)])
         os.environ['DM_GAMES_FIRST'] = env['DM_GAMES_FIRST'] = '1'

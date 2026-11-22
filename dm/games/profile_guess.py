@@ -65,7 +65,7 @@ def romfs_files(romfs):   # (path, size, first 32 bytes) of every RomFS file: fr
             if os.fsencode(n) in ARTIFACTS: continue
             p = Path(d) / n
             with open(p, 'rb') as f: head = f.read(32)
-            yield '/' + str(p.relative_to(romfs)), p.stat().st_size, head
+            yield '/' + p.relative_to(romfs).as_posix(), p.stat().st_size, head   # RomFS paths have '/', on Windows too
 
 
 def npdm(path):   # (system resource size, program ID) from main.npdm; a non-zero system resource means virtual address memory (Engage 16 MB); (0, None) without the file
