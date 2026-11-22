@@ -298,13 +298,17 @@ android {
     }
     signingConfigs {
         if (nxLive) live { storeFile file(signStore); storePassword signPass; keyAlias signAlias; keyPassword signPass }
+        // Test/play APKs may use the same persistent key as the public release when the workflow supplies it.
+        if (signStore && signAlias && signPass && new File(signStore).isFile()) {
+            persistent { storeFile file(signStore); storePassword signPass; keyAlias signAlias; keyPassword signPass }
+        }
     }
     buildTypes {
         debug { jniDebuggable true }
         release {
             minifyEnabled false
             debuggable !nxLive       // bring-up builds: run-as and the app's files stay reachable over adb; the release is not debuggable
-            signingConfig nxLive ? signingConfigs.live : signingConfigs.debug
+            signingConfig nxLive ? signingConfigs.live : (nxPlay && signStore && signAlias && signPass && new File(signStore).isFile() ? signingConfigs.persistent : signingConfigs.debug)
         }
     }
     externalNativeBuild {
