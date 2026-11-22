@@ -242,6 +242,12 @@ final class SidePanel extends FrameLayout {
             brandTitle.setAlpha(sy > Math.round(72 * dp) ? 0.92f : 1f);
         });
         addView(sh, new LayoutParams(panelWidth, LayoutParams.MATCH_PARENT, Gravity.END));
+        menuSink = new View(a);
+        menuSink.setFocusable(true);
+        menuSink.setFocusableInTouchMode(true);
+        menuSink.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+        addView(menuSink, new LayoutParams(1, 1));
+        getViewTreeObserver().addOnGlobalFocusChangeListener(this::focusMoved);
 
         setVisibility(GONE);
     }
