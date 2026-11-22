@@ -242,7 +242,6 @@ final class SidePanel extends FrameLayout {
             brandTitle.setAlpha(sy > Math.round(72 * dp) ? 0.92f : 1f);
         });
         addView(sh, new LayoutParams(panelWidth, LayoutParams.MATCH_PARENT, Gravity.END));
-        sheet = sh;
 
         setVisibility(GONE);
     }
