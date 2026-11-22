@@ -83,6 +83,7 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
     private boolean clean;   // the saved clean picture: stats, log, tag, controls and the panel strip hidden together
     private InputManager inputManager;
     private AudioManager audio;
+    private android.window.OnBackInvokedCallback backCallback;
     private AudioFocusRequest focus;
     private final AudioFocus focusState = new AudioFocus();
     /** The focus listener (AudioFocus): a loss for good while the game is on screen leaves the sound on, and the log says so once per loss */
@@ -97,6 +98,13 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
 
     @Override protected void onCreate(Bundle saved) {
         super.onCreate(saved);
+        // Android 13+ routes system Back through OnBackInvokedDispatcher instead of the
+        // deprecated Activity.onBackPressed callback. Keep Back inside the running game.
+        if (Build.VERSION.SDK_INT >= 33) {
+            backCallback = this::handleBack;
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback);
+        }
         fitOrientation();
         setShowWhenLocked(true);
         setTurnScreenOn(true);
@@ -1586,8 +1594,22 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
      * Back (the phone's button or its edge swipe) opens the in-game menu (SidePanel.openMenu: Pause or Resume, the four sections, Stop) and goes one level up in it (SidePanel.back);
      * while the controller applet's join screen shows, it cancels that
      */
+    private void handleBack() {
+        if (panel != null && !panel.isOpen() && CtrlScreen.back()) return;
+        if (panel != null) panel.back();
+        else end();
+    }
+
     @SuppressWarnings("deprecation")
-    @Override public void onBackPressed() { if (panel != null && !panel.isOpen() && CtrlScreen.back()) return; if (panel != null) panel.back(); else end(); }
+    @Override public void onBackPressed() { handleBack(); }
+
+    @Override protected void onDestroy() {
+        if (Build.VERSION.SDK_INT >= 33 && backCallback != null) {
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
+            backCallback = null;
+        }
+        super.onDestroy();
+    }
 
     // For CtrlScreen: the view tree it goes into (under the in-game panel), and whether a gamepad is connected (then the on-screen controls are hidden and cannot join)
     FrameLayout rootView() { return rootView; }
