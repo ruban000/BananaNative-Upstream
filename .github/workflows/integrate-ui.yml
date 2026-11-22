@@ -1,0 +1,47 @@
+name: Integrate UI branch into upstream staging
+
+on:
+  push:
+    branches:
+      - "apply/application-ui-next"
+    paths:
+      - ".github/workflows/integrate-ui.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: integrate-application-ui-next
+  cancel-in-progress: false
+
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: apply/application-ui-next
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch UI source branch
+        run: |
+          git remote add ui https://github.com/ruban000/BananaNative-UI.git
+          git fetch ui feature/application-ui-next
+
+      - name: Merge UI changes, preferring UI on conflicts
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git merge-base HEAD ui/feature/application-ui-next >/dev/null; then
+            git merge --no-edit -X theirs ui/feature/application-ui-next
+          else
+            echo "::error::The staging branch and UI source do not share Git history; refusing an unsafe merge."
+            exit 1
+          fi
+
+      - name: Push integration to staging only
+        run: git push origin HEAD:refs/heads/apply/application-ui-next
