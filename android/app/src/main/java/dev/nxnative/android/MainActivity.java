@@ -2830,6 +2830,9 @@ public final class MainActivity extends Activity {
     void prepareShaders(Game g) { page(false); Ondevice.prepareShaders(this, new File(g.gameDir), false); }
 
 
+    /** Home's games in the player's order; a game not in it goes last */
+    private List<Game> shownGames() { return GameOrder.sort(games, Prefs.gameOrder(this), Game::orderId); }
+
     private void stepMove(int delta) {
         List<String> ids = new ArrayList<>();
         for (Game x : shownGames()) ids.add(x.orderId());
@@ -2840,6 +2843,18 @@ public final class MainActivity extends Activity {
         refresh();
     }
 
+
+    /** No view with a background (a card, a row, a button) is at this point of the scroll view: the bananas show there */
+    private static boolean emptyAt(ViewGroup root, float x, float y) {
+        for (int i = root.getChildCount() - 1; i >= 0; i--) {
+            View c = root.getChildAt(i);
+            float cx = x + root.getScrollX() - c.getLeft(), cy = y + root.getScrollY() - c.getTop();
+            if (cx < 0 || cy < 0 || cx >= c.getWidth() || cy >= c.getHeight() || c.getVisibility() != View.VISIBLE) continue;
+            if (c.getBackground() != null) return false;
+            if (c instanceof ViewGroup && !emptyAt((ViewGroup) c, cx, cy)) return false;
+        }
+        return true;
+    }
 
     private View.OnTouchListener popListener(ViewGroup root) {
         final float slop = android.view.ViewConfiguration.get(this).getScaledTouchSlop();
