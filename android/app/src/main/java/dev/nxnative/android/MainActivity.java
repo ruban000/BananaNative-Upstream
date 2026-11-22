@@ -79,6 +79,25 @@ public final class MainActivity extends Activity {
     private LinearLayout dockRow;
     private HintBar hint;
     private final java.util.List<TileInfo> workTiles = new java.util.ArrayList<>();
+    /** Per-game home tile state shared with HomeLayout's grid and list presentations. */
+    static final class TileInfo {
+        final String name;
+        final TextView st;
+        final View.OnClickListener open;
+        View ov;
+        TextView ot;
+        android.widget.ProgressBar pb;
+        ProgressRing badge, ring;
+        boolean work;
+        TextView sub;
+        String version, workLine;
+        TileInfo(String name, TextView st, View.OnClickListener open) {
+            this.name = name;
+            this.st = st;
+            this.open = open;
+        }
+    }
+
     private int layoutNow = HomeLayout.ROW;
 
     @Override protected void onCreate(Bundle saved) {
