@@ -1368,7 +1368,7 @@ final class SidePanel extends FrameLayout {
 
     private void focusMoved(View old, View now) {
         if (now != adjusting) adjusting = null;
-        if (lit != null) { lit.setForeground(null); lit = null; }
+        if (lit != null) { if (lit.getForeground() instanceof GlassFocusDrawable) ((GlassFocusDrawable) lit.getForeground()).stop(); lit.setForeground(null); lit = null; }
         if (now == null || !inside(now) || isInTouchMode()) return;
         frame(now);
     }
@@ -1394,6 +1394,8 @@ final class SidePanel extends FrameLayout {
             });
             animator.start();
         }
+
+        void stop() { animator.cancel(); }
 
         @Override protected void onBoundsChange(android.graphics.Rect bounds) {
             float h = Math.max(1, bounds.height());
@@ -1435,7 +1437,7 @@ final class SidePanel extends FrameLayout {
     }
 
     private void frame(View now) {
-        if (lit != null && lit != now) lit.setForeground(null);
+        if (lit != null && lit != now) { if (lit.getForeground() instanceof GlassFocusDrawable) ((GlassFocusDrawable) lit.getForeground()).stop(); lit.setForeground(null); }
         float dp = getResources().getDisplayMetrics().density;
         now.setDefaultFocusHighlightEnabled(false);   // Android's own square highlight extends past rounded corners
         now.setForeground(new GlassFocusDrawable(FRAME_RADIUS_DP * dp, 2f * dp));
