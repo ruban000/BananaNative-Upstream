@@ -70,6 +70,16 @@ public final class MainActivity extends Activity {
     private String pendingId;
     private File pendingPackPick;   // the pack folder the user just picked (remembered in Prefs once it is accepted)
     private Game pendingArtworkGame;
+    // Upstream launcher state retained alongside the PS5 home presentation.
+    private static final String WIKI_URL = "https://git.eden-emu.dev/moceure/BananaNative/wiki";
+    private static final int PICK_BG = 9, PICK_SND = 10;
+    private TextView poppedText, userButton;
+    private Ui.Setting timeRow, channelRow;
+    private View updateDot, settingsButton, selectedTile;
+    private LinearLayout dockRow;
+    private HintBar hint;
+    private final java.util.List<TileInfo> workTiles = new java.util.ArrayList<>();
+    private int layoutNow = HomeLayout.ROW;
 
     @Override protected void onCreate(Bundle saved) {
         super.onCreate(saved);
