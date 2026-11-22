@@ -297,15 +297,6 @@ final class SidePanel extends FrameLayout {
         refresh();
     }
 
-    void close() {
-        if (!open) return;
-        open = false;
-        heldDir = stickHeld = PadPanel.NONE;
-        removeCallbacks(repeat);
-        if (animationsEnabled()) sheet.animate().translationX(sheet.getLayoutParams().width).setDuration(180).withEndAction(() -> { if (!open) setVisibility(GONE); }).start();
-        else setVisibility(GONE);
-    }
-
     /**
      * The menu, laid out as Eden's drawer (a Material 3 navigation drawer): the game's name large at the top, the GPU driver and the title ID under it, then one
      * line per row with its icon: Pause (Resume while the game is paused), the four sections and Stop. Rows 56 dp high (the panel's row height when that is more),
