@@ -1410,7 +1410,9 @@ final class SidePanel extends FrameLayout {
             android.graphics.RectF r = new android.graphics.RectF(b.left + stroke, b.top + stroke,
                     b.right - stroke, b.bottom - stroke);
             int save = canvas.save();
-            canvas.clipRoundRect(r, radius, radius);
+            android.graphics.Path clip = new android.graphics.Path();
+            clip.addRoundRect(r, radius, radius, android.graphics.Path.Direction.CW);
+            canvas.clipPath(clip);
             paint.setShader(null);
             paint.setStyle(android.graphics.Paint.Style.FILL);
             paint.setColor(0x0DFFFFFF);
