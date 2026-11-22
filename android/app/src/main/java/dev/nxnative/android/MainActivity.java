@@ -512,7 +512,7 @@ public final class MainActivity extends Activity {
 
         accessCard = accessCard();
         Ui.add(content, accessCard, 12);
-        Ondevice.attach(this, content, content.getChildCount());
+        Ondevice.attach(this);
         fixGap(content, Ui.GAP);
         gameBox = new LinearLayout(this);
         gameBox.setOrientation(LinearLayout.VERTICAL);
@@ -2828,4 +2828,96 @@ public final class MainActivity extends Activity {
     void updateShaders(Game g) { page(false); Ondevice.prepareShaders(this, new File(g.gameDir), true); }
 
     void prepareShaders(Game g) { page(false); Ondevice.prepareShaders(this, new File(g.gameDir), false); }
+
+
+    private void stepMove(int delta) {
+        List<String> ids = new ArrayList<>();
+        for (Game x : shownGames()) ids.add(x.orderId());
+        List<String> now = GameOrder.move(ids, moveId, delta);
+        if (now.equals(ids)) return;
+        Prefs.gameOrder(this, GameOrder.write(now));
+        keepSelected = moveId;
+        refresh();
+    }
+
+
+    private View.OnTouchListener popListener(ViewGroup root) {
+        final float slop = android.view.ViewConfiguration.get(this).getScaledTouchSlop();
+        final float[] down = new float[3];   // x, y, whether a tap may still follow (1)
+        return (v, e) -> {
+            switch (e.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    down[0] = e.getX(); down[1] = e.getY(); down[2] = emptyAt(root, e.getX(), e.getY()) ? 1 : 0;
+                    break;
+                case android.view.MotionEvent.ACTION_MOVE:
+                    if (Math.abs(e.getX() - down[0]) > slop || Math.abs(e.getY() - down[1]) > slop) down[2] = 0;
+                    break;
+                case android.view.MotionEvent.ACTION_UP:
+                    if (down[2] == 1 && e.getEventTime() - e.getDownTime() < android.view.ViewConfiguration.getLongPressTimeout()) {
+                        int[] a = new int[2], b = new int[2];
+                        v.getLocationInWindow(a);
+                        bananas.getLocationInWindow(b);
+                        bananas.popAt(e.getX() + a[0] - b[0], e.getY() + a[1] - b[1]);
+                    }
+                    down[2] = 0;
+                    break;
+                default:
+                    down[2] = 0;
+            }
+            return false;
+        };
+    }
+
+
+    private LinearLayout tileRow() {
+        android.widget.HorizontalScrollView hs = new android.widget.HorizontalScrollView(this);
+        hs.setHorizontalScrollBarEnabled(false);
+        hs.setClipToPadding(false);
+        hs.setClipChildren(false);
+        hs.setOnTouchListener(popListener(hs));   // a tap on the empty part of the row pops a banana
+        hs.setHorizontalFadingEdgeEnabled(true);   // a soft edge where more tiles are off screen
+        hs.setFadingEdgeLength(dp(40));
+        hs.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        // A tall window (a phone upright): one big tile in the middle, the next peeking in, the row centred in the space above the bottom bar (no text under the tiles; the tile's content description carries the name), and a swipe settles on a tile
+        boolean tall = getResources().getConfiguration().screenWidthDp < 600 && getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT;
+        final int tallSide = dp(Math.round(getResources().getConfiguration().screenWidthDp * 0.56f));
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setClipChildren(false);
+        row.setClipToPadding(false);
+        int edge = tall ? (getResources().getDisplayMetrics().widthPixels - tallSide) / 2 : dp(14);
+        row.setPadding(tall ? Math.min(dp(14), edge) : dp(14), 0, edge, 0);
+        hs.addView(row, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        if (tall) {
+            gameBox.setGravity(Gravity.CENTER_VERTICAL);
+            gameBox.setPadding(0, 0, 0, dp(64));
+            gameBox.addView(hs, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.round(tallSide * 1.3f)));
+            final Runnable[] snap = new Runnable[1];
+            snap[0] = () -> {   // the tile nearest the middle is the selected one, and the row settles on it
+                int mid = hs.getScrollX() + hs.getWidth() / 2, best = Integer.MAX_VALUE, to = hs.getScrollX();
+                View pick = null;
+                for (int k = 0; k < row.getChildCount(); k++) {
+                    View c = row.getChildAt(k);
+                    if (!(c.getTag() instanceof TileInfo)) continue;
+                    int cc = c.getLeft() + c.getWidth() / 2, d = Math.abs(cc - mid);
+                    if (d < best) { best = d; pick = c; to = cc - hs.getWidth() / 2; }
+                }
+                if (pick == null) return;
+                selectTile(pick, false);
+                if (Math.abs(to - hs.getScrollX()) > dp(2)) hs.smoothScrollTo(Math.max(0, to), 0);
+            };
+            hs.setOnScrollChangeListener((v, x, y, ox, oy) -> { hs.removeCallbacks(snap[0]); hs.postDelayed(snap[0], 140); });
+        } else gameBox.addView(hs, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        hs.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            int h = b - t, side = tall ? tallSide : Math.min(dp(180), Math.round(h * 0.68f));   // room above and below for the selected tile's growth
+            for (int k = 0; k < row.getChildCount(); k++) {
+                View c = row.getChildAt(k);
+                if (!(c.getTag() instanceof TileInfo)) continue;
+                ViewGroup.LayoutParams p = c.getLayoutParams();
+                if (p.width != side || p.height != side) { p.width = side; p.height = side; c.setLayoutParams(p); }
+            }
+            int pad = Math.max(dp(14), (r - l - side) / 2);   // room at both ends so the first and the last tile can stand in the middle
+            if (row.getPaddingLeft() != pad || row.getPaddingRight() != pad) row.setPadding(pad, 0, pad, 0);
+        }
 }
