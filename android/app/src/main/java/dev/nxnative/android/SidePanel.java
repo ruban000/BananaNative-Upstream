@@ -1380,4 +1380,10 @@ final class SidePanel extends FrameLayout {
         now.setForeground(d);
         lit = now;
     }
+
+    // Restored upstream layout helper.
+    private boolean stacked() {
+        float dp = getResources().getDisplayMetrics().density;
+        return getResources().getDisplayMetrics().widthPixels < menuWidth() + Math.round(320 * dp) + scrimPx();
+    }
 }
