@@ -1116,4 +1116,32 @@ final class GameSettings {
             if (l != null) { meta.setText(l); meta.setVisibility(View.VISIBLE); }
         });
     }
+
+    // Restored upstream layout helper.
+    private static LinearLayout split(MainActivity a, LinearLayout outer, Game g, boolean play, String[] keys, String[] labels, int sel, Runnable close) {
+        topBar(a, outer, g, false, close);   // Back, the game's picture and its name; under it the left column and the page
+        LinearLayout body = new LinearLayout(a);
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        Ui.add(outer, body, 8, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        LinearLayout left = new LinearLayout(a);
+        left.setOrientation(LinearLayout.VERTICAL);
+        android.widget.ScrollView ls = new android.widget.ScrollView(a);
+        ls.setVerticalScrollBarEnabled(false);
+        ls.addView(left);
+        body.addView(ls, new LinearLayout.LayoutParams(Ui.dp(a, 180), ViewGroup.LayoutParams.MATCH_PARENT));
+        if (play) {
+            android.widget.Button b = Ui.button(a, Tx.s(R.string.common_play), Ui.Kind.PRIMARY, v -> a.launch(g));
+            b.setCompoundDrawablesRelativeWithIntrinsicBounds(Ui.icon(a, R.drawable.ic_play, R.color.bn_on_banana), null, null, null);
+            b.setCompoundDrawablePadding(Ui.dp(a, 4));
+            left.addView(b, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(a, 44)));
+        }
+        for (int k = 0; k < keys.length; k++) {
+            int i2 = k;
+            String e = keys[k].equals(PERFORMANCE) ? "\u26A1" : keys[k].equals(GAME) ? "\uD83C\uDFAE" : keys[k].equals(SAVES) ? "\uD83D\uDCBE" : "\uD83D\uDCE6";
+            TextView n = Ui.navItem(a, e, labels[k], k == sel, v -> { tab = keys[i2]; a.gameSettingsTop(); });
+            n.setMinHeight(Ui.dp(a, 38));
+            Ui.add(left, n, k == 0 ? 10 : 0);
+        }
+        return a.newPane(body);
+    }
 }
