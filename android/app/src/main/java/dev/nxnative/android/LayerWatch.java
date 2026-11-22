@@ -217,7 +217,7 @@ final class LayerWatch {
         long wait = emptyRuns > 0 ? RETRY_SLOW_MS : RETRY_MS;
         int retryIn = busy || lastStart == 0 || emptyRuns == 0 ? 0 : (int) Math.max(1, (wait - (now - lastStart) + 999) / 1000);
         // (Off hides the label only: the build below goes on; a screen that throws while it draws the label must not take the tick, and so the build, with it)
-        String label = gaveUp ? null : LayerStatus.shown(Prefs.layerLabel(ctx), n, nPaused, lastStart != 0 || busy, busy, retryIn, nNote);
+        String label = gaveUp ? null : LayerStatus.shown(Prefs.layerLabel(ctx, titleId), n, nPaused, lastStart != 0 || busy, busy, retryIn, nNote);
         ui.post(() -> { if (!on) return; try { shown.show(label); } catch (RuntimeException e) { android.util.Log.w("nxnative", "shader label: " + e); } });   // the label is the main thread's
         if (LayerStatus.buildDue(n, gaveUp, full, paused, busy, now, lastStart, wait)) {
             int s = LayerPending.settled(root, version);

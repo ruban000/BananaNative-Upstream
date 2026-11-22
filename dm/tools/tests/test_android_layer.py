@@ -196,14 +196,14 @@ class Pending(unittest.TestCase):
     def test_label_wired(self):   # Off only hides the label: the watcher still builds; the label is at the very top and see-through
         main = J / 'main/java/dev/nxnative/android'
         lw, ga = (main / 'LayerWatch.java').read_text(encoding='utf-8'), (main / 'GameActivity.java').read_text(encoding='utf-8')
-        self.assertIn('String label = gaveUp ? null : LayerStatus.shown(Prefs.layerLabel(ctx), n,', lw); self.assertIn('shown.show(label)', lw)   # computed on the work thread, shown on the main thread
+        self.assertIn('String label = gaveUp ? null : LayerStatus.shown(Prefs.layerLabel(ctx, titleId), n,', lw); self.assertIn('shown.show(label)', lw)   # computed on the work thread, shown on the main thread
         self.assertIn('new HandlerThread("nxlayer-watch")', lw, 'the tick reads the request folder off the main thread (it delivers the controller input)')
         self.assertLess(lw.index('LayerStatus.shown('), lw.index('if (LayerStatus.buildDue('), 'the label is decided before, and apart from, the build condition')
         self.assertNotIn('LayerStatus.shown', ga.split('private void layerShow')[0])
         show = ga.split('private void layerShow(String text)')[1].split('private void skipShow')[0]
         self.assertIn('lp.topMargin = 0;', show); self.assertIn('bg.setColor(0x33000000)', show)
         self.assertNotIn('overlayItem', show)
-        self.assertIn('Prefs.layerLabel(act, w)', (main / 'SidePanel.java').read_text(encoding='utf-8'))
+        self.assertIn('Prefs.layerLabel(act, game(), w)', (main / 'SidePanel.java').read_text(encoding='utf-8'))   # the running game's own label
         self.assertIn('Prefs.layerLabel(this, w)', (main / 'MainActivity.java').read_text(encoding='utf-8'))
 
     def test_label_honest(self):

@@ -22,10 +22,11 @@ class Grouping(unittest.TestCase):
     def test_defaults_group(self):
         b = settings_body()
         self.assertIn('LinearLayout perf = defaultsGroup(content);', b)
-        # rows added to the group: only the defaults a game's page can override and that are not input
+        # rows added to the group: only the defaults a game's page can override (the in-game panel's settings among them: frame generation, Display, Picture size, the
+        # on-screen controls' look, Motion sensitivity, Pause on return); the input rows that were per game before stay in Controls
         in_group = set(re.findall(r'perf\.addView\(new Ui\.Setting\(this, "[^"]+", "([^"]+)"', b))
         in_group |= set(re.findall(r'perf\.addView\((\w+)Row\.view', b))
-        self.assertEqual(in_group, {'Use fast cores', 'res', 'cap', 'ups', 'sharp', 'drs'})
+        self.assertEqual(in_group, {'Use fast cores', 'res', 'cap', 'ups', 'sharp', 'drs', 'lsfg', 'disp', 'size', 'look', 'motion', 'Pause on return'})
 
     def test_top_level_rows(self):
         b = settings_body()

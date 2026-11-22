@@ -134,7 +134,7 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
         tag = overlayText(Gravity.TOP | Gravity.START, 1f);
         tag.setText(Prefs.buildTag(this));
         tag.setTypeface(Typeface.DEFAULT_BOLD);
-        tag.setVisibility(overlayOn() && Prefs.overlayItem(this, "tag") ? View.VISIBLE : View.GONE);
+        tag.setVisibility(overlayOn() && Prefs.overlayItem(this, "tag", titleId()) ? View.VISIBLE : View.GONE);
         root.addView(tag, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START));
         // The log block may grow at most up to the tag's bottom edge (its top margin), so a long log never runs under the tag
         tag.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
@@ -260,14 +260,14 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
         v.requestLayout();
     }
 
-    private boolean overlayOn() { return !clean && (overlayEnv != null ? overlayEnv : Prefs.overlay(this)); }
+    private boolean overlayOn() { return !clean && (overlayEnv != null ? overlayEnv : Prefs.overlay(this, titleId())); }
 
     private boolean logOverlayVisible() {
-        return !clean && (!drawing || failed || TouchControls.showLog(this));
+        return !clean && (!drawing || failed || TouchControls.showLog(this, titleId()));
     }
 
     /** The overlay shows the log's tail (Show startup log, the touch controls' log switch, or a failure); otherwise, until the first frame, one "starting" line */
-    private boolean fullLog() { return failed || Prefs.startupLog(this) || TouchControls.showLog(this); }
+    private boolean fullLog() { return failed || Prefs.startupLog(this) || TouchControls.showLog(this, titleId()); }
     /** The game's name for the "starting" line */
     private String bootName = "";
 
@@ -277,7 +277,7 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
         clean = hidden;
         Prefs.clean(this, hidden);
         if (fps != null) fps.setVisibility(hidden || !overlayOn() ? View.GONE : View.VISIBLE);
-        if (tag != null) tag.setVisibility(hidden || !overlayOn() || !Prefs.overlayItem(this, "tag") ? View.GONE : View.VISIBLE);
+        if (tag != null) tag.setVisibility(hidden || !overlayOn() || !Prefs.overlayItem(this, "tag", titleId()) ? View.GONE : View.VISIBLE);
         if (overlay != null) overlay.setVisibility(logOverlayVisible() ? View.VISIBLE : View.GONE);
         if (controls != null) controls.setClean(hidden);
         updateHandle(controls == null || controls.normalVisible());
@@ -401,7 +401,7 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
     private void fpsTick() {
         if (stopped || paused) { ui.postDelayed(this::fpsTick, 2000); return; }   // nothing to show: no readings (thermal, battery, the host's counters) while suspended
         boolean on = overlayOn();
-        CharSequence t = on ? stats.tick() : null, g = on && Prefs.overlayItem(this, "tag") ? tag.getText() : null;
+        CharSequence t = on ? stats.tick() : null, g = on && Prefs.overlayItem(this, "tag", titleId()) ? tag.getText() : null;
         boolean host = tagBlock.host(g) & fpsBlock.host(t);   // both every time: a block that is off empties its corner
         fps.setVisibility(!host && t != null ? View.VISIBLE : View.GONE);
         tag.setVisibility(!host && g != null ? View.VISIBLE : View.GONE);
@@ -550,7 +550,7 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
         }
         if (prof != null && prof.vegetationDetail && !Prefs.fullVegetation(this, id)) env.add("DM_VK_VEGETATION=0");
         if (prof != null) env.addAll(prof.optionsEnv(optEnv -> Prefs.gameOption(this, id, optEnv)));
-        Lsfg.env(this, env);   // frame generation: the user's Lossless.dll and the settings
+        Lsfg.env(this, env, titleId());   // frame generation: the user's Lossless.dll and the game's settings (its own, else Settings')
         GameUpscaler.env(this, id, env);   // the Upscaler (Game settings, the in-game panel): the game's own upscaler and the present's scaling
         if (Prefs.drsGame(id)) { int[] drs = Prefs.DRS[Prefs.drs(this, id)]; env.add("DM_DRS=" + drs[0] + "," + drs[1]); }   // dynamic resolution range (Prefs.DRS)
         int cap = Prefs.fpsCap(this, id);   // the game's own frame rate cap (its in-game panel, its Game settings), else the main screen's (unset: the profile's fps_target)
@@ -935,8 +935,8 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
                 android.widget.Toast.makeText(this, Tx.s(R.string.game_environment_lines, msg), android.widget.Toast.LENGTH_LONG).show();
             }
             if (testSave != null) Native.note("[nxlaunch] test app: DM_SAVE from env-" + id + ".txt: " + testSave);
-            Native.note("frame generation: " + (Lsfg.on(this) ? "on" : "off") + "; " + Lsfg.note);
-            if (Prefs.ramSaverLevel(this, id) == 2) Native.note("RAM saver: Strong (DM_VK_RAM_SAVER=2); frame generation " + (Lsfg.on(this) ? "on" : "off"));
+            Native.note("frame generation: " + (Lsfg.on(this, titleId()) ? "on" : "off") + (Lsfg.own(this, titleId()) ? " (this game's own setting)" : " (Settings' default)") + "; " + Lsfg.note);
+            if (Prefs.ramSaverLevel(this, id) == 2) Native.note("RAM saver: Strong (DM_VK_RAM_SAVER=2); frame generation " + (Lsfg.on(this, titleId()) ? "on" : "off"));
             Native.note(gpuNote + " (picked in the launcher; a DM_VK_DRIVER line in env.txt wins, the host's [vk] driver line says which ran)");
             Native.note(Recommend.logLine(Prefs.recStates(this, id)));   // each recommended setting with its value and source (yours / recommended / default); env.txt lines come later and win
             if (resNote != null) Native.note(resNote);
@@ -1252,7 +1252,7 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
 
     // ---- The host's side of the Activity: input devices, audio focus and route, motion, lifecycle ----
     private void hostSetup() {
-        if (lsfgFollow == null) lsfgFollow = Lsfg.follow(this, ui);   // the screen's refresh set higher or lower while the game runs: frame generation's choices follow
+        if (lsfgFollow == null) lsfgFollow = Lsfg.follow(this, ui, titleId());   // the screen's refresh set higher or lower while the game runs: frame generation's choices follow
         inputManager = (InputManager) getSystemService(Context.INPUT_SERVICE);
         inputManager.registerInputDeviceListener(this, ui);
         padMotion = new PadMotion();
@@ -1459,7 +1459,7 @@ public final class GameActivity extends Activity implements SurfaceHolder.Callba
     }
 
     /** Gamepads and joysticks only: a keyboard with arrow keys (SOURCE_DPAD) gets a player from its first pad key, if it ever sends one (PadOrder.active) */
-    private static boolean gamepadLike(InputDevice d) {
+    static boolean gamepadLike(InputDevice d) {   // (Settings › Player 1 lists the same devices)
         return d != null && !d.isVirtual() && (d.supportsSource(InputDevice.SOURCE_GAMEPAD) || d.supportsSource(InputDevice.SOURCE_JOYSTICK));
     }
     /** What PadOrder ranks a device by: external, gamepad buttons with a stick, a vendor ID; never its name */

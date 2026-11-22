@@ -1398,4 +1398,12 @@
     <string name="game_fast_fp16_shader_math">快速 FP16 着色器运算</string>
     <string name="game_fp16_on_turnip_faster">Turnip 上的 16 位半精度：着色器更快，发热更少</string>
     <string name="game_fp16_default_precision">默认精度</string>
+    <string name="common_picture_size">画面大小</string>
+    <string name="game_lsfg_on_target">开 · %1$d fps</string>
+    <string name="game_own_follows_settings">此游戏沿用设置（%1$s）。在此更改后将成为此游戏自己的设置。</string>
+    <string name="game_own_settings_note">这是此游戏自己的设置。使用设置默认值即可重新沿用设置。</string>
+    <string name="game_use_settings_default">使用设置默认值</string>
+    <string name="settings_touch_look">屏幕控制外观</string>
+    <string name="settings_panel_look">游戏内面板外观</string>
+    <string name="settings_player_one_away">所选手柄（未连接）</string>
 </resources>

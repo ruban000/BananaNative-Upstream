@@ -52,7 +52,7 @@ public final class MainActivity extends Activity {
     private View accessCard;
     private BananaBackgroundView bananas;   // the drifting bananas behind the screen
     private TextView poppedText;   // Settings › About: "Bananas Popped: n" (null when Settings is not shown)
-    private Ui.Setting overlayRow, resRow, capRow, upsRow, sharpRow, drsRow, lsfgRow, gpuRow, updateRow, timeRow, channelRow;
+    private Ui.Setting overlayRow, resRow, capRow, upsRow, sharpRow, drsRow, lsfgRow, gpuRow, updateRow, timeRow, channelRow, dispRow, sizeRow, lookRow, motionRow, panelRow, oneRow;
     /** The update dot on the dock's Settings button (Updater.dot) */
     private View updateDot; private View settingsButton;
     private boolean resumed, settingsPage;
@@ -861,7 +861,24 @@ public final class MainActivity extends Activity {
                 this::refreshSettings)).chevron(this);
         perf.addView(drsRow.view);
         lsfgRow = new Ui.Setting(this, "✨", Tx.s(R.string.settings_frame_generation), v -> frameGen()).chevron(this);
-        play.addView(lsfgRow.view);   // no per-game twin (the in-game panel has it): not a default, so it stays on the page
+        perf.addView(lsfgRow.view);   // the default of every game; a game's own: its Game settings › Frame generation, or the in-game panel
+        // The rest of the in-game panel's settings, as defaults a game's own Game settings (and the in-game panel, which writes the game's own) can override
+        dispRow = new Ui.Setting(this, "📺", Tx.s(R.string.common_display), v -> pick(Tx.s(R.string.common_display), Tx.arr(R.array.arr_display), Prefs.stretch(this) ? 1 : 0, w -> Prefs.stretchDefault(this, w == 1))).chevron(this);
+        perf.addView(dispRow.view);
+        sizeRow = new Ui.Setting(this, "🔲", Tx.s(R.string.common_picture_size), v -> pick(Tx.s(R.string.common_picture_size), GameSettings.sizeNames(), GameSettings.sizeIndex(Prefs.pictureSize(this)),
+                w -> Prefs.pictureSizeDefault(this, GameSettings.sizeOfIndex(w)))).chevron(this);
+        perf.addView(sizeRow.view);
+        lookRow = new Ui.Setting(this, "🎨", Tx.s(R.string.settings_touch_look), v -> touchLook()).chevron(this);
+        perf.addView(lookRow.view);
+        motionRow = new Ui.Setting(this, "🎯", Tx.s(R.string.game_motion_sensitivity), v -> pick(Tx.s(R.string.game_motion_sensitivity), Prefs.MOTION_NAMES, Prefs.motionSens(this), w -> Prefs.motionSensDefault(this, w))).chevron(this);
+        perf.addView(motionRow.view);
+        perf.addView(new Ui.Setting(this, "⏸️", Tx.s(R.string.game_pause_on_return), null).toggle(this, Prefs.pauseOnReturn(this), (b, on) -> Prefs.pauseOnReturnDefault(this, on))
+                .says(Tx.s(R.string.game_back_from_the_background_paused), Tx.s(R.string.game_back_from_the_background_runs)).view);
+        // The in-game panel's own look and Player 1: one setting for every game (see panelLook, playerOne)
+        panelRow = new Ui.Setting(this, "🎛️", Tx.s(R.string.settings_panel_look), v -> panelLook()).chevron(this);
+        ctl.addView(panelRow.view);
+        oneRow = new Ui.Setting(this, "1️⃣", Tx.s(R.string.game_player_1), v -> playerOne()).chevron(this);
+        ctl.addView(oneRow.view);
         gpuRow = new Ui.Setting(this, "🎮", Tx.s(R.string.common_gpu_driver), v -> GpuDriver.dialog(this, PICK_DRIVER)).chevron(this);   // custom GPU drivers (GpuDriver.java)
         sys.addView(gpuRow.view);
         timeRow = new Ui.Setting(this, "🕒", Tx.s(R.string.common_time_of_day), v -> TimeOfDay.dialog(this, this::refreshSettings)).chevron(this);   // the clock the next start gives the game (Prefs.timeOverride → DM_TIME)
@@ -962,7 +979,13 @@ public final class MainActivity extends Activity {
         sharpRow.value(GameUpscaler.sharpName(GameUpscaler.sharp(this)));
         sharpRow.view.setVisibility(GameUpscaler.mode(this) == GameUpscaler.MODE_FSR ? View.VISIBLE : View.GONE);
         drsRow.value(Prefs.DRS_NAMES[Prefs.drs(this)]);
-        lsfgRow.value(!BuildConfig.NX_LSFG ? Tx.s(R.string.home_not_in_this_build) : Lsfg.on(this) ? Tx.s(R.string.home_on_multiplier, Lsfg.multiplier(this)) + (Lsfg.find(this) == null ? Tx.s(R.string.home_lossless_dll_missing) : "") : Tx.s(R.string.game_off));
+        lsfgRow.value(!BuildConfig.NX_LSFG ? Tx.s(R.string.home_not_in_this_build) : Lsfg.on(this) ? Lsfg.label(this, null) + (Lsfg.find(this) == null ? Tx.s(R.string.home_lossless_dll_missing) : "") : Tx.s(R.string.game_off));
+        dispRow.value(Tx.arr(R.array.arr_display)[Prefs.stretch(this) ? 1 : 0]);
+        sizeRow.value(GameSettings.sizeNames()[GameSettings.sizeIndex(Prefs.pictureSize(this))]);
+        lookRow.value(GameSettings.touchLookValue(this, null));
+        motionRow.value(Prefs.MOTION_NAMES[Prefs.motionSens(this)]);
+        panelRow.value(Tx.arr(R.array.arr_panel_look)[Prefs.panelSize(this)] + " · " + Tx.arr(R.array.arr_panel_look)[Prefs.panelText(this)]);
+        oneRow.value(playerOneLabel());
         GpuDriver.Info d = GpuDriver.selected(this);
         gpuRow.value(d == null ? Tx.s(R.string.common_system) : d.label());
         timeRow.value(TimeOfDay.label(this));
@@ -2419,7 +2442,7 @@ public final class MainActivity extends Activity {
     private void overlayItems() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        Overlay.rows(this, box, null);
+        Overlay.rows(this, box, null, null);   // the default of every game without its own
         Ui.sheet(this, Tx.s(R.string.home_overlay), box).setPositiveButton(Tx.s(R.string.common_done), null).setOnDismissListener(d -> refreshSettings()).show();
     }
 
@@ -2455,7 +2478,7 @@ public final class MainActivity extends Activity {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         File dll = Lsfg.find(this);
-        Lsfg.rows(this, box, Lsfg.note + (dll != null ? "" : Tx.s(R.string.game_put_dll_in_documents)), () -> {});
+        Lsfg.rows(this, box, Lsfg.note + (dll != null ? "" : Tx.s(R.string.game_put_dll_in_documents)), () -> {}, null);   // the default of every game without its own
         Ui.add(box, Ui.small(this, Tx.s(R.string.home_ported_from_eden_gpl_3)), 10);
         Ui.sheet(this, Tx.s(R.string.home_frame_generation), box).setPositiveButton(Tx.s(R.string.common_done), null).setOnDismissListener(d -> refreshSettings())
                 .setNeutralButton(Tx.s(R.string.home_pick_lossless_dll), (d, w) -> {
@@ -2507,6 +2530,53 @@ public final class MainActivity extends Activity {
     private static String touchLabel(int m) { return m == TouchControls.MODE_AUTO ? Tx.s(R.string.home_auto_hidden_while_a_controller) : Tx.arr(R.array.arr_touch_mode)[m]; }
     private static String rotationLabel(boolean auto) { return auto ? Tx.s(R.string.home_automatic_the_game_follows_the) : Tx.s(R.string.home_landscape_the_game_window_stays); }
     /** A default's choice in Settings (no "Default" entry: this is the default) */
+    /** Settings › On-screen controls look: the defaults of every game without its own (TouchControls.lookRows; the show / hide button is its own row) */
+    private void touchLook() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        TouchControls.lookRows(this, box, null);
+        Ui.sheet(this, Tx.s(R.string.settings_touch_look), box).setPositiveButton(Tx.s(R.string.common_done), null).setOnDismissListener(d -> refreshSettings()).show();
+    }
+
+    /** Settings › In-game panel look: the panel's own size and text size (PanelLook), the same setting as the panel's General rows. It is the launcher's own panel, not a
+     *  game setting, so every game shares it (no per-game value) */
+    private void panelLook() {
+        String[] what = {Tx.s(R.string.game_size), Tx.s(R.string.game_text_size)};
+        new PadFocus.Builder(this).setTitle(Tx.s(R.string.settings_panel_look)).setItems(new String[] {what[0] + ": " + Tx.arr(R.array.arr_panel_look)[Prefs.panelSize(this)],
+                what[1] + ": " + Tx.arr(R.array.arr_panel_look)[Prefs.panelText(this)]}, (d, k) ->
+                pick(what[k], Tx.arr(R.array.arr_panel_look), k == 0 ? Prefs.panelSize(this) : Prefs.panelText(this), w -> { if (k == 0) Prefs.panelSize(this, w); else Prefs.panelText(this, w); }))
+                .setNegativeButton(Tx.s(R.string.common_cancel), null).show();
+    }
+
+    /** The gamepads connected now (GameActivity.gamepadLike): descriptor and name */
+    private static java.util.List<String[]> gamepadsNow() {
+        java.util.List<String[]> out = new java.util.ArrayList<>();
+        for (int id : android.view.InputDevice.getDeviceIds()) {
+            android.view.InputDevice d = android.view.InputDevice.getDevice(id);
+            if (GameActivity.gamepadLike(d)) out.add(new String[] {d.getDescriptor(), d.getName()});
+        }
+        return out;
+    }
+    private String playerOneLabel() {
+        String chosen = Prefs.padFirst(this);
+        if (chosen.isEmpty()) return Tx.s(R.string.game_automatic);
+        for (String[] p : gamepadsNow()) if (p[0].equals(chosen)) return p[1];
+        return Tx.s(R.string.settings_player_one_away);
+    }
+    /**
+     * Settings › Player 1 (PadOrder): Automatic or one of the gamepads connected now, kept by the device's descriptor; the same setting as the in-game panel's Player 1.
+     * It names a physical device, so every game shares it (no per-game value)
+     */
+    private void playerOne() {
+        java.util.List<String[]> pads = gamepadsNow();
+        String chosen = Prefs.padFirst(this);
+        java.util.List<String> names = new java.util.ArrayList<>(), keys = new java.util.ArrayList<>();
+        names.add(Tx.s(R.string.game_automatic)); keys.add("");
+        for (String[] p : pads) { names.add(p[1]); keys.add(p[0]); }
+        if (!chosen.isEmpty() && !keys.contains(chosen)) { names.add(Tx.s(R.string.settings_player_one_away)); keys.add(chosen); }   // the one chosen, while it is not connected
+        pick(Tx.s(R.string.game_player_1), names.toArray(new String[0]), Math.max(0, keys.indexOf(chosen)), w -> Prefs.padFirst(this, keys.get(w)));
+    }
+
     private void pick(String title, String[] items, int cur, java.util.function.IntConsumer set) {
         new PadFocus.Builder(this).setTitle(title).setSingleChoiceItems(items, cur, (d, w) -> { set.accept(w); refreshSettings(); d.dismiss(); }).setNegativeButton(Tx.s(R.string.common_cancel), null).show();
     }

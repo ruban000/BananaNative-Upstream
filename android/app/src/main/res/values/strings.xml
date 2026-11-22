@@ -1489,4 +1489,12 @@
     <string name="game_fast_fp16_shader_math">Fast FP16 shader math</string>
     <string name="game_fp16_on_turnip_faster">16-bit half precision on Turnip: faster shader math, lower heat</string>
     <string name="game_fp16_default_precision">Default precision</string>
+    <string name="common_picture_size">Picture size</string>
+    <string name="game_lsfg_on_target">On · %1$d fps</string>
+    <string name="game_own_follows_settings">This game follows Settings (%1$s). A change here becomes this game\'s own.</string>
+    <string name="game_own_settings_note">These are this game\'s own settings. Use Settings\' default to follow Settings again.</string>
+    <string name="game_use_settings_default">Use Settings\' default</string>
+    <string name="settings_touch_look">On-screen controls look</string>
+    <string name="settings_panel_look">In-game panel look</string>
+    <string name="settings_player_one_away">The chosen controller (not connected)</string>
 </resources>

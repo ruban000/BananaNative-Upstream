@@ -17,10 +17,10 @@ LSFG = J / 'main/java/dev/nxnative/android/Lsfg.java'
 class Wiring(unittest.TestCase):
     def test_lsfg_offers_and_uses_what_the_screen_shows(self):
         t = LSFG.read_text(encoding='utf-8')
-        self.assertIn('PanelRates.clamp(prefs(c).getInt("lsfg_mult", 2), multipliers(c))', t)   # the env and the in-game push take the held value
-        self.assertIn('PanelRates.clamp(prefs(c).getInt("lsfg_target", 0), targets(c))', t)
-        self.assertIn('choice(c, tv, target(c), tl', t)
-        self.assertIn('choice(c, mv, multiplier(c), ml', t)
+        self.assertIn('PanelRates.clamp(num(c, "lsfg_mult", titleId, 2), multipliers(c))', t)   # the env and the in-game push take the held value (the game's own, else the default)
+        self.assertIn('PanelRates.clamp(num(c, "lsfg_target", titleId, 0), targets(c))', t)
+        self.assertIn('choice(c, tv, target(c, titleId), tl', t)
+        self.assertIn('choice(c, mv, multiplier(c, titleId), ml', t)
         self.assertIn('"peak_refresh_rate"', t)
         self.assertNotIn('TARGETS = {0, 60, 90, 120}', t)
 
@@ -30,7 +30,7 @@ class Wiring(unittest.TestCase):
         self.assertIn('registerDisplayListener', t)
         self.assertIn('if (m == last[0] && t == last[1]) return;', t)   # the host gets the settings again only when what is in use changes
         g = (J / 'main/java/dev/nxnative/android/GameActivity.java').read_text(encoding='utf-8')
-        self.assertIn('lsfgFollow = Lsfg.follow(this, ui)', g)
+        self.assertIn('lsfgFollow = Lsfg.follow(this, ui, titleId())', g)
         self.assertIn('lsfgFollow.run(); lsfgFollow = null;', g)
 
 

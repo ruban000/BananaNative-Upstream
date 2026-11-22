@@ -1414,4 +1414,12 @@
     <string name="game_fast_fp16_shader_math">Matemáticas de sombreado FP16 rápidas</string>
     <string name="game_fp16_on_turnip_faster">Media precisión de 16 bits en Turnip: sombreado más rápido y menos calor</string>
     <string name="game_fp16_default_precision">Precisión predeterminada</string>
+    <string name="common_picture_size">Tamaño de la imagen</string>
+    <string name="game_lsfg_on_target">Activado · %1$d fps</string>
+    <string name="game_own_follows_settings">Este juego sigue los Ajustes (%1$s). Un cambio aquí será propio de este juego.</string>
+    <string name="game_own_settings_note">Estos son los ajustes propios de este juego. Usa «Valor de Ajustes» para volver a seguir los Ajustes.</string>
+    <string name="game_use_settings_default">Valor de Ajustes</string>
+    <string name="settings_touch_look">Aspecto de los controles en pantalla</string>
+    <string name="settings_panel_look">Aspecto del panel del juego</string>
+    <string name="settings_player_one_away">El mando elegido (no conectado)</string>
 </resources>

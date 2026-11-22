@@ -1406,4 +1406,12 @@
     <string name="game_fast_fp16_shader_math">Hızlı FP16 gölgelendirici matematiği</string>
     <string name="game_fp16_on_turnip_faster">Turnip\'te 16 bit yarım duyarlık: daha hızlı gölgelendirme, daha az ısı</string>
     <string name="game_fp16_default_precision">Varsayılan duyarlık</string>
+    <string name="common_picture_size">Görüntü boyutu</string>
+    <string name="game_lsfg_on_target">Açık · %1$d fps</string>
+    <string name="game_own_follows_settings">Bu oyun Ayarlar\'ı izliyor (%1$s). Burada yapılan bir değişiklik bu oyuna özel olur.</string>
+    <string name="game_own_settings_note">Bunlar bu oyunun kendi ayarları. Ayarlar\'a yeniden uymak için Ayarlar varsayılanını kullanın.</string>
+    <string name="game_use_settings_default">Ayarlar varsayılanını kullan</string>
+    <string name="settings_touch_look">Ekran kontrollerinin görünümü</string>
+    <string name="settings_panel_look">Oyun içi panelin görünümü</string>
+    <string name="settings_player_one_away">Seçilen kumanda (bağlı değil)</string>
 </resources>

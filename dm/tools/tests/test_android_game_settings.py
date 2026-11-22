@@ -30,9 +30,10 @@ class GameSettingsPage(unittest.TestCase):
                      'driver(a, g, again)', 'gpuTiming(a, g, again)', 'language(a, g, again)', 'xbox(a, g, again)', 'PadMapUi.forGame(a, g, again)', 'env(a, g, again)',
                      'Prefs.resetGame(a, id)', 'Prefs.backToRecommended(a, id)'):
             self.assertIn(call, self.gs, f'{call}: its row is gone')
-        for setter in ('fullVegetation', 'skipLayers', 'hold60', 'decouple', 'instancedDraws', 'classicPasses', 'keepGpuUp', 'psoAsync', 'ramSaver', 'pauseOnReturn', 'pinThreads'):
+        for setter in ('fullVegetation', 'skipLayers', 'hold60', 'decouple', 'instancedDraws', 'classicPasses', 'keepGpuUp', 'psoAsync', 'ramSaver', 'pinThreads'):
             self.assertIn(f'Prefs.{setter}(a, id, on)', self.gs, f'{setter}: its switch is gone')
         self.assertIn('Prefs.rumbleOwn(a, id, ', self.gs)
+        self.assertIn('Prefs.pauseOnReturnOwn(a, id, ', self.gs)   # Settings' default first, then the game's own
         self.assertIn('Prefs.gameOption(a, id, opt.env, checked)', self.gs, "the profile's options")
 
     def test_keep_gpu_clock_up(self):   # PR 472's ADPF rule as a player switch: off by default (heat), on passes DM_VK_ADPF_SPAN_ANY=1, in Speed, cleared by Reset to defaults

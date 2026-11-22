@@ -1398,4 +1398,12 @@
     <string name="game_fast_fp16_shader_math">빠른 FP16 셰이더 연산</string>
     <string name="game_fp16_on_turnip_faster">Turnip에서 16비트 반정밀도: 셰이더 연산이 빨라지고 발열이 줄어요</string>
     <string name="game_fp16_default_precision">기본 정밀도</string>
+    <string name="common_picture_size">화면 크기</string>
+    <string name="game_lsfg_on_target">켬 · %1$d fps</string>
+    <string name="game_own_follows_settings">이 게임은 설정(%1$s)을 따릅니다. 여기서 바꾸면 이 게임만의 설정이 됩니다.</string>
+    <string name="game_own_settings_note">이 게임만의 설정입니다. 설정 기본값을 누르면 다시 설정을 따릅니다.</string>
+    <string name="game_use_settings_default">설정 기본값 사용</string>
+    <string name="settings_touch_look">화면 컨트롤 모양</string>
+    <string name="settings_panel_look">게임 내 패널 모양</string>
+    <string name="settings_player_one_away">선택한 컨트롤러(연결 안 됨)</string>
 </resources>

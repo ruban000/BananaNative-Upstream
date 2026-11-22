@@ -731,7 +731,7 @@ final class SidePanel extends FrameLayout {
             box.addView(DrsSlider.view(act, Prefs.drs(act, game()), drsHead::setText, i -> { Prefs.drs(act, game(), i); Native.drsSet(Prefs.DRS[i][0], Prefs.DRS[i][1]); }));
         }
 
-        lsfgNow = Lsfg.rows(act, box, "", () -> { Lsfg.push(act); refresh(); });
+        lsfgNow = Lsfg.rows(act, box, "", () -> { Lsfg.push(act, game()); refresh(); }, game());   // the running game's own setting from now on (Settings' stays the default of the others)
 
         Profile prof = Profile.of(game());
         if (prof != null) {
@@ -794,7 +794,7 @@ final class SidePanel extends FrameLayout {
         picture();
 
         head(Tx.s(R.string.settings_overlay));
-        Overlay.rows(act, box, null);
+        Overlay.rows(act, box, null, game());   // the running game's own overlay from now on
     }
 
     /** Controls: Player 1, the on-screen controls, rumble, the phone's Motion sensitivity and the Button mapping shortcut */
@@ -857,9 +857,9 @@ final class SidePanel extends FrameLayout {
         head(Tx.s(R.string.game_shaders));
         layerNow = note(((GameActivity) act).layerLine());
         note(Tx.s(R.string.game_shaders_the_game_lacks_are_3));
-        Button lab = row(ID_LABEL, Tx.s(R.string.game_building_shaders_label), Overlay.labelChoices()[Prefs.layerLabel(act)]);   // Off / the count / the words: takes effect at the label's next update
+        Button lab = row(ID_LABEL, Tx.s(R.string.game_building_shaders_label), Overlay.labelChoices()[Prefs.layerLabel(act, game())]);   // Off / the count / the words: takes effect at the label's next update
         lab.setOnClickListener(v -> padDialog(new AlertDialog.Builder(act).setTitle(Tx.s(R.string.game_building_shaders_label))
-                .setSingleChoiceItems(Overlay.labelChoices(), Prefs.layerLabel(act), (d, w) -> { Prefs.layerLabel(act, w); d.dismiss(); restyle(ID_LABEL); })
+                .setSingleChoiceItems(Overlay.labelChoices(), Prefs.layerLabel(act, game()), (d, w) -> { Prefs.layerLabel(act, game(), w); d.dismiss(); restyle(ID_LABEL); })   // the running game's own label from now on
                 .setNegativeButton(Tx.s(R.string.common_cancel), null).show()));
     }
 
