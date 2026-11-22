@@ -62,7 +62,7 @@ jobs:
               if i == 0:  # Legacy wording-only patch conflicts with upstream's localized label.
                   continue
 
-              diff_start = patch.find("\\ndiff --git ")
+              diff_start = patch.find("\ndiff --git ")
               if diff_start < 0:
                   continue
               header, diff_text = patch[:diff_start], patch[diff_start:]
@@ -77,7 +77,7 @@ jobs:
                       continue
                   kept.append(block)
               if kept:
-                  selected.append(header + "\\n" + "".join(kept))
+                  selected.append(header + "\n" + "".join(kept))
 
           if not selected:
               raise SystemExit("No Android UI or touch-input patches were selected")
