@@ -2919,5 +2919,10 @@ public final class MainActivity extends Activity {
             }
             int pad = Math.max(dp(14), (r - l - side) / 2);   // room at both ends so the first and the last tile can stand in the middle
             if (row.getPaddingLeft() != pad || row.getPaddingRight() != pad) row.setPadding(pad, 0, pad, 0);
-        }
+        });
+        return row;
+    }
+
+    /** Add game: a round banana-yellow button (the plus of the dock's yellow), floating at the bottom right of Home */
+
 }
