@@ -312,26 +312,34 @@ final class TouchControls extends View {
         float bar = picX * w;   // the width of each letterbox bar
         float rStick = 60 * d, rRight = 54 * d, rPad = 50 * d, rFace = 25 * d, rSh = 25 * d, rSmall = 17 * d, rClick = 17 * d, off = 1.65f * rFace;
         n = 0;
-        // Shoulders in the band's top corners, ZL / ZR outside, L / R inside, minus / plus next to them
-        float shY = y0 + m + 0.7f * rSh;
-        add(BUTTON, ZL, 0, SHAPE_SHOULDER, m + rSh, shY, rSh, "ZL");
-        add(BUTTON, L, 0, SHAPE_SHOULDER, m + 3 * rSh + 10 * d, shY, rSh, "L");
-        add(BUTTON, R, 0, SHAPE_SHOULDER, w - m - 3 * rSh - 10 * d, shY, rSh, "R");
-        add(BUTTON, MINUS, 0, SHAPE_ROUND, m + 4 * rSh + 22 * d + rSmall, shY, rSmall, "−");
-        add(BUTTON, PLUS, 0, SHAPE_ROUND, w - m - 4 * rSh - 22 * d - rSmall, shY, rSmall, "+");
-        // Left: the stick high, the D-pad low, centred in the bar when it is wide enough
-        float top = shY + rSh + 10 * d;
-        float lx = Math.max(m + rStick, bar / 2), ly = Math.max(y0 + bh * 0.45f, top + rStick);
+        // Pokopia reference layout: shoulder controls near the upper edges, D-pad on the left,
+        // and the four face icons in a vertical column on the right side of the game picture.
+        float left = picX * w, right = (picX + picW) * w;
+        float topPic = picY * h, bottomPic = (picY + picH) * h;
+        float leftX = left + Math.max(m + rSh, picW * w * 0.035f);
+        float rightX = right - Math.max(m + rFace, picW * w * 0.045f);
+        float topShoulderY = topPic + Math.max(m + rSh, picH * h * 0.12f);
+        add(BUTTON, ZL, 0, SHAPE_SHOULDER, leftX, topPic + picH * h * 0.43f, rSh, "ZL");
+        add(BUTTON, L, 0, SHAPE_SHOULDER, leftX, topShoulderY, rSh, "L");
+        add(BUTTON, R, 0, SHAPE_SHOULDER, rightX, topShoulderY, rSh, "R");
+        add(BUTTON, MINUS, 0, SHAPE_ROUND, leftX + 2.2f * rSh, topShoulderY, rSmall, "−");
+        add(BUTTON, PLUS, 0, SHAPE_ROUND, rightX - 2.2f * rSh, topShoulderY, rSmall, "+");
+        // Left analogue stick stays low; D-pad is a vertical Up / Right / Down column.
+        float top = topShoulderY + rSh + 10 * d;
+        float lx = left + Math.max(m + rStick, picW * w * 0.075f);
+        float ly = Math.min(bottomPic - rStick - m, topPic + picH * h * 0.72f);
         int ls = add(STICK, 0, 0, SHAPE_ROUND, lx, ly, rStick, "");
-        add(DPAD, UP | DOWN | LEFT | RIGHT, 0, SHAPE_ROUND, Math.max(m + rPad, bar / 2), h - m - rPad, rPad, "");
+        add(DPAD, UP | DOWN | LEFT | RIGHT, 0, SHAPE_ROUND,
+                left + Math.max(m + rPad, picW * w * 0.035f), topPic + picH * h * 0.68f, rPad, "");
         float diag = (rStick + rClick + 6 * d) * 0.7071f;
         add(BUTTON, LS, 0, SHAPE_ROUND, lx + diag, ly + diag, rClick, "L3");
-        // Right: the face buttons high (A right, B bottom, X top, Y left, as on a Switch), the right stick low
-        float fx = Math.min(w - m - rFace - off, w - bar / 2), fy = ly;
-        add(BUTTON, A, 0, SHAPE_ROUND, fx + off, fy, rFace, "A");
-        add(BUTTON, B, 0, SHAPE_ROUND, fx, fy + off, rFace, "B");
-        add(BUTTON, X, 0, SHAPE_ROUND, fx, fy - off, rFace, "X");
-        add(BUTTON, Y, 0, SHAPE_ROUND, fx - off, fy, rFace, "Y");
+        // Pokopia's face actions read top-to-bottom: X, Y, A, B.
+        float faceTop = topPic + picH * h * 0.40f;
+        float faceGap = Math.max(2.15f * rFace, picH * h * 0.105f);
+        add(BUTTON, X, 0, SHAPE_ROUND, rightX, faceTop, rFace, "X");
+        add(BUTTON, Y, 0, SHAPE_ROUND, rightX, faceTop + faceGap, rFace, "Y");
+        add(BUTTON, A, 0, SHAPE_ROUND, rightX, faceTop + 2 * faceGap, rFace, "A");
+        add(BUTTON, B, 0, SHAPE_ROUND, rightX - 0.8f * rFace, faceTop + 3 * faceGap, rFace, "B");
         float rx = Math.min(w - m - rRight, w - bar / 2), ry = h - m - rRight;
         add(STICK, 0, 1, SHAPE_ROUND, rx, ry, rRight, "");
         float diagR = (rRight + rClick + 6 * d) * 0.7071f;
