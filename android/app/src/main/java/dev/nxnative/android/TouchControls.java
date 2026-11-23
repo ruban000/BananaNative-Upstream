@@ -37,6 +37,7 @@ import java.util.Arrays;
  * hide button or the panel's handle (Back or the gamepad's Home button opens the panel), and everything comes back when the last one goes; On keeps them with a gamepad
  * too; Off never draws them, and every touch is the game's touchscreen.
  */
+// Custom control artwork: minus, plus, X and combined D-pad.
 final class TouchControls extends View {
     // DM_BTN_* (dm/host/dm_input.h, nn::hid::NpadButton order)
     private static final long A = 1, B = 1 << 1, X = 1 << 2, Y = 1 << 3, LS = 1 << 4, RS = 1 << 5, L = 1 << 6, R = 1 << 7, ZL = 1 << 8, ZR = 1 << 9,
