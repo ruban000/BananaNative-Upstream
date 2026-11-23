@@ -778,7 +778,7 @@ final class TouchControls extends View {
                 if (icon != null) {
                     // Fit the complete transparent PNG inside the original visual footprint.
                     // Enlarge the artwork within the same button centre; fit the whole image without cropping.
-                    float iconScale = 1.30f;
+                    float iconScale = 1.00f;
                     // Identical square visual box for every face/shoulder icon; preserve aspect ratio.
                     float box = 2f * r[i] * iconScale;
                     float fit = Math.min(box / icon.getWidth(), box / icon.getHeight());
