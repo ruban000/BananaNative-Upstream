@@ -68,7 +68,25 @@ jobs:
           python-version: "3.14"
 
       - name: Install native build tools
+        shell: bash
         run: |
+          set -euo pipefail
+          # Some hosted runner images may omit the Ubuntu archive sources.
+          if ! grep -Rqs 'archive.ubuntu.com/ubuntu' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
+            sudo tee /etc/apt/sources.list.d/ubuntu-noble.sources >/dev/null <<'EOF'
+          Types: deb
+          URIs: http://archive.ubuntu.com/ubuntu
+          Suites: noble noble-updates noble-backports
+          Components: main universe restricted multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+          Types: deb
+          URIs: http://security.ubuntu.com/ubuntu
+          Suites: noble-security
+          Components: main universe restricted multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          EOF
+          fi
           sudo apt-get update
           sudo apt-get install -y ninja-build zsh perl
 
