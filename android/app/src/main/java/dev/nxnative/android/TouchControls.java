@@ -115,6 +115,24 @@ final class TouchControls extends View {
     private final Path path = new Path();
     private final RectF rect = new RectF();
 
+    // Crop transparent padding so every supplied icon has the same visible footprint.
+    private static Bitmap trimTransparent(Bitmap source) {
+        if (source == null) return null;
+        int w = source.getWidth(), h = source.getHeight();
+        int[] pixels = new int[w * h];
+        source.getPixels(pixels, 0, w, 0, 0, w, h);
+        int left = w, top = h, right = -1, bottom = -1;
+        for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) {
+            if ((pixels[y * w + x] >>> 24) != 0) {
+                if (x < left) left = x; if (x > right) right = x;
+                if (y < top) top = y; if (y > bottom) bottom = y;
+            }
+        }
+        if (right < left || bottom < top) return source;
+        if (left == 0 && top == 0 && right == w - 1 && bottom == h - 1) return source;
+        return Bitmap.createBitmap(source, left, top, right - left + 1, bottom - top + 1);
+    }
+
     TouchControls(Context c, boolean input) {
         super(c);
         this.input = input;
@@ -127,11 +145,13 @@ final class TouchControls extends View {
         buttonIcons[6] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_r);
         buttonIcons[7] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_l);
         minusIcon = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_minus);
+        for (int n = 0; n < buttonIcons.length; n++) buttonIcons[n] = trimTransparent(buttonIcons[n]);
         plusIcon = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_plus);
         dpadIcons[0] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.dpad_up);
         dpadIcons[1] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.dpad_right);
         dpadIcons[2] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.dpad_down);
         dpadIcons[3] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.dpad_left);
+        for (int n = 0; n < dpadIcons.length; n++) dpadIcons[n] = trimTransparent(dpadIcons[n]);
         opacity = prefs().getFloat("opacity", 0.6f);
         scale = prefs().getFloat("scale", 1f);
         haptics = prefs().getBoolean("haptics", true);
@@ -758,10 +778,10 @@ final class TouchControls extends View {
                 if (icon != null) {
                     // Fit the complete transparent PNG inside the original visual footprint.
                     // Enlarge the artwork within the same button centre; fit the whole image without cropping.
-                    float iconScale = 1.3f;
-                    float boxW = 2f * r[i] * iconScale;
-                    float boxH = (shape[i] == SHAPE_SHOULDER ? 1.24f : 2f) * r[i] * iconScale;
-                    float fit = Math.min(boxW / icon.getWidth(), boxH / icon.getHeight());
+                    float iconScale = 1.30f;
+                    // Identical square visual box for every face/shoulder icon; preserve aspect ratio.
+                    float box = 2f * r[i] * iconScale;
+                    float fit = Math.min(box / icon.getWidth(), box / icon.getHeight());
                     float drawW = icon.getWidth() * fit, drawH = icon.getHeight() * fit;
                     rect.set(cx[i] - drawW / 2f, cy[i] - drawH / 2f, cx[i] + drawW / 2f, cy[i] + drawH / 2f);
                     iconPaint.setAlpha(held ? 190 : 255);
@@ -859,7 +879,9 @@ final class TouchControls extends View {
             Bitmap icon = dpadIcons[k];
             float ix = x + dx[k], iy = y + dy[k];
             if (icon != null) {
-                rect.set(ix - iconSize / 2f, iy - iconSize / 2f, ix + iconSize / 2f, iy + iconSize / 2f);
+                float fit = Math.min(iconSize / icon.getWidth(), iconSize / icon.getHeight());
+                float dw = icon.getWidth() * fit, dh = icon.getHeight() * fit;
+                rect.set(ix - dw / 2f, iy - dh / 2f, ix + dw / 2f, iy + dh / 2f);
                 iconPaint.setAlpha((pressed[i] & dirs[k]) != 0 ? 190 : 255);
                 c.drawBitmap(icon, null, rect, iconPaint);
             } else {
