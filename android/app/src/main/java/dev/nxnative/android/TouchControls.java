@@ -110,7 +110,8 @@ final class TouchControls extends View {
     private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     // The artwork replaces only the eight matching button faces; their existing layout and hit targets stay unchanged.
     private final Bitmap[] buttonIcons = new Bitmap[8];
-    private Bitmap minusIcon, plusIcon, dpadIcon;
+    private Bitmap minusIcon, plusIcon;
+    private final Bitmap[] dpadIcons = new Bitmap[4];
     private final Path path = new Path();
     private final RectF rect = new RectF();
 
@@ -119,15 +120,18 @@ final class TouchControls extends View {
         this.input = input;
         buttonIcons[0] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_a);
         buttonIcons[1] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_b);
-        buttonIcons[2] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.control_x);
+        buttonIcons[2] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_x);
         buttonIcons[3] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_y);
         buttonIcons[4] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_zr);
         buttonIcons[5] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_zl);
         buttonIcons[6] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_r);
         buttonIcons[7] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_l);
-        minusIcon = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.control_minus);
-        plusIcon = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.control_plus);
-        dpadIcon = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.control_dpad);
+        minusIcon = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_minus);
+        plusIcon = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_plus);
+        dpadIcons[0] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.dpad_up);
+        dpadIcons[1] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.dpad_right);
+        dpadIcons[2] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.dpad_down);
+        dpadIcons[3] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.dpad_left);
         opacity = prefs().getFloat("opacity", 0.6f);
         scale = prefs().getFloat("scale", 1f);
         haptics = prefs().getBoolean("haptics", true);
@@ -845,33 +849,24 @@ final class TouchControls extends View {
     }
 
     private void drawDpad(Canvas c, int i) {
-        float x = cx[i], y = cy[i], rr = r[i], w = rr * 0.36f;
-        if (dpadIcon != null) {
-            float boxW = rr * 2.25f, boxH = rr * 1.25f;
-            float fit = Math.min(boxW / dpadIcon.getWidth(), boxH / dpadIcon.getHeight());
-            float dw = dpadIcon.getWidth() * fit, dh = dpadIcon.getHeight() * fit;
-            rect.set(x - dw / 2f, y - dh / 2f, x + dw / 2f, y + dh / 2f);
-            iconPaint.setAlpha((pressed[i] != 0) ? 190 : 255);
-            c.drawBitmap(dpadIcon, null, rect, iconPaint);
-            return;
-        }
-        fill.setColor(Color.argb(alpha(0.25f), 0, 0, 0));
-        c.drawCircle(x, y, rr, fill);
-        c.drawCircle(x, y, rr, line);
+        float x = cx[i], y = cy[i], rr = r[i];
+        // Four uploaded directional PNGs; original touch regions remain unchanged.
+        float iconSize = rr * 0.92f, offset = rr * 0.52f;
+        float[] dx = {0f, offset, 0f, -offset};
+        float[] dy = {-offset, 0f, offset, 0f};
         long[] dirs = {UP, RIGHT, DOWN, LEFT};
         for (int k = 0; k < 4; k++) {
-            boolean held = (pressed[i] & dirs[k]) != 0;
-            path.reset();
-            // a triangle pointing away from the centre, rotated a quarter turn per direction
-            float[] pts = {0, -rr * 0.82f, w, -rr * 0.38f, -w, -rr * 0.38f};
-            for (int j = 0; j < 6; j += 2) {
-                float px = pts[j], py = pts[j + 1];
-                for (int t = 0; t < k; t++) { float q = px; px = -py; py = q; }
-                if (j == 0) path.moveTo(x + px, y + py); else path.lineTo(x + px, y + py);
+            Bitmap icon = dpadIcons[k];
+            float ix = x + dx[k], iy = y + dy[k];
+            if (icon != null) {
+                rect.set(ix - iconSize / 2f, iy - iconSize / 2f, ix + iconSize / 2f, iy + iconSize / 2f);
+                iconPaint.setAlpha((pressed[i] & dirs[k]) != 0 ? 190 : 255);
+                c.drawBitmap(icon, null, rect, iconPaint);
+            } else {
+                boolean held = (pressed[i] & dirs[k]) != 0;
+                fill.setColor(held ? Color.argb(alpha(0.9f), 255, 255, 255) : Color.argb(alpha(0.35f), 255, 255, 255));
+                c.drawCircle(ix, iy, iconSize * 0.36f, fill);
             }
-            path.close();
-            fill.setColor(held ? Color.argb(alpha(0.9f), 255, 255, 255) : Color.argb(alpha(0.35f), 255, 255, 255));
-            c.drawPath(path, fill);
         }
     }
 
