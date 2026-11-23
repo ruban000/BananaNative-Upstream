@@ -896,7 +896,7 @@ final class TouchControls extends View {
         // Pokopia profile: Up, Right and Down in one vertical column. Left stays hidden;
         // all four native directional hit regions remain active and unchanged.
         float iconSize = rr * 0.92f, offset = rr * 0.52f;
-        float[] dx = {0f, 0f, 0f, 0f};
+        float[] dx = {0f, 0f, 0f, offset};
         float[] dy = {-offset, 0f, offset, 0f};
         long[] dirs = {UP, RIGHT, DOWN, LEFT};
         String[] keys = {"dpad_up", "dpad_right", "dpad_down", "dpad_left"};
