@@ -651,7 +651,9 @@ final class SidePanel extends FrameLayout {
 
     /** Another tab: its rows built, scrolled to its top; with a controller the focus on its first row */
     private void showTab(int k) {
-        if (!open || k == tab) return;
+        if (k < TAB_PERF || k > TAB_GENERAL || (open && k == tab)) return;
+        // Tabs remain clickable while the drawer is showing its menu-only state.
+        // showPage() opens the selected section and also handles switching sections.
         showPage(k);
     }
 
