@@ -118,7 +118,7 @@ final class TouchControls extends View {
         this.input = input;
         buttonIcons[0] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_a);
         buttonIcons[1] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_b);
-        buttonIcons[2] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_x);
+        buttonIcons[2] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.control_x);
         buttonIcons[3] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_y);
         buttonIcons[4] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_zr);
         buttonIcons[5] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_zl);
