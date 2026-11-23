@@ -1,5 +1,7 @@
 package dev.nxnative.android;
 
+import android.app.AlertDialog;
+
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
@@ -775,10 +777,11 @@ final class TouchControls extends View {
             else if (kind[i] == DPAD) drawDpad(c, i);
             else {
                 Bitmap icon = buttonIcon(buttons[i]);
+                String iconKey = buttonIconKey(buttons[i]);
                 if (icon != null) {
-                    // Fit the complete transparent PNG inside the original visual footprint.
-                    // Enlarge the artwork within the same button centre; fit the whole image without cropping.
-                    float iconScale = 1.00f;
+                    if (!iconShown(iconKey)) continue; // visual only: keep the native hit target active
+                    // Minus gets a larger visible mark without changing its touch target.
+                    float iconScale = buttons[i] == MINUS ? 1.45f : 1.00f;
                     // Identical square visual box for every face/shoulder icon; preserve aspect ratio.
                     float box = 2f * r[i] * iconScale;
                     float fit = Math.min(box / icon.getWidth(), box / icon.getHeight());
@@ -803,6 +806,26 @@ final class TouchControls extends View {
             if (off) { line.setColor(Color.argb(Math.round(255 * 0.8f), 255, 120, 120)); c.drawLine(cx[i] - r[i] * 0.7f, cy[i] + r[i] * 0.7f, cx[i] + r[i] * 0.7f, cy[i] - r[i] * 0.7f, line); }
             dim = 1f;
         }
+    }
+
+    /** Persisted icon visibility is presentation-only; it never changes controller input or hit targets. */
+    private boolean iconShown(String key) {
+        if (key == null) return true;
+        return prefs().getBoolean("icon_" + key, !"dpad_left".equals(key));
+    }
+
+    private String buttonIconKey(long button) {
+        if (button == A) return "a";
+        if (button == B) return "b";
+        if (button == X) return "x";
+        if (button == Y) return "y";
+        if (button == ZR) return "zr";
+        if (button == ZL) return "zl";
+        if (button == R) return "r";
+        if (button == L) return "l";
+        if (button == MINUS) return "minus";
+        if (button == PLUS) return "plus";
+        return null;
     }
 
     /** The PNG assigned to a Switch face or shoulder button, or null for the ordinary labelled controls. */
@@ -870,12 +893,15 @@ final class TouchControls extends View {
 
     private void drawDpad(Canvas c, int i) {
         float x = cx[i], y = cy[i], rr = r[i];
-        // Four uploaded directional PNGs; original touch regions remain unchanged.
+        // Pokopia profile: Up, Right and Down in one vertical column. Left stays hidden;
+        // all four native directional hit regions remain active and unchanged.
         float iconSize = rr * 0.92f, offset = rr * 0.52f;
-        float[] dx = {0f, offset, 0f, -offset};
+        float[] dx = {0f, 0f, 0f, 0f};
         float[] dy = {-offset, 0f, offset, 0f};
         long[] dirs = {UP, RIGHT, DOWN, LEFT};
+        String[] keys = {"dpad_up", "dpad_right", "dpad_down", "dpad_left"};
         for (int k = 0; k < 4; k++) {
+            if (!iconShown(keys[k])) continue;
             Bitmap icon = dpadIcons[k];
             float ix = x + dx[k], iy = y + dy[k];
             if (icon != null) {
@@ -954,6 +980,11 @@ final class TouchControls extends View {
         ss.setOnSeekBarChangeListener(live);
         hb.setOnCheckedChangeListener((b, v) -> { haptics = v; save(); });
         lb.setOnCheckedChangeListener((b, v) -> prefs().edit().putBoolean("log", v).commit());
+        Button customizeIcons = new Button(ctx);
+        customizeIcons.setText("☷   Customize control icons…");
+        stylePanelAction(customizeIcons, ctx, true);
+        customizeIcons.setOnClickListener(v -> showIconCustomization(ctx));
+        addPanelAction(box, customizeIcons, ctx);
         Button reset = new Button(ctx);
         reset.setText("↻   Reset the controls");
         stylePanelAction(reset, ctx, false);
@@ -971,6 +1002,23 @@ final class TouchControls extends View {
         editHint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         editHint.setTextColor(Color.LTGRAY);
         box.addView(editHint);
+    }
+
+    private void showIconCustomization(Context ctx) {
+        final String[] keys = {"a", "b", "x", "y", "zl", "l", "r", "minus", "plus",
+                "dpad_up", "dpad_right", "dpad_down", "dpad_left"};
+        final String[] names = {"A", "B", "X", "Y", "ZL", "L", "R", "− Minus", "+ Plus",
+                "D-pad Up", "D-pad Right", "D-pad Down", "D-pad Left"};
+        boolean[] checked = new boolean[keys.length];
+        for (int i = 0; i < keys.length; i++) checked[i] = iconShown(keys[i]);
+        new AlertDialog.Builder(ctx)
+                .setTitle("Customize control icons")
+                .setMultiChoiceItems(names, checked, (dialog, which, isChecked) -> {
+                    prefs().edit().putBoolean("icon_" + keys[which], isChecked).apply();
+                    invalidate();
+                })
+                .setPositiveButton("Done", (dialog, which) -> invalidate())
+                .show();
     }
 
     /** Whether GameActivity keeps the newest log lines over the picture once the game draws (off by default; the settings dialog's last box) */
