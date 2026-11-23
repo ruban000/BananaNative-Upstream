@@ -109,6 +109,7 @@ final class TouchControls extends View {
     private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     // The artwork replaces only the eight matching button faces; their existing layout and hit targets stay unchanged.
     private final Bitmap[] buttonIcons = new Bitmap[8];
+    private Bitmap minusIcon, plusIcon, dpadIcon;
     private final Path path = new Path();
     private final RectF rect = new RectF();
 
@@ -123,6 +124,9 @@ final class TouchControls extends View {
         buttonIcons[5] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_zl);
         buttonIcons[6] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_r);
         buttonIcons[7] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.button_l);
+        minusIcon = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.control_minus);
+        plusIcon = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.control_plus);
+        dpadIcon = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.control_dpad);
         opacity = prefs().getFloat("opacity", 0.6f);
         scale = prefs().getFloat("scale", 1f);
         haptics = prefs().getBoolean("haptics", true);
@@ -786,6 +790,8 @@ final class TouchControls extends View {
         if (button == ZL) return buttonIcons[5];
         if (button == R) return buttonIcons[6];
         if (button == L) return buttonIcons[7];
+        if (button == MINUS) return minusIcon;
+        if (button == PLUS) return plusIcon;
         return null;
     }
 
@@ -839,6 +845,15 @@ final class TouchControls extends View {
 
     private void drawDpad(Canvas c, int i) {
         float x = cx[i], y = cy[i], rr = r[i], w = rr * 0.36f;
+        if (dpadIcon != null) {
+            float boxW = rr * 2.25f, boxH = rr * 1.25f;
+            float fit = Math.min(boxW / dpadIcon.getWidth(), boxH / dpadIcon.getHeight());
+            float dw = dpadIcon.getWidth() * fit, dh = dpadIcon.getHeight() * fit;
+            rect.set(x - dw / 2f, y - dh / 2f, x + dw / 2f, y + dh / 2f);
+            iconPaint.setAlpha((pressed[i] != 0) ? 190 : 255);
+            c.drawBitmap(dpadIcon, null, rect, iconPaint);
+            return;
+        }
         fill.setColor(Color.argb(alpha(0.25f), 0, 0, 0));
         c.drawCircle(x, y, rr, fill);
         c.drawCircle(x, y, rr, line);
