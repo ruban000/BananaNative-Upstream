@@ -211,6 +211,7 @@ final class SidePanel extends FrameLayout {
         tabs.setBackground(railBg);
         tabs.setPadding(Math.round(5 * dp), Math.round(10 * dp), Math.round(5 * dp), Math.round(10 * dp));
         body.addView(tabs, new LinearLayout.LayoutParams(Math.round(100 * dp), LayoutParams.MATCH_PARENT));
+        tabBar(); // Populate the navigation rail; without this the other sections are inaccessible by touch.
         scroll.setClipToPadding(false);
         scroll.setFillViewport(false);
         scroll.setBackgroundColor(0x00000000);
