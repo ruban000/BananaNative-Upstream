@@ -1326,6 +1326,8 @@ final class SidePanel extends FrameLayout {
         if (!menuOpen) slideIn();
         boolean same = open && k == tab;
         tab = k;
+        // Rebuild the rail's selected state whenever the active section changes.
+        tabBar();
         if (!open) {
             open = true;
             sheet.setVisibility(VISIBLE);
