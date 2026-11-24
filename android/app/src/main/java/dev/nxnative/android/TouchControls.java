@@ -349,17 +349,17 @@ final class TouchControls extends View {
         add(BUTTON, ZR, 0, SHAPE_SHOULDER, rx - diagZR, ry + diagZR, rSh, "ZR");
         // Pokopia profile coordinates use the 20x20 editor grid (columns 1-20, rows A-T).
         // Set group centres before groups() so the normal editor offsets/scaling remain available.
-        setGridCenter(ZL, w, h, 3.0f, 10.0f);
-        setGridCenter(L, w, h, 3.0f, 4.0f);
-        setGridCenter(MINUS, w, h, 5.0f, 4.0f);
-        setGridCenter(R, w, h, 17.0f, 4.0f);
-        setGridCenter(PLUS, w, h, 19.0f, 4.0f);
-        setGridCenter(UP | DOWN | LEFT | RIGHT, w, h, 6.0f, 12.0f);
-        setGridCenter(LS, w, h, 7.0f, 12.0f);
-        setGridCenter(X, w, h, 15.0f, 10.0f);
-        setGridCenter(Y, w, h, 15.0f, 12.0f);
-        setGridCenter(A, w, h, 15.0f, 15.0f);
-        setGridCenter(B, w, h, 15.0f, 17.0f);
+        setGridCenter(ZL, w, h, 3.0f, 11.0f);
+        setGridCenter(L, w, h, 3.0f, 6.0f);
+        setGridCenter(MINUS, w, h, 4.0f, 6.0f);
+        setGridCenter(R, w, h, 16.0f, 6.0f);
+        setGridCenter(PLUS, w, h, 18.0f, 6.0f);
+        setGridCenter(UP | DOWN | LEFT | RIGHT, w, h, 6.0f, 9.5f);
+        setGridCenter(LS, w, h, 7.0f, 9.5f);
+        setGridCenter(X, w, h, 13.0f, 12.0f);
+        setGridCenter(Y, w, h, 13.0f, 14.0f);
+        setGridCenter(A, w, h, 13.0f, 16.0f);
+        setGridCenter(B, w, h, 13.0f, 18.0f);
 
         // Push apart what still overlaps (a large size on a small screen): the later control moves towards the middle
         for (int pass = 0; pass < 4; pass++)
