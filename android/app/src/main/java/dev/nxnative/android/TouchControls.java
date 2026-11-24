@@ -299,7 +299,7 @@ final class TouchControls extends View {
     private void layout(int w, int h) {
         if (w <= 0 || h <= 0) return;
         float dp = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 1, getResources().getDisplayMetrics()), u = unit();
-        String key = Math.round(w / u / 40) + "x" + Math.round(h / u / 40) + "@pokopia-grid-v3";
+        String key = Math.round(w / u / 40) + "x" + Math.round(h / u / 40) + "@pokopia-gameplay-reference-v4";
         if (!key.equals(prof)) { prof = key; load(); }   // a new screen shape (a fold, an unfold): its own layout
         float[] p = PictureFit.rect(w, h, placeX, placeY, stretch, pictureSize, aspect);
         picX = p[0]; picY = p[1]; picW = p[2]; picH = p[3];
@@ -347,19 +347,19 @@ final class TouchControls extends View {
         // ZR is an invisible, active shoulder-button hit target at the lower-left edge of the right stick.
         float diagZR = (rRight + rSh + 6 * d) * 0.7071f;
         add(BUTTON, ZR, 0, SHAPE_SHOULDER, rx - diagZR, ry + diagZR, rSh, "ZR");
-        // Pokopia profile coordinates use the 20x20 editor grid (columns 1-20, rows A-T).
-        // Set group centres before groups() so the normal editor offsets/scaling remain available.
-        setGridCenter(ZL, w, h, 3.0f, 11.0f);
-        setGridCenter(L, w, h, 3.0f, 6.0f);
-        setGridCenter(MINUS, w, h, 4.0f, 6.0f);
-        setGridCenter(R, w, h, 16.0f, 6.0f);
-        setGridCenter(PLUS, w, h, 18.0f, 6.0f);
-        setGridCenter(UP | DOWN | LEFT | RIGHT, w, h, 6.0f, 9.5f);
-        setGridCenter(LS, w, h, 7.0f, 9.5f);
-        setGridCenter(X, w, h, 13.0f, 12.0f);
-        setGridCenter(Y, w, h, 13.0f, 14.0f);
-        setGridCenter(A, w, h, 13.0f, 16.0f);
-        setGridCenter(B, w, h, 13.0f, 18.0f);
+        // Match the uploaded Pokopia gameplay screenshot. Positions are fractions of the fitted game picture,
+        // not the full device view, so letterbox bars and aspect-ratio changes do not shift the controls.
+        setPictureCenter(L, w, h, 0.097f, 0.090f);
+        setPictureCenter(MINUS, w, h, 0.045f, 0.226f);
+        setPictureCenter(ZL, w, h, 0.047f, 0.396f);
+        setPictureCenter(UP | DOWN | LEFT | RIGHT, w, h, 0.045f, 0.720f);
+        setPictureCenter(LS, w, h, 0.075f, 0.720f);
+        setPictureCenter(R, w, h, 0.927f, 0.127f);
+        setPictureCenter(PLUS, w, h, 0.980f, 0.242f);
+        setPictureCenter(X, w, h, 0.950f, 0.396f);
+        setPictureCenter(Y, w, h, 0.960f, 0.505f);
+        setPictureCenter(A, w, h, 0.950f, 0.607f);
+        setPictureCenter(B, w, h, 0.910f, 0.675f);
 
         // Push apart what still overlaps (a large size on a small screen): the later control moves towards the middle
         for (int pass = 0; pass < 4; pass++)
@@ -392,6 +392,19 @@ final class TouchControls extends View {
                 n, w, h, h / dp, u, y0, prof, custom() ? ", the user's layout" : "", picX, picY, scale, opacity, active() ? "shown" : "hidden")
                 + (stretch || pictureSize < PictureFit.SIZE_MAX ? ", picture " + (stretch ? "stretched" : "fitted") + " at " + pictureSize + " %" : ""));
         apply();
+    }
+
+    /** Position a default control relative to the fitted game picture, matching a gameplay screenshot. */
+    private void setPictureCenter(long button, int w, int h, float xFraction, float yFraction) {
+        float x = (picX + picW * xFraction) * w;
+        float y = (picY + picH * yFraction) * h;
+        for (int i = 0; i < n; i++) {
+            if (buttons[i] == button) {
+                cx[i] = x;
+                cy[i] = y;
+                return;
+            }
+        }
     }
 
     /** Position a default control at a 20x20 editor-grid cell centre; group editing remains relative to it. */
