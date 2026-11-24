@@ -299,7 +299,7 @@ final class TouchControls extends View {
     private void layout(int w, int h) {
         if (w <= 0 || h <= 0) return;
         float dp = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 1, getResources().getDisplayMetrics()), u = unit();
-        String key = Math.round(w / u / 40) + "x" + Math.round(h / u / 40);
+        String key = Math.round(w / u / 40) + "x" + Math.round(h / u / 40) + "@pokopia-grid-v3";
         if (!key.equals(prof)) { prof = key; load(); }   // a new screen shape (a fold, an unfold): its own layout
         float[] p = PictureFit.rect(w, h, placeX, placeY, stretch, pictureSize, aspect);
         picX = p[0]; picY = p[1]; picW = p[2]; picH = p[3];
@@ -351,15 +351,15 @@ final class TouchControls extends View {
         // Set group centres before groups() so the normal editor offsets/scaling remain available.
         setGridCenter(ZL, w, h, 3.0f, 10.0f);
         setGridCenter(L, w, h, 3.0f, 4.0f);
-        setGridCenter(MINUS, w, h, 4.3f, 4.0f);
+        setGridCenter(MINUS, w, h, 5.0f, 4.0f);
         setGridCenter(R, w, h, 17.0f, 4.0f);
-        setGridCenter(PLUS, w, h, 18.5f, 4.0f);
-        setGridCenter(UP | DOWN | LEFT | RIGHT, w, h, 6.3f, 12.0f);
+        setGridCenter(PLUS, w, h, 19.0f, 4.0f);
+        setGridCenter(UP | DOWN | LEFT | RIGHT, w, h, 6.0f, 12.0f);
         setGridCenter(LS, w, h, 7.0f, 12.0f);
-        setGridCenter(X, w, h, 15.2f, 10.5f);
-        setGridCenter(Y, w, h, 15.2f, 13.0f);
-        setGridCenter(A, w, h, 15.2f, 15.5f);
-        setGridCenter(B, w, h, 15.2f, 18.0f);
+        setGridCenter(X, w, h, 15.0f, 10.0f);
+        setGridCenter(Y, w, h, 15.0f, 12.0f);
+        setGridCenter(A, w, h, 15.0f, 15.0f);
+        setGridCenter(B, w, h, 15.0f, 17.0f);
 
         // Push apart what still overlaps (a large size on a small screen): the later control moves towards the middle
         for (int pass = 0; pass < 4; pass++)
