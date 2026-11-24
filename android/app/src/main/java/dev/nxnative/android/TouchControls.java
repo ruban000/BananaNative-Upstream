@@ -299,7 +299,7 @@ final class TouchControls extends View {
     private void layout(int w, int h) {
         if (w <= 0 || h <= 0) return;
         float dp = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 1, getResources().getDisplayMetrics()), u = unit();
-        String key = Math.round(w / u / 40) + "x" + Math.round(h / u / 40) + "@pokopia-gameplay-reference-v4";
+        String key = Math.round(w / u / 40) + "x" + Math.round(h / u / 40) + "@pokopia-grid-exact-v5";
         if (!key.equals(prof)) { prof = key; load(); }   // a new screen shape (a fold, an unfold): its own layout
         float[] p = PictureFit.rect(w, h, placeX, placeY, stretch, pictureSize, aspect);
         picX = p[0]; picY = p[1]; picW = p[2]; picH = p[3];
@@ -347,20 +347,22 @@ final class TouchControls extends View {
         // ZR is an invisible, active shoulder-button hit target at the lower-left edge of the right stick.
         float diagZR = (rRight + rSh + 6 * d) * 0.7071f;
         add(BUTTON, ZR, 0, SHAPE_SHOULDER, rx - diagZR, ry + diagZR, rSh, "ZR");
-        // Match the uploaded Pokopia gameplay screenshot. Positions are fractions of the fitted game picture,
-        // not the full device view, so letterbox bars and aspect-ratio changes do not shift the controls.
-        setPictureCenter(L, w, h, 0.097f, 0.090f);
-        setPictureCenter(MINUS, w, h, 0.045f, 0.226f);
-        setPictureCenter(ZL, w, h, 0.047f, 0.396f);
-        setPictureCenter(UP | DOWN | LEFT | RIGHT, w, h, 0.045f, 0.720f);
-        setPictureCenter(LS, w, h, 0.075f, 0.720f);
-        setPictureCenter(R, w, h, 0.927f, 0.127f);
-        setPictureCenter(PLUS, w, h, 0.980f, 0.242f);
-        setPictureCenter(X, w, h, 0.950f, 0.396f);
-        setPictureCenter(Y, w, h, 0.960f, 0.505f);
-        setPictureCenter(A, w, h, 0.950f, 0.607f);
-        setPictureCenter(B, w, h, 0.910f, 0.675f);
+        // Pokopia profile: exact cells from the user's original A-T / 1-20 grid reference.
+        // Coordinates are applied after the default layout and are not altered by collision avoidance.
+        setGridCenter(L, w, h, 3.5f, 3.5f);
+        setGridCenter(MINUS, w, h, 5.0f, 3.5f);
+        setGridCenter(ZL, w, h, 3.0f, 10.0f);
+        setGridCenter(UP | DOWN | LEFT | RIGHT, w, h, 6.0f, 12.0f);
+        setGridCenter(LS, w, h, 7.0f, 12.0f);
+        setGridCenter(R, w, h, 17.0f, 4.0f);
+        setGridCenter(PLUS, w, h, 18.5f, 5.0f);
+        setGridCenter(X, w, h, 15.0f, 10.0f);
+        setGridCenter(Y, w, h, 15.0f, 12.0f);
+        setGridCenter(A, w, h, 15.0f, 15.0f);
+        setGridCenter(B, w, h, 15.0f, 17.0f);
 
+        // Keep the Pokopia reference-grid coordinates exact; do not auto-shift controls apart.
+        if (!key.contains("@pokopia-grid-exact-v5")) {
         // Push apart what still overlaps (a large size on a small screen): the later control moves towards the middle
         for (int pass = 0; pass < 4; pass++)
             for (int j = 0; j < n; j++)
@@ -370,6 +372,7 @@ final class TouchControls extends View {
                     float move = (float) Math.sqrt(Math.max(0, need * need - dy * dy)) - Math.abs(dx);
                     cx[j] += cx[j] < w / 2f ? move : -move;
                 }
+        }
         groups(w, h, u);
         // Place the invisible ZR hit target at the centre of grid cell 17R (20x20 grid).
         for (int i = 0; i < n; i++) if (buttons[i] == ZR) {
