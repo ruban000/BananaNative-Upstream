@@ -115,8 +115,10 @@ final class TouchControls extends View {
     private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     // The artwork replaces only the eight matching button faces; their existing layout and hit targets stay unchanged.
     private final Bitmap[] buttonIcons = new Bitmap[8];
+    private final Bitmap[] pokopiaButtonIcons = new Bitmap[12];
     private Bitmap minusIcon, plusIcon;
     private final Bitmap[] dpadIcons = new Bitmap[4];
+    private final Bitmap[] pokopiaDpadIcons = new Bitmap[3];
     private final Path path = new Path();
     private final RectF rect = new RectF();
 
@@ -138,6 +140,12 @@ final class TouchControls extends View {
         return Bitmap.createBitmap(source, left, top, right - left + 1, bottom - top + 1);
     }
 
+    private Bitmap loadProfileIcon(String name) {
+        try (java.io.InputStream stream = getContext().getAssets().open("controls/pokopia/" + name + ".png")) {
+            return trimTransparent(BitmapFactory.decodeStream(stream));
+        } catch (Exception ignored) { return null; }
+    }
+
     TouchControls(Context c, boolean input) {
         super(c);
         this.input = input;
@@ -157,6 +165,11 @@ final class TouchControls extends View {
         dpadIcons[2] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.dpad_down);
         dpadIcons[3] = BitmapFactory.decodeResource(getResources(), dev.nxnative.android.R.drawable.dpad_left);
         for (int n = 0; n < dpadIcons.length; n++) dpadIcons[n] = trimTransparent(dpadIcons[n]);
+        String[] pokopiaNames = {"button_a", "button_b", "button_x", "button_y", "button_zr", "button_zl", "button_r", "button_l", "button_minus", "button_plus", "button_l3", "button_r3"};
+        for (int n = 0; n < pokopiaNames.length; n++) pokopiaButtonIcons[n] = loadProfileIcon(pokopiaNames[n]);
+        pokopiaDpadIcons[0] = loadProfileIcon("dpad_up");
+        pokopiaDpadIcons[1] = loadProfileIcon("dpad_right");
+        pokopiaDpadIcons[2] = loadProfileIcon("dpad_down");
         opacity = prefs().getFloat("opacity", 0.6f);
         scale = prefs().getFloat("scale", 1f);
         haptics = prefs().getBoolean("haptics", true);
@@ -873,6 +886,8 @@ final class TouchControls extends View {
     }
 
     private String buttonIconKey(long button) {
+        if (button == LS) return "l3";
+        if (button == RS) return "r3";
         if (button == A) return "a";
         if (button == B) return "b";
         if (button == X) return "x";
@@ -888,6 +903,20 @@ final class TouchControls extends View {
 
     /** The PNG assigned to a Switch face or shoulder button, or null for the ordinary labelled controls. */
     private Bitmap buttonIcon(long button) {
+        if ("pokopia".equals(oscProfile)) {
+            if (button == A) return pokopiaButtonIcons[0];
+            if (button == B) return pokopiaButtonIcons[1];
+            if (button == X) return pokopiaButtonIcons[2];
+            if (button == Y) return pokopiaButtonIcons[3];
+            if (button == ZR) return pokopiaButtonIcons[4];
+            if (button == ZL) return pokopiaButtonIcons[5];
+            if (button == R) return pokopiaButtonIcons[6];
+            if (button == L) return pokopiaButtonIcons[7];
+            if (button == MINUS) return pokopiaButtonIcons[8];
+            if (button == PLUS) return pokopiaButtonIcons[9];
+            if (button == LS) return pokopiaButtonIcons[10];
+            if (button == RS) return pokopiaButtonIcons[11];
+        }
         if (button == A) return buttonIcons[0];
         if (button == B) return buttonIcons[1];
         if (button == X) return buttonIcons[2];
@@ -960,7 +989,7 @@ final class TouchControls extends View {
         String[] keys = {"dpad_up", "dpad_right", "dpad_down", "dpad_left"};
         for (int k = 0; k < 4; k++) {
             if (!iconShown(keys[k])) continue;
-            Bitmap icon = dpadIcons[k];
+            Bitmap icon = ("pokopia".equals(oscProfile) && k < 3 && pokopiaDpadIcons[k] != null) ? pokopiaDpadIcons[k] : dpadIcons[k];
             float ix = x + dx[k], iy = y + dy[k];
             if (icon != null) {
                 float fit = Math.min(iconSize / icon.getWidth(), iconSize / icon.getHeight());
@@ -1089,9 +1118,9 @@ final class TouchControls extends View {
     }
 
     private void showIconCustomization(Context ctx) {
-        final String[] keys = {"a", "b", "x", "y", "zl", "l", "r", "minus", "plus",
+        final String[] keys = {"a", "b", "x", "y", "zl", "l", "r", "minus", "plus", "l3", "r3",
                 "dpad_up", "dpad_right", "dpad_down", "dpad_left"};
-        final String[] names = {"A", "B", "X", "Y", "ZL", "L", "R", "− Minus", "+ Plus",
+        final String[] names = {"A", "B", "X", "Y", "ZL", "L", "R", "− Minus", "+ Plus", "L3", "R3",
                 "D-pad Up", "D-pad Right", "D-pad Down", "D-pad Left"};
         boolean[] checked = new boolean[keys.length];
         for (int i = 0; i < keys.length; i++) checked[i] = iconShown(keys[i]);
