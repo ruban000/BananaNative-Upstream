@@ -21,6 +21,8 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Spinner;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -58,6 +60,7 @@ final class TouchControls extends View {
     private boolean haptics;
     private boolean dualStick;   // one setting: invisible floating-origin left and right sticks
     private boolean coordinateGrid;   // display-only 20x20 coordinate grid for precise control placement
+    private String oscProfile = "default";   // named on-screen-control preset: default or pokopia
     private int rightSwipeSensitivity;   // user-facing right-side swipe sensitivity (1..10)
     private static int nativeRightSwipeSensitivity(int level) { return 130 + Math.round((Math.max(1, Math.min(10, level)) - 1) * (110.0f / 9.0f)); }
 
@@ -159,6 +162,7 @@ final class TouchControls extends View {
         haptics = prefs().getBoolean("haptics", true);
         dualStick = prefs().getBoolean("dual_stick", false);
         coordinateGrid = prefs().getBoolean("coordinate_grid", false);
+        oscProfile = prefs().getString("osc_profile", "default");
         int savedSensitivity = prefs().getInt("right_swipe_sensitivity", 3);
         // Migrate the previous native 8..240 preference to the new 1..10 scale.
         rightSwipeSensitivity = savedSensitivity > 10
@@ -347,6 +351,8 @@ final class TouchControls extends View {
         // ZR is an invisible, active shoulder-button hit target at the lower-left edge of the right stick.
         float diagZR = (rRight + rSh + 6 * d) * 0.7071f;
         add(BUTTON, ZR, 0, SHAPE_SHOULDER, rx - diagZR, ry + diagZR, rSh, "ZR");
+        // Keep the default controller arrangement unless the user selects the Pokopia OSC profile.
+        if ("pokopia".equals(oscProfile)) {
         // Pokopia profile: exact cells from the user's original A-T / 1-20 grid reference.
         // Coordinates are applied after the default layout and are not altered by collision avoidance.
         setGridCenter(L, w, h, 3.5f, 3.5f);
@@ -360,6 +366,7 @@ final class TouchControls extends View {
         setGridCenter(Y, w, h, 15.0f, 12.0f);
         setGridCenter(A, w, h, 15.0f, 15.0f);
         setGridCenter(B, w, h, 15.0f, 17.0f);
+        }
 
         // Keep the Pokopia reference-grid coordinates exact; do not auto-shift controls apart.
         if (!key.contains("@pokopia-grid-exact-v5")) {
@@ -1000,6 +1007,31 @@ final class TouchControls extends View {
         db.setText("Invisible dual joysticks (left / right screen halves)");
         db.setChecked(dualStick);
         db.setOnCheckedChangeListener((b, v) -> setDualStick(v));
+        TextView profileLabel = new TextView(ctx);
+        profileLabel.setText("OSC control profile");
+        profileLabel.setTextColor(Color.WHITE);
+        Spinner profilePicker = new Spinner(ctx);
+        String[] profileNames = {"Default", "Pokopia"};
+        ArrayAdapter<String> profileAdapter = new ArrayAdapter<>(ctx, android.R.layout.simple_spinner_item, profileNames);
+        profileAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        profilePicker.setAdapter(profileAdapter);
+        profilePicker.setSelection("pokopia".equals(oscProfile) ? 1 : 0);
+        profilePicker.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            private boolean initial = true;
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent, android.view.View view, int position, long id) {
+                if (initial) { initial = false; return; }
+                String next = position == 1 ? "pokopia" : "default";
+                if (!next.equals(oscProfile)) {
+                    oscProfile = next;
+                    prefs().edit().putString("osc_profile", oscProfile).commit();
+                    resetLayout();
+                    relayout();
+                    invalidate();
+                    Native.note("on-screen controls profile: " + ("pokopia".equals(oscProfile) ? "Pokopia" : "Default"));
+                }
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
         gb.setText("Coordinate Grid (A-T / 1-20)");
         gb.setChecked(coordinateGrid);
         gb.setOnCheckedChangeListener((b, v) -> setCoordinateGrid(v));
@@ -1041,6 +1073,7 @@ final class TouchControls extends View {
         stylePanelAction(reset, ctx, false);
         reset.setOnClickListener(v -> { os.setProgress(50); ss.setProgress(40); hb.setChecked(true); });   // 60 % opacity, 100 % size, the tick on
         box.addView(ol); box.addView(os); box.addView(sl); box.addView(ss); box.addView(hb); box.addView(lb); box.addView(tb); box.addView(db); box.addView(gb);
+        box.addView(profileLabel); box.addView(profilePicker);
         box.addView(sensitivityLabel); box.addView(sensitivityBar);
         addPanelAction(box, reset, ctx);
         Button ed = new Button(ctx);   // the layout editor (runs onEditStart); the picture's position is in the panel's Picture rows (positionRows)
