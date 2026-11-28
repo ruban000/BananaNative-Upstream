@@ -375,9 +375,9 @@ final class TouchControls extends View {
         setGridCenter(LS, w, h, 7.0f, 12.0f);
         setGridCenter(R, w, h, 17.0f, 4.0f);
         setGridCenter(PLUS, w, h, 18.5f, 5.0f);
-        setGridCenter(X, w, h, 15.0f, 10.0f);
+        setGridCenter(X, w, h, 15.0f, 9.5f);
         setGridCenter(Y, w, h, 15.0f, 12.0f);
-        setGridCenter(A, w, h, 15.0f, 15.0f);
+        setGridCenter(A, w, h, 15.0f, 14.5f);
         setGridCenter(B, w, h, 15.0f, 17.0f);
         }
 
@@ -982,7 +982,7 @@ final class TouchControls extends View {
         float x = cx[i], y = cy[i], rr = r[i];
         // Pokopia profile: Up, Right and Down in one vertical column. Left stays hidden;
         // all four native directional hit regions remain active and unchanged.
-        float iconSize = rr * 0.92f, offset = rr * 0.52f;
+        float iconSize = rr * 0.78f, offset = rr * 0.92f;
         float[] dx = {0f, 0f, 0f, offset};
         float[] dy = {-offset, 0f, offset, 0f};
         long[] dirs = {UP, RIGHT, DOWN, LEFT};
