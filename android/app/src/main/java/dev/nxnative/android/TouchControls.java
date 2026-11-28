@@ -618,7 +618,7 @@ final class TouchControls extends View {
                 float pad = 10 * unit();
                 if (dragG == -1) for (int g = 0; g < GROUPS; g++)
                     if (gbox[g] != null && x >= gbox[g].left - pad && x <= gbox[g].right + pad && y >= gbox[g].top - pad && y <= gbox[g].bottom + pad) { dragG = g; break; }
-                if (dragG < 0 && x >= picX * getWidth() && x <= (picX + picW) * getWidth() && y >= picY * getHeight() && y <= (picY + picH) * getHeight()) dragG = GROUPS;
+                if (dragG == -1 && x >= picX * getWidth() && x <= (picX + picW) * getWidth() && y >= picY * getHeight() && y <= (picY + picH) * getHeight()) dragG = GROUPS;
                 dragId = id; lastX = x; lastY = y; downX = x; downY = y; moved = false;
                 invalidate();
                 return true;
