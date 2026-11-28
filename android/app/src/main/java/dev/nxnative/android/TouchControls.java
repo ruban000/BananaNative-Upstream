@@ -82,6 +82,9 @@ final class TouchControls extends View {
     private static final String[] GROUP_NAME = {"left stick", "D-pad", "A B X Y", "right stick", "ZL L −", "ZR R +"};
     private String prof;
     private final float[] gdx = new float[GROUPS], gdy = new float[GROUPS], gsc = new float[GROUPS];
+    // Per-control offsets let every button, stick and the D-pad move independently of its group.
+    private final java.util.Map<String, float[]> controlOffsets = new java.util.LinkedHashMap<>();
+    private int dragControl = -1;
     private float placeX = 0.5f, placeY = 0.5f;
     private boolean stretch;   // the replay stretches the picture over the whole view (DM_VK_STRETCH)
     private int pictureSize = PictureFit.SIZE_MAX;   // the picture's share of its fitted or stretched size (DM_VK_PICTURE_SIZE), %
@@ -394,6 +397,10 @@ final class TouchControls extends View {
                 }
         }
         groups(w, h, u);
+        for (int i = 0; i < n; i++) {
+            float[] offset = controlOffsets.get(controlKey(i));
+            if (offset != null) { cx[i] += offset[0] * u; cy[i] += offset[1] * u; }
+        }
         // Place the invisible ZR hit target at the centre of grid cell 17R (20x20 grid).
         for (int i = 0; i < n; i++) if (buttons[i] == ZR) {
             cx[i] = w * 16.5f / 20f;
@@ -519,6 +526,12 @@ final class TouchControls extends View {
             catch (RuntimeException e) { gdx[g] = 0; gdy[g] = 0; gsc[g] = 1; }
         }
         hidden = TouchHidden.parse(prefs().getString("hidden@" + prof, ""), allKeys());
+        controlOffsets.clear();
+        for (String key : allKeys()) {
+            String[] p = prefs().getString("control_" + key + "@" + prof, "0 0").split(" ");
+            try { controlOffsets.put(key, new float[] {Float.parseFloat(p[0]), Float.parseFloat(p[1])}); }
+            catch (RuntimeException ignored) { controlOffsets.put(key, new float[] {0, 0}); }
+        }
         String[] v = prefs().getString("picture@" + prof, "0.5 " + defY()).split(" ");
         try { placeX = Float.parseFloat(v[0]); placeY = Float.parseFloat(v[1]); } catch (RuntimeException e) { placeX = 0.5f; placeY = defY(); }
     }
@@ -527,6 +540,10 @@ final class TouchControls extends View {
         SharedPreferences.Editor e = prefs().edit();
         for (int g = 0; g < GROUPS; g++) e.putString("group" + g + "@" + prof, gdx[g] + " " + gdy[g] + " " + gsc[g]);
         e.putString("hidden@" + prof, TouchHidden.encode(hidden));
+        for (java.util.Map.Entry<String, float[]> item : controlOffsets.entrySet()) {
+            float[] offset = item.getValue();
+            e.putString("control_" + item.getKey() + "@" + prof, offset[0] + " " + offset[1]);
+        }
         e.putString("picture@" + prof, placeX + " " + placeY).commit();   // commit: the game process may end right after (Stop)
     }
 
@@ -565,7 +582,7 @@ final class TouchControls extends View {
     }
 
     private void resetLayout() {
-        Arrays.fill(gdx, 0); Arrays.fill(gdy, 0); Arrays.fill(gsc, 1); placeX = 0.5f; placeY = defY(); hidden = new java.util.LinkedHashSet<>();
+        Arrays.fill(gdx, 0); Arrays.fill(gdy, 0); Arrays.fill(gsc, 1); controlOffsets.clear(); for (String key : allKeys()) controlOffsets.put(key, new float[] {0, 0}); placeX = 0.5f; placeY = defY(); hidden = new java.util.LinkedHashSet<>();
         relayout(); saveLayout();
     }
 
@@ -595,12 +612,14 @@ final class TouchControls extends View {
         switch (act) {
             case MotionEvent.ACTION_DOWN: {
                 for (int k = 0; k < tool.length; k++) if (tool[k] != null && tool[k].contains(x, y)) { toolTap(k); return true; }
-                dragG = -1;
+                dragG = -1; dragControl = -1;
+                tapI = controlAt(x, y);
+                if (tapI >= 0) { dragG = -2; dragControl = tapI; }
                 float pad = 10 * unit();
-                for (int g = 0; g < GROUPS; g++)
+                if (dragG == -1) for (int g = 0; g < GROUPS; g++)
                     if (gbox[g] != null && x >= gbox[g].left - pad && x <= gbox[g].right + pad && y >= gbox[g].top - pad && y <= gbox[g].bottom + pad) { dragG = g; break; }
                 if (dragG < 0 && x >= picX * getWidth() && x <= (picX + picW) * getWidth() && y >= picY * getHeight() && y <= (picY + picH) * getHeight()) dragG = GROUPS;
-                dragId = id; lastX = x; lastY = y; downX = x; downY = y; moved = false; tapI = controlAt(x, y);
+                dragId = id; lastX = x; lastY = y; downX = x; downY = y; moved = false;
                 invalidate();
                 return true;
             }
@@ -613,7 +632,7 @@ final class TouchControls extends View {
                 return true;
             case MotionEvent.ACTION_MOVE: {
                 int j = e.findPointerIndex(dragId);
-                if (dragG < 0 || j < 0) return true;
+                if (dragG < 0 && dragG != -2 || j < 0) return true;
                 float mx = e.getX(j), my = e.getY(j), u = unit();
                 if (!moved && pinchId < 0) {   // a tap stays put: the drag starts only past a slop of 8 units, from there
                     if (Math.hypot(mx - downX, my - downY) < 8 * u) return true;
@@ -622,6 +641,11 @@ final class TouchControls extends View {
                 if (pinchId >= 0) {
                     int q = e.findPointerIndex(pinchId);
                     if (q >= 0 && pinchD0 > 0) gsc[dragG] = Math.max(0.5f, Math.min(2f, pinchS0 * (float) Math.hypot(mx - e.getX(q), my - e.getY(q)) / pinchD0));
+                } else if (dragG == -2 && dragControl >= 0) {
+                    String key = controlKey(dragControl);
+                    float[] offset = controlOffsets.get(key);
+                    if (offset == null) { offset = new float[] {0, 0}; controlOffsets.put(key, offset); }
+                    offset[0] += (mx - lastX) / u; offset[1] += (my - lastY) / u;
                 } else if (dragG < GROUPS) {
                     gdx[dragG] += (mx - lastX) / u; gdy[dragG] += (my - lastY) / u;
                 } else {
@@ -641,7 +665,7 @@ final class TouchControls extends View {
             case MotionEvent.ACTION_CANCEL:
                 if (act == MotionEvent.ACTION_UP && !moved && tapI >= 0) toggleHidden(tapI);
                 if (dragG == GROUPS) { placeX = snapEnd(placeX); placeY = snapEnd(placeY); relayout(); }
-                dragG = -1; dragId = -1; pinchId = -1; tapI = -1;
+                dragG = -1; dragControl = -1; dragId = -1; pinchId = -1; tapI = -1;
                 saveLayout(); invalidate();
                 return true;
             default:
@@ -840,7 +864,7 @@ final class TouchControls extends View {
             boolean held = pressed[i] != 0;
             boolean off = editing && hid[i];
             // Keep ZR in the native touch layout, but never draw its icon, shape, or label.
-            if (buttons[i] == ZR) continue;
+            if (buttons[i] == ZR && !editing) continue;
             fill.setColor(held ? Color.argb(alpha(0.55f), 255, 255, 255) : Color.argb(alpha(0.35f), 0, 0, 0));
             line.setColor(Color.argb(alpha(0.9f), 255, 255, 255));
             if (kind[i] == STICK && dualStick && !editing) continue;
@@ -852,7 +876,7 @@ final class TouchControls extends View {
                 if (icon != null) {
                     if (!iconShown(iconKey)) continue; // visual only: keep the native hit target active
                     // Minus gets a larger visible mark without changing its touch target.
-                    float iconScale = buttons[i] == MINUS ? 1.45f : 1.00f;
+                    float iconScale = (buttons[i] == MINUS || buttons[i] == PLUS) ? 1.00f : 0.70f;
                     // Identical square visual box for every face/shoulder icon; preserve aspect ratio.
                     float box = 2f * r[i] * iconScale;
                     float fit = Math.min(box / icon.getWidth(), box / icon.getHeight());
@@ -982,7 +1006,7 @@ final class TouchControls extends View {
         float x = cx[i], y = cy[i], rr = r[i];
         // Pokopia profile: Up, Right and Down in one vertical column. Left stays hidden;
         // all four native directional hit regions remain active and unchanged.
-        float iconSize = rr * 0.78f, offset = rr * 0.92f;
+        float iconSize = rr * 0.78f * 0.70f, offset = rr * 0.92f;
         float[] dx = {0f, 0f, 0f, offset};
         float[] dy = {-offset, 0f, offset, 0f};
         long[] dirs = {UP, RIGHT, DOWN, LEFT};
